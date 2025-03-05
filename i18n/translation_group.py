@@ -1,5 +1,8 @@
 import re
+from utils.config import ConfigManager
 
+# Initialize config manager
+config = ConfigManager()
 
 def escape_unicode(s):
     ret = []
@@ -28,6 +31,7 @@ class TranslationGroup():
         self.usage_comment = usage_comment
         self.is_in_base = is_in_base
         self.values = {}
+        self.default_locale = config.get('translation.default_locale', 'en')
     
     def add_translation(self, locale, translation):
         self.values[locale] = translation
@@ -38,7 +42,7 @@ class TranslationGroup():
         except KeyError as e:
             if fail_on_key_error:
                raise e
-            if locale == "en":
+            if locale == self.default_locale:
                 return self.key
             return ""
 
@@ -54,14 +58,14 @@ class TranslationGroup():
 
     def get_invalid_index_locales(self):
         invalid_index_locales = []
-        english_translation = self.get_translation("en")
-        if "{0}" in english_translation:
-            en_indices = get_string_format_indices(english_translation)
+        default_translation = self.get_translation(self.default_locale)
+        if "{0}" in default_translation:
+            default_indices = get_string_format_indices(default_translation)
             for locale, translation in self.values.items():
-                if locale == "en":
+                if locale == self.default_locale:
                     continue
                 this_locale_indices = get_string_format_indices(translation)
-                if en_indices != this_locale_indices:
+                if default_indices != this_locale_indices:
                     invalid_index_locales.append(locale)
         return invalid_index_locales
 

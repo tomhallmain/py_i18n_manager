@@ -1,0 +1,38 @@
+{
+    "ui": {
+        "window": {
+            "min_width": 800,
+            "min_height": 600,
+            "title": "i18n Translation Manager"
+        },
+        "stats_widget": {
+            "success_color": "#2ecc71",
+            "success_background": "#e8f5e9",
+            "success_border": "#a5d6a7",
+            "default_background": "#f0f0f0",
+            "default_border": "#cccccc"
+        },
+        "recent_projects": {
+            "max_items": 10,
+            "dialog": {
+                "min_width": 500,
+                "min_height": 300
+            }
+        }
+    },
+    "intro_details": {
+        "default_first_author": "THOMAS HALL <tomhall.main@gmail.com>",
+        "default_last_translator": "Thomas Hall <tomhall.main@gmail.com>",
+        "default_application_name": "APPLICATION",
+        "default_version": "1.0"
+    },
+    "translation": {
+        "default_locale": "en",
+        "auto_check_status": true,
+        "show_success_message": true
+    },
+    "files": {
+        "settings_dir": ".i18n_manager",
+        "settings_file": "settings.json"
+    }
+} 

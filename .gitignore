@@ -1,2 +1,10 @@
 __pycache__
 *.swp
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Settings
+.i18n_manager/

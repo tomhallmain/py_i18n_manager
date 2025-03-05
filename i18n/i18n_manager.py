@@ -3,20 +3,28 @@ import os
 import subprocess
 import sys
 import time
-
+import logging
 
 from i18n.translation_group import TranslationGroup
 
+logger = logging.getLogger(__name__)
 
 class I18NManager():
     MSGID = "msgid"
     MSGSTR = "msgstr"
 
-    def __init__(self, directory, locales=[]):
+    def __init__(self, directory, locales=[], intro_details=None):
+        logger.debug(f"Initializing I18NManager with directory: {directory}, locales: {locales}")
         self._directory = directory
         self.locales = locales[:]
         self.translations = {}
-        self.POT_Intro_Details = self.get_POT_intro_details()
+        # Store intro details if provided, otherwise use defaults
+        self.intro_details = intro_details or {
+            "first_author": "THOMAS HALL <tomhall.main@gmail.com>",
+            "last_translator": "Thomas Hall <tomhall.main@gmail.com>",
+            "application_name": "APPLICATION",
+            "version": "1.0"
+        }
 
     def create_mo_files(self):
         for locale in self.locales:
@@ -87,7 +95,6 @@ class I18NManager():
                     in_usage_comment = True
                     usage_comment += line
 
-
     def get_msgid(self, line):
         msgid = line[7:-2]
         return msgid
@@ -136,57 +143,68 @@ class I18NManager():
                 self.locales.append(locale)
             self._parse_po(PO, locale)
 
-    def print_invalid_translations(self):
-        one_invalid_translation_found = False
+    def get_invalid_translations(self):
+        """Calculate invalid translations and return them in a structured format.
+        
+        Returns:
+            tuple: (not_in_base, missing_locale_groups, invalid_unicode_locale_groups, invalid_index_locale_groups)
+        """
         not_in_base = []
         missing_locale_groups = []
         invalid_unicode_locale_groups = []
         invalid_index_locale_groups = []
+        
         for msgid, group in self.translations.items():
             if not group.is_in_base:
                 not_in_base.append(msgid)
-                one_invalid_translation_found = True
             else:
                 missing_locales = group.get_missing_locales(self.locales)
                 if len(missing_locales) > 0:
                     missing_locale_groups.append((msgid, missing_locales))
-#                    one_invalid_translation_found = True # NOTE these should be written as empty in self.write_new_files()
+                    
                 invalid_unicode_locales = group.get_invalid_unicode_locales()
                 if len(invalid_unicode_locales) > 0:
                     invalid_unicode_locale_groups.append((msgid, invalid_unicode_locales))
-                    one_invalid_translation_found = True
+                    
                 invalid_index_locales = group.get_invalid_index_locales()
                 if len(invalid_index_locales) > 0:
                     invalid_index_locale_groups.append((msgid, invalid_index_locales))
-                    one_invalid_translation_found = True
+                    
+        return not_in_base, missing_locale_groups, invalid_unicode_locale_groups, invalid_index_locale_groups
 
+    def print_invalid_translations(self):
+        """Print invalid translations to the console."""
+        not_in_base, missing_locale_groups, invalid_unicode_locale_groups, invalid_index_locale_groups = self.get_invalid_translations()
+        
+        one_invalid_translation_found = False
+        
         for msgid in not_in_base:
             print(f"Not in base: \"{msgid}\"")
-            print("Found in locales: " + str(list(group.values.keys())))
+            one_invalid_translation_found = True
 
         for msgid, missing_locales in missing_locale_groups:
             print(f"Missing translations: \"{msgid}\"")
-            found_locales = list(set(group.values.keys()) - set(missing_locales))
+            found_locales = list(set(self.locales) - set(missing_locales))
             if len(found_locales) > 0:
-                print(f"Missing in locales: {missing_locales}")
-                print(f"Found in locales: {found_locales}")
+                print(f"Missing in locales: {missing_locales} - Found in locales: {found_locales}")
             else:
                 print("Missing in ALL locales.")
+            one_invalid_translation_found = True
 
         for msgid, invalid_locales in invalid_unicode_locale_groups:
-            print(f"Invalid unicode: \"{msgid}\"")
-            print(f"Invalid in locales: {invalid_locales}")
+            print(f"Invalid unicode: \"{msgid}\" in locales: {invalid_locales}")
             self.translations[msgid].fix_encoded_unicode_escape_strings(invalid_locales)
+            one_invalid_translation_found = True
 
         for msgid, invalid_locales in invalid_index_locale_groups:
-            print(f"Invalid indices: \"{msgid}\"")
-            print(f"Invalid in locales: {invalid_locales}")
+            print(f"Invalid indices: \"{msgid}\" in locales: {invalid_locales}")
+            one_invalid_translation_found = True
 
         if not one_invalid_translation_found:
             print("No invalid translations found.")
             return False
 
-        return False # not a problem if there are invalid translations, we will overwrite them in the new POs
+        return False  # not a problem if there are invalid translations, we will overwrite them in the new POs
 
     def print_translations(self):
         for msgid, group in self.translations.items():
@@ -199,45 +217,133 @@ class I18NManager():
         for PO in PO_files:
             locale = self._get_po_locale(PO)
             print(f"Writing new file {locale} to {PO}")
-            intro_details = self.POT_Intro_Details.replace("$LANG", locale)
-            with open(PO, "w", encoding="utf8") as f:
-                f.write(intro_details)
-                for msgid, group in self.translations.items():
-                    if msgid == "" or not group.is_in_base:
-                        continue
-                    f.write(group.usage_comment)
-                    f.write(f"{I18NManager.MSGID} \"{msgid}\"\n")
-                    msgstr = group.get_translation(locale)
-                    if "\n" in msgstr:
-                        f.write(f"{I18NManager.MSGSTR} \"\"\n")
-                        for line in msgstr.split("\n"):
-                            if line != "":
-                                f.write(f"\"{line}\"\n")
-                    else:
-                        f.write(f"{I18NManager.MSGSTR} \"{msgstr}\"\n")
-                    f.write("\n")
+            self.write_po_file(PO, locale)
 
-    def get_POT_intro_details(self):
+    def _escape_string(self, s):
+        """Convert a string to non-encoded Unicode format for PO files.
+        
+        Args:
+            s (str): The string to convert
+            
+        Returns:
+            str: The string in non-encoded Unicode format
+        """
+        if not isinstance(s, str):
+            return str(s)
+            
+        # Convert to bytes and back to get non-encoded Unicode
+        return s.encode('unicode_escape').decode('unicode_escape')
+        
+    def write_po_file(self, po_file, locale):
+        """Write translations to a PO file for a specific locale.
+        
+        Args:
+            po_file (str): Path to the PO file
+            locale (str): Locale code
+        """
+        logger.debug(f"Writing PO file for locale {locale}: {po_file}")
+        # Get intro details with current locale
+        intro_details = self.get_POT_intro_details(
+            locale=locale,
+            first_author=self.intro_details["first_author"],
+            last_translator=self.intro_details["last_translator"],
+            application_name=self.intro_details["application_name"],
+            version=self.intro_details["version"]
+        )
+        
+        with open(po_file, 'w', encoding='utf-8') as f:
+            # Write header
+            f.write(intro_details)
+            
+            # Write translations
+            translation_count = 0
+            for msgid, group in self.translations.items():
+                if not group.is_in_base:
+                    continue
+                    
+                # Write usage comment if present
+                if group.usage_comment:
+                    f.write(group.usage_comment)
+                    
+                # Write msgid
+                f.write(f'msgid "{self._escape_string(msgid)}"\n')
+                
+                # Write msgstr
+                translation = group.get_translation(locale)
+                if translation:
+                    if "\n" in translation:
+                        f.write(f"{I18NManager.MSGSTR} \"\"\n")
+                        for line in translation.split("\n"):
+                            if line != "":
+                                f.write(f"\"{self._escape_string(line)}\"\n")
+                    else:
+                        f.write(f"{I18NManager.MSGSTR} \"{self._escape_string(translation)}\"\n")
+                else:
+                    f.write('msgstr ""\n')
+                    
+                f.write('\n')
+                translation_count += 1
+                
+            logger.debug(f"Wrote {translation_count} translations to PO file")
+
+    def get_POT_intro_details(self, locale="en", first_author="THOMAS HALL", year=None, application_name="APPLICATION", version="1.0", last_translator=""):
         timestamp = time.strftime('%Y-%m-%d %H:%M%z')
-        return f'''# APPLICATION TRANSLATIONS
-# Copyright (C) YEAR ORGANIZATION
-# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+        year = time.strftime('%Y') if year is None else year
+        return f'''# {application_name} TRANSLATIONS
+# {first_author}, {year}.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: PACKAGE VERSION\\n"
+"Project-Id-Version: {version}\\n"
 "POT-Creation-Date: {timestamp}\\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\\n"
-"Last-Translator: Thomas Hall <tomhall.main@gmail.com>\\n"
-"Language-Team: $LANG Team <<EMAIL>>\\n"
+"PO-Revision-Date: {timestamp}\\n"
+"Last-Translator: {last_translator}\\n"
+"Language: {locale}\\n"
+"Language-Team: {locale} Team <<EMAIL>>\\n"
 "MIME-Version: 1.0\\n"
 "Content-Type: text/plain; charset=cp1252\\n"
 "Content-Transfer-Encoding: 8bit\\n"
-"Generated-By: pygettext.py 1.5\\n"
 
 
 '''
 
+    def update_po_files(self, modified_locales):
+        """Update PO files for specific locales that have been modified.
+        
+        Args:
+            modified_locales (list): List of locale codes that need to be updated
+            
+        Returns:
+            int: 0 for success, non-zero for failure
+        """
+        try:
+            logger.debug(f"Starting PO file update for locales: {modified_locales}")
+            
+            # Update only the specified locales
+            for locale in modified_locales:
+                if locale not in self.locales:
+                    logger.warning(f"Locale {locale} not found in project")
+                    print(f"Warning: Locale {locale} not found in project")
+                    continue
+                    
+                # Construct the correct path including LC_MESSAGES directory
+                po_file = os.path.join(self._directory, locale, "LC_MESSAGES", "base.po")
+                if not os.path.exists(po_file):
+                    logger.warning(f"PO file not found for locale {locale}: {po_file}")
+                    print(f"Warning: PO file not found for locale {locale}")
+                    continue
+
+                # Write updated translations to PO file
+                logger.debug(f"Writing updated translations to PO file: {po_file}")
+                self.write_po_file(po_file, locale)
+                logger.info(f"Successfully updated PO file for locale {locale}")
+                print(f"Updated PO file for locale {locale}")
+
+            return 0
+        except Exception as e:
+            logger.error(f"Error updating PO files: {e}", exc_info=True)
+            print(f"Error updating PO files: {e}")
+            return 1
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

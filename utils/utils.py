@@ -1,5 +1,6 @@
 import asyncio
 import glob
+import logging
 import math
 import random
 import re
@@ -7,12 +8,8 @@ import os
 import sys
 import threading
 
-has_imported_windll = False
-try:
-    from ctypes import WinDLL
-    has_imported_windll = True
-except ImportError as e:
-    print("Failed to import WinDLL, skipping sleep prevention.")
+
+from utils.custom_formatter import CustomFormatter
 
 
 RESET = "\033[m"
@@ -22,9 +19,37 @@ DARK_RED = "\033[91m"
 DARK_GREEN = "\033[92m"
 CYAN = "\033[34m"
 
+# create logger
+logger = logging.getLogger("simple_image_compare")
+logger.setLevel(logging.DEBUG)
+
+# create console handler with a higher log level
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+
+ch.setFormatter(CustomFormatter())
+
+logger.addHandler(ch)
+
 
 class Utils:
     sleep_prevented = False
+
+    @staticmethod
+    def log(message, level=logging.INFO):
+        logger.log(level, message)
+    
+    @staticmethod
+    def log_debug(message):
+        Utils.log(message, logging.DEBUG)
+
+    @staticmethod
+    def log_red(message):
+        Utils.log(message, logging.ERROR)
+    
+    @staticmethod
+    def log_yellow(message):
+        Utils.log(message, logging.WARNING)
 
     @staticmethod
     def extract_substring(text, pattern):
@@ -205,27 +230,6 @@ class Utils:
         sound = os.path.join(os.path.dirname(os.path.dirname(__file__)), "lib", "sounds", sound + ".wav")
         import winsound
         winsound.PlaySound(sound, winsound.SND_ASYNC)
-
-    @staticmethod
-    def prevent_sleep(prevent_sleep: bool = False) -> None:
-        if not has_imported_windll:
-            return
-        if prevent_sleep == Utils.sleep_prevented:
-            return
-
-        """Set system sleep behavior to keep the system awake and screen on"""
-        # thread execution flags for enabling/disabling system sleep
-        ES_SYSTEM_REQUIRED = 0x0001  # keep system awake
-        ES_DISPLAY_REQUIRED = 0x0002  # keep display awake
-        ES_CONTINUOUS = 0x8000_0000  # see MSDN SetThreadExecutionState docs
-        kernel32 = WinDLL('kernel32', use_last_error=True)
-        if prevent_sleep:  # prevent system sleep
-            kernel32.SetThreadExecutionState(  # set to literal: 0x8000_0003
-                (ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED)
-            )
-        else:  # allow system sleep
-            kernel32.SetThreadExecutionState(ES_CONTINUOUS)
-        Utils.sleep_prevented = prevent_sleep
 
     @staticmethod
     def get_files_from_dir(dirpath, recursive=False, random_sort=False):
