@@ -14,6 +14,14 @@ logger = logging.getLogger(__name__)
 class I18NManager():
     """Manages the Python internationalization (i18n) workflow for translation files.
     
+    TODO: Add support for additional file formats:
+    - Java properties files (.properties)
+    - JavaScript common i18n formats:
+      * JSON format (e.g., react-i18next)
+      * YAML format
+      * ICU MessageFormat
+      * Angular i18n XLIFF format
+    
     The workflow for managing Python translations consists of several steps:
     
     1. POT File Generation:
@@ -137,6 +145,14 @@ class I18NManager():
             pot_file, po_files = self.gather_files()
             logger.debug(f"Found POT file: {pot_file}")
             logger.debug(f"Found PO files: {len(po_files)}")
+            
+            # TODO: Investigate false positives in status check after PO updates
+            # Possible causes to check:
+            # 1. Translation state not being properly reset between write and check
+            # 2. Cache/memory state of translations persisting after file updates
+            # 3. File system delays in updating PO files before status check
+            # 4. Stale translations not being properly purged after writes
+            # 5. Locale status tracking getting out of sync with file state
             
             # Only parse files and fill translations during CHECK_STATUS
             if action == TranslationAction.CHECK_STATUS:

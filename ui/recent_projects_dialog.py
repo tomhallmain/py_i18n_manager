@@ -51,6 +51,15 @@ class ProjectListItem(QWidget):
         self.project_path = project_path
         
 class RecentProjectsDialog(QDialog):
+    """Dialog for selecting from recent projects.
+    
+    TODO: Add functionality to run check status on the 10 most recent directories and display
+    colored status indicators next to each project:
+    - Green: All translations up to date
+    - Yellow: Has missing translations
+    - Red: Has invalid translations (unicode/indices)
+    - Gray: Project not found/invalid
+    """
     project_selected = pyqtSignal(str)  # Emitted when a project is selected
     project_removed = pyqtSignal(str)   # Emitted when a project is removed
     

@@ -51,6 +51,9 @@ class OutstandingItemsWindow(QDialog):
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.show_context_menu)
+        # Enable context menu for header
+        self.table.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.horizontalHeader().customContextMenuRequested.connect(self.show_header_context_menu)
         layout.addWidget(self.table)
         
         # Buttons
@@ -89,18 +92,54 @@ class OutstandingItemsWindow(QDialog):
             
         menu = QMenu()
         
-        # Add Argos Translate option
-        translate_with_argos = QAction(_("Translate with Argos Translate"), self)
-        translate_with_argos.triggered.connect(lambda: self.translate_selected_item(item, use_llm=False))
-        menu.addAction(translate_with_argos)
+        # Add Copy Text option first
+        copy_text = QAction(_("Copy Text"), self)
+        copy_text.triggered.connect(lambda: self.copy_cell_text(item))
+        menu.addAction(copy_text)
         
-        # Add LLM Translate option
-        translate_with_llm = QAction(_("Translate with LLM"), self)
-        translate_with_llm.triggered.connect(lambda: self.translate_selected_item(item, use_llm=True))
-        menu.addAction(translate_with_llm)
+        # Only show translation options for non-key column cells
+        if item.column() > 0:
+            menu.addSeparator()
+            # Add Argos Translate option
+            translate_with_argos = QAction(_("Translate with Argos Translate"), self)
+            translate_with_argos.triggered.connect(lambda: self.translate_selected_item(item, use_llm=False))
+            menu.addAction(translate_with_argos)
+            
+            # Add LLM Translate option
+            translate_with_llm = QAction(_("Translate with LLM"), self)
+            translate_with_llm.triggered.connect(lambda: self.translate_selected_item(item, use_llm=True))
+            menu.addAction(translate_with_llm)
         
         menu.exec(self.table.mapToGlobal(position))
+
+    def show_header_context_menu(self, position):
+        """Show context menu for header items."""
+        # Get the column index at the position
+        column = self.table.horizontalHeader().logicalIndexAt(position)
+        if column < 0:
+            return
+            
+        # Create menu
+        menu = QMenu()
         
+        # Add Copy Text option
+        copy_text = QAction(_("Copy Text"), self)
+        header_text = self.table.horizontalHeaderItem(column).text()
+        copy_text.triggered.connect(lambda: self.copy_text_to_clipboard(header_text))
+        menu.addAction(copy_text)
+        
+        menu.exec(self.table.horizontalHeader().mapToGlobal(position))
+
+    def copy_cell_text(self, item):
+        """Copy the text from a cell to the clipboard."""
+        if item:
+            self.copy_text_to_clipboard(item.text())
+
+    def copy_text_to_clipboard(self, text):
+        """Copy the given text to the clipboard."""
+        from PyQt6.QtWidgets import QApplication
+        QApplication.clipboard().setText(text)
+
     def translate_selected_item(self, item, use_llm=False):
         """Translate a single selected item.
         
