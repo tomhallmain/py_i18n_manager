@@ -10,6 +10,44 @@ from i18n.translation_group import TranslationGroup
 logger = logging.getLogger(__name__)
 
 class I18NManager():
+    """Manages the Python internationalization (i18n) workflow for translation files.
+    
+    The workflow for managing Python translations consists of several steps:
+    
+    1. POT File Generation:
+       - Using pygettext.py, scan Python source files for translatable strings
+       - Generate base.pot file containing all extracted strings
+       - Each string becomes a msgid in the POT file
+    
+    2. Base Translation Set:
+       - Parse the POT file to establish the base set of translations
+       - Each msgid from POT becomes a TranslationGroup marked as 'in_base'
+       - This represents the current, valid set of strings needing translation
+    
+    3. Locale Translations:
+       - Parse existing PO files for each locale (e.g., fr/LC_MESSAGES/base.po)
+       - Each PO file may contain:
+         * Translations for current base strings
+         * Missing translations (empty msgstr)
+         * Stale translations (msgid not in current base)
+         * Invalid translations (Unicode/format string issues)
+    
+    4. Translation Management:
+       - Track missing translations for each locale
+       - Identify invalid Unicode sequences
+       - Identify invalid format string indices
+       - Allow user to fix/add translations via UI
+    
+    5. PO File Updates:
+       - Write updated PO files for each locale
+       - Include only translations for current base strings
+       - Exclude stale translations not in current base
+       - Maintain proper headers and metadata
+    
+    The class provides methods to handle each step of this workflow and maintains
+    the state of translations in memory between file operations.
+    """
+    
     MSGID = "msgid"
     MSGSTR = "msgstr"
 
@@ -21,8 +59,8 @@ class I18NManager():
         self.written_locales = set()  # Track which locales have been written to
         # Store intro details if provided, otherwise use defaults
         self.intro_details = intro_details or {
-            "first_author": "THOMAS HALL <tomhall.main@gmail.com>",
-            "last_translator": "Thomas Hall <tomhall.main@gmail.com>",
+            "first_author": "AUTHOR NAME <author@example.com>",
+            "last_translator": "Translator Name <translator@example.com>",
             "application_name": "APPLICATION",
             "version": "1.0"
         }
@@ -379,6 +417,56 @@ msgstr ""
             return True
         except Exception as e:
             logger.error(f"Error writing PO file for locale {locale}: {e}")
+            return False
+
+    def generate_pot_file(self):
+        """Generate the base.pot file using pygettext.py.
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Get the project root directory (one level up from locale dir if needed)
+            project_dir = self._directory
+            if project_dir.endswith('locale'):
+                project_dir = os.path.dirname(project_dir)
+                
+            # Ensure locale directory exists
+            locale_dir = os.path.join(project_dir, 'locale')
+            os.makedirs(locale_dir, exist_ok=True)
+            
+            logger.info(f"Generating POT file in directory: {project_dir}")
+            
+            # Try different possible locations for pygettext
+            python_version = f"Python{sys.version_info.major}{sys.version_info.minor}"
+            possible_paths = [
+                os.path.join(sys.prefix, "Tools", "i18n", "pygettext.py"),  # Current Python installation
+                rf"C:\{python_version}\Tools\i18n\pygettext.py",            # Windows specific Python version
+                r"C:\Python310\Tools\i18n\pygettext.py",                    # Hardcoded fallback
+                "pygettext.py"                                              # Assume it's in PATH
+            ]
+            
+            for pygettext_path in possible_paths:
+                try:
+                    if os.path.exists(pygettext_path) or pygettext_path == "pygettext.py":
+                        result = subprocess.run(
+                            ["python", pygettext_path, "-d", "base", "-o", "locale\\base.pot", "."],
+                            cwd=project_dir,
+                            capture_output=True,
+                            text=True
+                        )
+                        if result.returncode == 0:
+                            logger.info(f"Successfully generated base.pot file using {pygettext_path}")
+                            return True
+                except Exception as e:
+                    logger.debug(f"Failed to use pygettext at {pygettext_path}: {e}")
+                    continue
+            
+            logger.error("Could not find a working pygettext.py installation")
+            return False
+                
+        except Exception as e:
+            logger.error(f"Error generating POT file: {e}")
             return False
 
 if __name__ == "__main__":

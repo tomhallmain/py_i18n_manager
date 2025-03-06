@@ -3,11 +3,15 @@ import os
 
 from utils.utils import Utils
 
-_locale = Utils.get_default_user_language()
+_locale = os.environ['LANG'] if "LANG" in os.environ else None
+if not _locale or _locale == '':
+    _locale = Utils.get_default_user_language()
+elif _locale is not None and "_" in _locale:
+    _locale = _locale[:_locale.index("_")]
 
 class I18N:
     localedir = os.path.join(os.path.dirname(os.path.abspath(os.path.dirname(__file__))), 'locale')
-    locale = _locale
+    locale = "en"
     translate = gettext.translation('base', localedir, languages=[_locale])
 
     @staticmethod

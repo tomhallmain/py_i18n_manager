@@ -94,6 +94,7 @@ class MainWindow(QMainWindow):
         self.show_outstanding_btn = QPushButton("Show Outstanding Items")
         self.show_all_btn = QPushButton("Show All Translations")
         self.write_default_btn = QPushButton("Write Default Locale")
+        self.generate_pot_btn = QPushButton("Generate POT")
         
         self.check_status_btn.clicked.connect(lambda: self.run_translation_task())
         self.update_po_btn.clicked.connect(lambda: self.run_translation_task(0))
@@ -101,6 +102,7 @@ class MainWindow(QMainWindow):
         self.show_outstanding_btn.clicked.connect(self.show_outstanding_items)
         self.show_all_btn.clicked.connect(self.show_all_translations)
         self.write_default_btn.clicked.connect(self.write_default_locale)
+        self.generate_pot_btn.clicked.connect(self.generate_pot)
         
         button_layout.addWidget(self.check_status_btn)
         button_layout.addWidget(self.update_po_btn)
@@ -108,6 +110,7 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(self.show_outstanding_btn)
         button_layout.addWidget(self.show_all_btn)
         button_layout.addWidget(self.write_default_btn)
+        button_layout.addWidget(self.generate_pot_btn)
         status_layout.addLayout(button_layout)
         
         self.tab_widget.addTab(status_tab, "Status")
@@ -182,6 +185,7 @@ class MainWindow(QMainWindow):
         self.show_outstanding_btn.setEnabled(has_project and has_translations)
         self.show_all_btn.setEnabled(has_project and has_translations)
         self.write_default_btn.setEnabled(has_project and has_translations)
+        self.generate_pot_btn.setEnabled(has_project and has_translations)
         
     def run_translation_task(self, mode=None):
         if not self.current_project:
@@ -388,6 +392,25 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Error", f"Default locale ({default_locale}) not found in project")
         except Exception as e:
             error_msg = f"Failed to write default locale PO file: {e}"
+            logger.error(error_msg)
+            QMessageBox.critical(self, "Error", error_msg)
+
+    def generate_pot(self):
+        """Generate the base.pot file for the current project."""
+        if not self.current_project:
+            QMessageBox.warning(self, "Error", "Please select a project first")
+            return
+            
+        try:
+            self.status_text.append("\nGenerating base.pot file...")
+            if self.i18n_manager and self.i18n_manager.generate_pot_file():
+                self.status_text.append("Successfully generated base.pot file")
+                # Run status check to refresh translations
+                self.run_translation_task()
+            else:
+                QMessageBox.warning(self, "Error", "Failed to generate base.pot file")
+        except Exception as e:
+            error_msg = f"Failed to generate POT file: {e}"
             logger.error(error_msg)
             QMessageBox.critical(self, "Error", error_msg)
 
