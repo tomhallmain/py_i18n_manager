@@ -29,7 +29,8 @@
     "translation": {
         "default_locale": "en",
         "auto_check_status": true,
-        "show_success_message": true
+        "show_success_message": true,
+        "models_dir": "D:\\translation_models\\argos"
     },
     "files": {
         "settings_dir": ".i18n_manager",

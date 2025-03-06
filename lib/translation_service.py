@@ -1,12 +1,21 @@
 from lib.llm import LLM
-from utils.config import ConfigManager
+from lib.argos_translate import ArgosTranslate
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+import logging
+
+logger = logging.getLogger(__name__)
 
 class TranslationService:
-    def __init__(self):
+    def __init__(self, default_locale='en'):
+        """Initialize the translation service.
+        
+        Args:
+            default_locale (str, optional): Default source locale for translations. Defaults to 'en'.
+        """
+        self.default_locale = default_locale
         self.llm = LLM()
-        self.config = ConfigManager()
+        self.argos = ArgosTranslate()
         self._executor = ThreadPoolExecutor(max_workers=4)
         
     def __del__(self):
@@ -14,7 +23,7 @@ class TranslationService:
         if hasattr(self, '_executor'):
             self._executor.shutdown(wait=True)
         
-    def translate(self, text, target_locale, context=None):
+    def translate_with_llm(self, text, target_locale, context=None):
         """Translate text to the target locale using LLM.
         
         Args:
@@ -25,13 +34,10 @@ class TranslationService:
         Returns:
             str: The translated text
         """
-        # Get the default locale for context
-        default_locale = self.config.get('translation.default_locale', 'en')
-        
         # Construct the prompt
         prompt = self._create_translation_prompt(
             text=text,
-            source_locale=default_locale,
+            source_locale=self.default_locale,
             target_locale=target_locale,
             context=context
         )
@@ -45,8 +51,42 @@ class TranslationService:
             )
             return response if response else ""
         except Exception as e:
-            print(f"Translation failed: {e}")
+            logger.error(f"LLM translation failed: {e}")
             return ""
+            
+    def translate_with_argos(self, text, target_locale, source_locale=None):
+        """Translate text to the target locale using Argos Translate.
+        
+        Args:
+            text (str): The text to translate
+            target_locale (str): The target locale code (e.g., 'es', 'fr')
+            source_locale (str, optional): Source locale code. Defaults to default_locale.
+            
+        Returns:
+            str: The translated text
+        """
+        if source_locale is None:
+            source_locale = self.default_locale
+            
+        return self.argos.translate(text, target_locale, source_locale)
+            
+    def translate(self, text, target_locale, context=None, use_llm=False):
+        """Translate text using the specified or default method.
+        
+        Args:
+            text (str): The text to translate
+            target_locale (str): The target locale code (e.g., 'es', 'fr')
+            context (str, optional): Additional context about the text
+            use_llm (bool, optional): Whether to use LLM instead of Argos Translate
+            
+        Returns:
+            str: The translated text
+        """
+        if use_llm or not self.argos.is_usable:
+            if not use_llm:
+                logger.warning("Argos Translate is not usable, using LLM")
+            return self.translate_with_llm(text, target_locale, context)
+        return self.translate_with_argos(text, target_locale)
             
     def _create_translation_prompt(self, text, source_locale, target_locale, context=None):
         """Create a structured prompt for the LLM translation request."""

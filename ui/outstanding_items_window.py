@@ -19,7 +19,10 @@ class OutstandingItemsWindow(QDialog):
         self.setWindowTitle(_("Outstanding Translation Items"))
         self.setMinimumSize(800, 600)
         self.config = ConfigManager()
-        self.translation_service = TranslationService()
+        
+        default_locale = self.config.get('translation.default_locale', 'en')
+        self.translation_service = TranslationService(default_locale=default_locale)
+        
         self.is_translating = False
         self.show_escaped = False
         self.setup_ui()
@@ -84,13 +87,26 @@ class OutstandingItemsWindow(QDialog):
             return
             
         menu = QMenu()
-        translate_action = QAction(_("Translate This Item"), self)
-        translate_action.triggered.connect(lambda: self.translate_selected_item(item))
-        menu.addAction(translate_action)
+        
+        # Add Argos Translate option
+        translate_with_argos = QAction(_("Translate with Argos Translate"), self)
+        translate_with_argos.triggered.connect(lambda: self.translate_selected_item(item, use_llm=False))
+        menu.addAction(translate_with_argos)
+        
+        # Add LLM Translate option
+        translate_with_llm = QAction(_("Translate with LLM"), self)
+        translate_with_llm.triggered.connect(lambda: self.translate_selected_item(item, use_llm=True))
+        menu.addAction(translate_with_llm)
+        
         menu.exec(self.table.mapToGlobal(position))
         
-    def translate_selected_item(self, item):
-        """Translate a single selected item."""
+    def translate_selected_item(self, item, use_llm=False):
+        """Translate a single selected item.
+        
+        Args:
+            item: The table item to translate
+            use_llm (bool): Whether to use LLM for translation
+        """
         row = item.row()
         col = item.column()
         if col == 0:  # Don't translate the key column
@@ -98,10 +114,18 @@ class OutstandingItemsWindow(QDialog):
             
         msgid = self.table.item(row, 0).text()
         locale = self.table.horizontalHeaderItem(col).text()
-        self.translate_item(row, col, msgid, locale)
+        self.translate_item(row, col, msgid, locale, use_llm)
         
-    def translate_item(self, row, col, msgid, locale):
-        """Translate a single item and update the table."""
+    def translate_item(self, row, col, msgid, locale, use_llm=False):
+        """Translate a single item and update the table.
+        
+        Args:
+            row (int): The row number in the table
+            col (int): The column number in the table
+            msgid (str): The translation key
+            locale (str): The target locale
+            use_llm (bool): Whether to use LLM for translation
+        """
         # Get the English translation if available, otherwise use default locale
         default_locale = self.config.get('translation.default_locale', 'en')
         source_text = self.translations[msgid].get_translation('en') or self.translations[msgid].get_translation(default_locale)
@@ -115,7 +139,8 @@ class OutstandingItemsWindow(QDialog):
                 translated = self.translation_service.translate(
                     text=source_text,
                     target_locale=locale,
-                    context=f"Translation key: {msgid}"
+                    context=f"Translation key: {msgid}",
+                    use_llm=use_llm
                 )
                 if translated:
                     item = QTableWidgetItem(translated)

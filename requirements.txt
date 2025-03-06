@@ -1,2 +1,3 @@
 PyQt6>=6.4.0
-polib>=1.2.0 
+polib>=1.2.0
+argostranslate
