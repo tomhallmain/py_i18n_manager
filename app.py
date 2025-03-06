@@ -1,5 +1,3 @@
-import sys
-import os
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                             QTextEdit, QTabWidget, QMessageBox, QFrame)
@@ -10,6 +8,7 @@ from ui.outstanding_items_window import OutstandingItemsWindow
 from ui.all_translations_window import AllTranslationsWindow
 from ui.recent_projects_dialog import RecentProjectsDialog
 from utils.settings_manager import SettingsManager
+from utils.translations import I18N
 from workers.translation_worker import TranslationWorker
 import logging
 
@@ -17,11 +16,14 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+# Set up translation
+_ = I18N._
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         logger.debug("Initializing MainWindow")
-        self.setWindowTitle("i18n Translation Manager")
+        self.setWindowTitle(_("i18n Translation Manager"))
         self.setMinimumSize(800, 600)
         
         # Initialize settings manager
@@ -53,16 +55,16 @@ class MainWindow(QMainWindow):
         
         # Project title
         title_layout = QHBoxLayout()
-        title_label = QLabel("Current Project:")
+        title_label = QLabel(_("Current Project:"))
         title_label.setStyleSheet("font-weight: bold; font-size: 14px;")
-        self.project_label = QLabel("No project selected")
+        self.project_label = QLabel(_("No project selected"))
         self.project_label.setStyleSheet("font-size: 14px;")
         title_layout.addWidget(title_label)
         title_layout.addWidget(self.project_label)
         title_layout.addStretch()
         
         # Project selection button
-        select_project_btn = QPushButton("Select Project")
+        select_project_btn = QPushButton(_("Select Project"))
         select_project_btn.clicked.connect(self.show_project_selector)
         
         project_layout.addLayout(title_layout)
@@ -88,13 +90,14 @@ class MainWindow(QMainWindow):
         
         # Action buttons
         button_layout = QHBoxLayout()
-        self.check_status_btn = QPushButton("Check Status")
-        self.update_po_btn = QPushButton("Update PO Files")
-        self.create_mo_btn = QPushButton("Create MO Files")
-        self.show_outstanding_btn = QPushButton("Show Outstanding Items")
-        self.show_all_btn = QPushButton("Show All Translations")
-        self.write_default_btn = QPushButton("Write Default Locale")
-        self.generate_pot_btn = QPushButton("Generate POT")
+        self.check_status_btn = QPushButton(_("Check Status"))
+        self.update_po_btn = QPushButton(_("Update PO Files"))
+        self.create_mo_btn = QPushButton(_("Create MO Files"))
+        self.show_outstanding_btn = QPushButton(_("Show Outstanding Items"))
+        self.show_all_btn = QPushButton(_("Show All Translations"))
+        self.write_default_btn = QPushButton(_("Write Default Locale"))
+        self.generate_pot_btn = QPushButton(_("Generate POT"))
+        self.find_untranslated_btn = QPushButton(_("Find Untranslated"))
         
         self.check_status_btn.clicked.connect(lambda: self.run_translation_task())
         self.update_po_btn.clicked.connect(lambda: self.run_translation_task(0))
@@ -103,6 +106,7 @@ class MainWindow(QMainWindow):
         self.show_all_btn.clicked.connect(self.show_all_translations)
         self.write_default_btn.clicked.connect(self.write_default_locale)
         self.generate_pot_btn.clicked.connect(self.generate_pot)
+        self.find_untranslated_btn.clicked.connect(self.find_untranslated_strings)
         
         button_layout.addWidget(self.check_status_btn)
         button_layout.addWidget(self.update_po_btn)
@@ -111,9 +115,10 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(self.show_all_btn)
         button_layout.addWidget(self.write_default_btn)
         button_layout.addWidget(self.generate_pot_btn)
+        button_layout.addWidget(self.find_untranslated_btn)
         status_layout.addLayout(button_layout)
         
-        self.tab_widget.addTab(status_tab, "Status")
+        self.tab_widget.addTab(status_tab, _("Status"))
         
         # Update button states after all buttons are created
         self.update_button_states()
@@ -186,6 +191,7 @@ class MainWindow(QMainWindow):
         self.show_all_btn.setEnabled(has_project and has_translations)
         self.write_default_btn.setEnabled(has_project and has_translations)
         self.generate_pot_btn.setEnabled(has_project and has_translations)
+        self.find_untranslated_btn.setEnabled(has_project and has_translations)
         
     def run_translation_task(self, mode=None):
         if not self.current_project:
@@ -411,6 +417,31 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Error", "Failed to generate base.pot file")
         except Exception as e:
             error_msg = f"Failed to generate POT file: {e}"
+            logger.error(error_msg)
+            QMessageBox.critical(self, "Error", error_msg)
+
+    def find_untranslated_strings(self):
+        """Find and display potential untranslated strings in the project."""
+        if not self.i18n_manager:
+            QMessageBox.warning(self, "Error", "Please select a project first")
+            return
+            
+        try:
+            self.status_text.append("\nSearching for untranslated strings...")
+            results = self.i18n_manager.find_translatable_strings()
+            
+            if not results:
+                self.status_text.append("No untranslated strings found in UI components.")
+                return
+                
+            self.status_text.append("\nPotential untranslated strings found:")
+            for file_path, strings in results.items():
+                self.status_text.append(f"\nIn {file_path}:")
+                for string in strings:
+                    self.status_text.append(f"  • {string}")
+                    
+        except Exception as e:
+            error_msg = f"Error finding untranslated strings: {e}"
             logger.error(error_msg)
             QMessageBox.critical(self, "Error", error_msg)
 

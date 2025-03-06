@@ -2,13 +2,16 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
                             QMessageBox, QLineEdit, QComboBox, QCheckBox)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from utils.translations import I18N
+
+_ = I18N._
 
 class AllTranslationsWindow(QDialog):
     translation_updated = pyqtSignal(str, str, str)  # msgid, locale, new_value
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("All Translations")
+        self.setWindowTitle(_("All Translations"))
         self.setMinimumSize(1000, 700)
         self.show_escaped = False
         self.setup_ui()
@@ -21,9 +24,9 @@ class AllTranslationsWindow(QDialog):
         
         # Search box
         search_layout = QHBoxLayout()
-        search_label = QLabel("Search:")
+        search_label = QLabel(_("Search:"))
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("Search translation keys...")
+        self.search_box.setPlaceholderText(_("Search translation keys..."))
         self.search_box.textChanged.connect(self.filter_table)
         search_layout.addWidget(search_label)
         search_layout.addWidget(self.search_box)
@@ -31,9 +34,9 @@ class AllTranslationsWindow(QDialog):
         
         # Status filter
         filter_layout = QHBoxLayout()
-        filter_label = QLabel("Filter:")
+        filter_label = QLabel(_("Filter:"))
         self.status_filter = QComboBox()
-        self.status_filter.addItems(["All", "Missing", "Invalid Unicode", "Invalid Indices"])
+        self.status_filter.addItems([_("All"), _("Missing"), _("Invalid Unicode"), _("Invalid Indices")])
         self.status_filter.currentTextChanged.connect(self.filter_table)
         filter_layout.addWidget(filter_label)
         filter_layout.addWidget(self.status_filter)
@@ -52,13 +55,13 @@ class AllTranslationsWindow(QDialog):
         # Buttons
         button_layout = QHBoxLayout()
         
-        save_btn = QPushButton("Save Changes")
+        save_btn = QPushButton(_("Save Changes"))
         save_btn.clicked.connect(self.save_changes)
-        close_btn = QPushButton("Close")
+        close_btn = QPushButton(_("Close"))
         close_btn.clicked.connect(self.close)
         
         # Add Unicode display toggle
-        self.unicode_toggle = QCheckBox("Show Escaped Unicode")
+        self.unicode_toggle = QCheckBox(_("Show Escaped Unicode"))
         self.unicode_toggle.stateChanged.connect(self.toggle_unicode_display)
         
         button_layout.addWidget(save_btn)
@@ -167,14 +170,14 @@ class AllTranslationsWindow(QDialog):
                 changes.append((msgid, locale, new_value))
         
         if not changes:
-            QMessageBox.information(self, "Info", "No changes to save.")
+            QMessageBox.information(self, _("Info"), _("No changes to save."))
             return
         
         # Emit changes
         for msgid, locale, new_value in changes:
             self.translation_updated.emit(msgid, locale, new_value)
         
-        QMessageBox.information(self, "Success", f"Saved {len(changes)} changes successfully!")
+        QMessageBox.information(self, _("Success"), _("Saved {} changes successfully!").format(len(changes)))
 
     def update_table_display(self):
         """Update the table display based on current Unicode display mode."""

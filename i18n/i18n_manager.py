@@ -4,6 +4,7 @@ import subprocess
 import sys
 import time
 import logging
+import re
 
 from i18n.translation_group import TranslationGroup
 
@@ -468,6 +469,74 @@ msgstr ""
         except Exception as e:
             logger.error(f"Error generating POT file: {e}")
             return False
+
+    def find_translatable_strings(self):
+        """Find potential hardcoded strings in Python files that might need translation.
+        
+        This method scans Python files in the project directory for strings that:
+        1. Are used in UI contexts (e.g., QLabel, QPushButton, setWindowTitle)
+        2. Are not already wrapped in _() translation calls
+        3. Contain actual text (not just symbols or empty strings)
+        
+        Returns:
+            dict: A dictionary mapping filenames to lists of potential translatable strings
+        """
+        # Get the project root directory
+        project_dir = self._directory
+        if project_dir.endswith('locale'):
+            project_dir = os.path.dirname(project_dir)
+            
+        # Patterns that suggest UI text
+        ui_patterns = [
+            r'QLabel\(["\']([^"\']+)["\']\)',
+            r'QPushButton\(["\']([^"\']+)["\']\)',
+            r'setWindowTitle\(["\']([^"\']+)["\']\)',
+            r'setText\(["\']([^"\']+)["\']\)',
+            r'setTitle\(["\']([^"\']+)["\']\)',
+            r'setPlaceholderText\(["\']([^"\']+)["\']\)',
+            r'QMessageBox\.(?:information|warning|critical|question)\([^,]+,["\']([^"\']+)["\'],["\']([^"\']+)["\']\)',
+            r'addTab\([^,]+,["\']([^"\']+)["\']\)'
+        ]
+        
+        # Combine patterns
+        combined_pattern = '|'.join(ui_patterns)
+        
+        # Store results
+        results = {}
+        
+        # Walk through Python files
+        for root, _, files in os.walk(project_dir):
+            for file in files:
+                if not file.endswith('.py'):
+                    continue
+                    
+                file_path = os.path.join(root, file)
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        
+                    # Find all potential UI strings
+                    matches = re.finditer(combined_pattern, content)
+                    strings = []
+                    
+                    for match in matches:
+                        # Get all capturing groups from the match
+                        groups = [g for g in match.groups() if g]
+                        for string in groups:
+                            # Skip if already wrapped in _()
+                            if not re.search(r'_\(["\']' + re.escape(string) + r'["\']\)', content):
+                                # Skip strings that are just whitespace, numbers, or symbols
+                                if string.strip() and not string.strip().isdigit():
+                                    strings.append(string)
+                    
+                    if strings:
+                        rel_path = os.path.relpath(file_path, project_dir)
+                        results[rel_path] = strings
+                        
+                except Exception as e:
+                    logger.error(f"Error processing file {file_path}: {e}")
+                    
+        return results
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

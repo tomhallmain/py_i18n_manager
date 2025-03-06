@@ -2,6 +2,9 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QLabel, QListWidget, QListWidgetItem, QFileDialog,
                             QWidget)
 from PyQt6.QtCore import Qt, pyqtSignal
+from utils.translations import I18N
+
+_ = I18N._
 
 class ProjectListItem(QWidget):
     remove_clicked = pyqtSignal(str)  # Signal to emit when remove is clicked
@@ -24,7 +27,7 @@ class ProjectListItem(QWidget):
         button_layout.setSpacing(5)
         
         # Select button
-        select_btn = QPushButton("Select")
+        select_btn = QPushButton(_("Select"))
         select_btn.setStyleSheet("""
             QPushButton {
                 padding: 2px 8px;
@@ -34,7 +37,7 @@ class ProjectListItem(QWidget):
         button_layout.addWidget(select_btn)
         
         # Remove button
-        remove_btn = QPushButton("×")
+        remove_btn = QPushButton(_("×"))
         remove_btn.setFixedSize(24, 24)
         remove_btn.setStyleSheet("""
             QPushButton {
@@ -53,7 +56,7 @@ class RecentProjectsDialog(QDialog):
     
     def __init__(self, recent_projects, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Select Project")
+        self.setWindowTitle(_("Select Project"))
         self.setMinimumSize(500, 300)
         self.setup_ui(recent_projects)
         
@@ -61,7 +64,7 @@ class RecentProjectsDialog(QDialog):
         layout = QVBoxLayout(self)
         
         # Title
-        title = QLabel("Select a Recent Project")
+        title = QLabel(_("Select a Recent Project"))
         title.setStyleSheet("font-weight: bold; font-size: 14px;")
         layout.addWidget(title)
         
@@ -78,14 +81,14 @@ class RecentProjectsDialog(QDialog):
         # Buttons
         button_layout = QHBoxLayout()
         
-        select_btn = QPushButton("Select")
+        select_btn = QPushButton(_("Select"))
         select_btn.clicked.connect(self.handle_selection)
         select_btn.setEnabled(False)  # Disabled until selection
         
-        browse_btn = QPushButton("Browse...")
+        browse_btn = QPushButton(_("Browse..."))
         browse_btn.clicked.connect(self.browse_project)
         
-        cancel_btn = QPushButton("Cancel")
+        cancel_btn = QPushButton(_("Cancel"))
         cancel_btn.clicked.connect(self.reject)
         
         button_layout.addWidget(select_btn)
@@ -128,7 +131,7 @@ class RecentProjectsDialog(QDialog):
     def browse_project(self):
         directory = QFileDialog.getExistingDirectory(
             self,
-            "Select Project Directory",
+            _("Select Project Directory"),
             "",
             QFileDialog.Option.ShowDirsOnly
         )

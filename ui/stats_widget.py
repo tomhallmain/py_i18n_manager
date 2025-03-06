@@ -1,5 +1,8 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
 from PyQt6.QtCore import Qt
+from utils.translations import I18N
+
+_ = I18N._
 
 class StatsWidget(QWidget):
     def __init__(self, parent=None):
@@ -23,7 +26,7 @@ class StatsWidget(QWidget):
         frame_layout = QVBoxLayout(frame)
         
         # Title
-        title = QLabel("Translation Statistics")
+        title = QLabel(_("Translation Statistics"))
         title.setStyleSheet("font-weight: bold; font-size: 14px;")
         frame_layout.addWidget(title)
         
@@ -32,7 +35,7 @@ class StatsWidget(QWidget):
         
         # Total translations
         total_translations_layout = QVBoxLayout()
-        self.total_translations_label = QLabel("Total Translations:")
+        self.total_translations_label = QLabel(_("Total Translations:"))
         self.total_translations_value = QLabel("0")
         self.total_translations_value.setStyleSheet("font-size: 16px; font-weight: bold;")
         total_translations_layout.addWidget(self.total_translations_label)
@@ -41,7 +44,7 @@ class StatsWidget(QWidget):
         
         # Total locales
         total_locales_layout = QVBoxLayout()
-        self.total_locales_label = QLabel("Total Locales:")
+        self.total_locales_label = QLabel(_("Total Locales:"))
         self.total_locales_value = QLabel("0")
         self.total_locales_value.setStyleSheet("font-size: 16px; font-weight: bold;")
         total_locales_layout.addWidget(self.total_locales_label)
@@ -50,7 +53,7 @@ class StatsWidget(QWidget):
         
         # Missing translations
         missing_translations_layout = QVBoxLayout()
-        self.missing_translations_label = QLabel("Missing Translations:")
+        self.missing_translations_label = QLabel(_("Missing Translations:"))
         self.missing_translations_value = QLabel("0")
         self.missing_translations_value.setStyleSheet("font-size: 16px; font-weight: bold; color: red;")
         missing_translations_layout.addWidget(self.missing_translations_label)
@@ -59,7 +62,7 @@ class StatsWidget(QWidget):
         
         # Invalid Unicode translations
         invalid_unicode_layout = QVBoxLayout()
-        self.invalid_unicode_label = QLabel("Invalid Unicode:")
+        self.invalid_unicode_label = QLabel(_("Invalid Unicode:"))
         self.invalid_unicode_value = QLabel("0")
         self.invalid_unicode_value.setStyleSheet("font-size: 16px; font-weight: bold; color: red;")
         invalid_unicode_layout.addWidget(self.invalid_unicode_label)
@@ -68,7 +71,7 @@ class StatsWidget(QWidget):
         
         # Invalid indices translations
         invalid_indices_layout = QVBoxLayout()
-        self.invalid_indices_label = QLabel("Invalid Indices:")
+        self.invalid_indices_label = QLabel(_("Invalid Indices:"))
         self.invalid_indices_value = QLabel("0")
         self.invalid_indices_value.setStyleSheet("font-size: 16px; font-weight: bold; color: red;")
         invalid_indices_layout.addWidget(self.invalid_indices_label)
@@ -77,7 +80,7 @@ class StatsWidget(QWidget):
         
         # Stale translations
         stale_translations_layout = QVBoxLayout()
-        self.stale_translations_label = QLabel("Stale Translations:")
+        self.stale_translations_label = QLabel(_("Stale Translations:"))
         self.stale_translations_value = QLabel("0")
         self.stale_translations_value.setStyleSheet("font-size: 16px; font-weight: bold;")
         stale_translations_layout.addWidget(self.stale_translations_label)

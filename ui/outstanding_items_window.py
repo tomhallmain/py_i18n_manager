@@ -6,6 +6,9 @@ from PyQt6.QtGui import QColor, QAction
 from utils.config import ConfigManager
 from lib.translation_service import TranslationService
 from utils.utils import Utils
+from utils.translations import I18N
+
+_ = I18N._
 
 class OutstandingItemsWindow(QDialog):
     # Signal now takes a list of (msgid, new_value) tuples for each locale
@@ -13,7 +16,7 @@ class OutstandingItemsWindow(QDialog):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Outstanding Translation Items")
+        self.setWindowTitle(_("Outstanding Translation Items"))
         self.setMinimumSize(800, 600)
         self.config = ConfigManager()
         self.translation_service = TranslationService()
@@ -24,8 +27,8 @@ class OutstandingItemsWindow(QDialog):
     def closeEvent(self, event):
         """Handle cleanup when the window is closed."""
         if self.is_translating:
-            reply = QMessageBox.question(self, 'Translation in Progress',
-                                       'Translation is in progress. Are you sure you want to close?',
+            reply = QMessageBox.question(self, _('Translation in Progress'),
+                                       _('Translation is in progress. Are you sure you want to close?'),
                                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if reply == QMessageBox.StandardButton.No:
                 event.ignore()
@@ -51,20 +54,20 @@ class OutstandingItemsWindow(QDialog):
         button_layout = QHBoxLayout()
         
         # Translation buttons
-        self.translate_all_btn = QPushButton("Translate All Missing")
+        self.translate_all_btn = QPushButton(_("Translate All Missing"))
         self.translate_all_btn.clicked.connect(self.translate_all_missing)
         
-        self.cancel_btn = QPushButton("Cancel Translation")
+        self.cancel_btn = QPushButton(_("Cancel Translation"))
         self.cancel_btn.clicked.connect(self.cancel_translation)
         self.cancel_btn.setEnabled(False)
         
-        save_btn = QPushButton("Save Changes")
+        save_btn = QPushButton(_("Save Changes"))
         save_btn.clicked.connect(self.save_changes)
-        close_btn = QPushButton("Close")
+        close_btn = QPushButton(_("Close"))
         close_btn.clicked.connect(self.close)
         
         # Add Unicode display toggle
-        self.unicode_toggle = QCheckBox("Show Escaped Unicode")
+        self.unicode_toggle = QCheckBox(_("Show Escaped Unicode"))
         self.unicode_toggle.stateChanged.connect(self.toggle_unicode_display)
         
         button_layout.addWidget(self.translate_all_btn)
@@ -81,7 +84,7 @@ class OutstandingItemsWindow(QDialog):
             return
             
         menu = QMenu()
-        translate_action = QAction("Translate This Item", self)
+        translate_action = QAction(_("Translate This Item"), self)
         translate_action.triggered.connect(lambda: self.translate_selected_item(item))
         menu.addAction(translate_action)
         menu.exec(self.table.mapToGlobal(position))
