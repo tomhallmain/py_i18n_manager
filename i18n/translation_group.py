@@ -5,6 +5,14 @@ from utils.config import ConfigManager
 config = ConfigManager()
 
 def escape_unicode(s):
+    """Convert a string to ASCII-encoded Unicode format for PO files.
+    
+    Args:
+        s (str): The string to convert
+        
+    Returns:
+        str: The string in ASCII-encoded Unicode format
+    """
     ret = []
     for c in s:
         n = ord(c)
@@ -13,6 +21,29 @@ def escape_unicode(s):
         else:
             ret.append(c)
     return "".join(ret)
+
+
+def unescape_unicode(s):
+    """Convert an ASCII-encoded Unicode string back to regular Unicode.
+    
+    Args:
+        s (str): The ASCII-encoded Unicode string to convert
+        
+    Returns:
+        str: The string in regular Unicode format
+    """
+    # Replace \u00 with \x for short sequences
+    s = s.replace('\\u00', '\\x')
+    # Replace \u with \U for long sequences
+    s = s.replace('\\u', '\\U')
+    
+    try:
+        # Decode the escaped string back to Unicode
+        return s.encode('ascii').decode('unicode_escape')
+    except Exception as e:
+        print(f"Error unescaping string: {e}")
+        return s
+
 
 
 def get_string_format_indices(s):
@@ -45,6 +76,14 @@ class TranslationGroup():
             if locale == self.default_locale:
                 return self.key
             return ""
+
+    def get_translation_escaped(self, locale, fail_on_key_error=False):
+        translation = self.get_translation(locale, fail_on_key_error)
+        return escape_unicode(translation)
+
+    def get_translation_unescaped(self, locale, fail_on_key_error=False):
+        translation = self.get_translation(locale, fail_on_key_error)
+        return unescape_unicode(translation)
 
     def get_missing_locales(self, expected_locales):
         return [locale for locale in expected_locales if not locale in self.values or self.values[locale].strip() == '']

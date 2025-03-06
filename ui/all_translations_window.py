@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                             QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
-                            QMessageBox, QLineEdit, QComboBox)
-from PyQt6.QtCore import Qt, pyqtSignal
+                            QMessageBox, QLineEdit, QComboBox, QCheckBox)
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 
 class AllTranslationsWindow(QDialog):
     translation_updated = pyqtSignal(str, str, str)  # msgid, locale, new_value
@@ -10,6 +10,7 @@ class AllTranslationsWindow(QDialog):
         super().__init__(parent)
         self.setWindowTitle("All Translations")
         self.setMinimumSize(1000, 700)
+        self.show_escaped = False
         self.setup_ui()
         
     def setup_ui(self):
@@ -50,13 +51,19 @@ class AllTranslationsWindow(QDialog):
         
         # Buttons
         button_layout = QHBoxLayout()
+        
         save_btn = QPushButton("Save Changes")
         save_btn.clicked.connect(self.save_changes)
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(self.close)
         
+        # Add Unicode display toggle
+        self.unicode_toggle = QCheckBox("Show Escaped Unicode")
+        self.unicode_toggle.stateChanged.connect(self.toggle_unicode_display)
+        
         button_layout.addWidget(save_btn)
         button_layout.addWidget(close_btn)
+        button_layout.addWidget(self.unicode_toggle)
         layout.addLayout(button_layout)
         
         # Store original data
@@ -167,4 +174,34 @@ class AllTranslationsWindow(QDialog):
         for msgid, locale, new_value in changes:
             self.translation_updated.emit(msgid, locale, new_value)
         
-        QMessageBox.information(self, "Success", f"Saved {len(changes)} changes successfully!") 
+        QMessageBox.information(self, "Success", f"Saved {len(changes)} changes successfully!")
+
+    def update_table_display(self):
+        """Update the table display based on current Unicode display mode."""
+        if not self.all_translations or not self.all_locales:
+            return
+            
+        for row in range(self.table.rowCount()):
+            if self.table.isRowHidden(row):
+                continue
+                
+            msgid = self.table.item(row, 0).text()
+            for col in range(1, self.table.columnCount()):
+                locale = self.table.horizontalHeaderItem(col).text()
+                group = self.all_translations.get(msgid)
+                if group:
+                    value = group.get_translation(locale)
+                    if value:
+                        item = self.table.item(row, col)
+                        if item:
+                            if self.show_escaped:
+                                item.setText(group.get_translation_escaped(locale))
+                            else:
+                                item.setText(value.get_translation_unescaped(locale))
+
+    def toggle_unicode_display(self):
+        """Toggle the Unicode display mode."""
+        self.show_escaped = not self.show_escaped
+        self.update_table_display()
+        # Force UI update
+        QTimer.singleShot(0, lambda: self.table.viewport().update()) 

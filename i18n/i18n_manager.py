@@ -227,58 +227,6 @@ class I18NManager():
             print(f"Writing new file {locale} to {PO}")
             self.write_po_file(PO, locale)
 
-    def _escape_string(self, s):
-        """Convert a string to ASCII-encoded Unicode format for PO files.
-        
-        Args:
-            s (str): The string to convert
-            
-        Returns:
-            str: The string in ASCII-encoded Unicode format
-        """
-        if not isinstance(s, str):
-            return str(s)
-            
-        result = []
-        for c in s:
-            if ord(c) <= 0x7F:  # ASCII character
-                result.append(c)
-            else:
-                # Get Python's escaped version
-                escaped = c.encode('ascii', 'backslashreplace').decode()
-                # Convert \x to \u00 for short sequences, \u for long ones
-                if len(escaped) < 6:  # e.g., \xE9
-                    escaped = escaped.replace('\\x', '\\u00')
-                else:  # e.g., \U0001F600
-                    escaped = escaped.replace('\\U', '\\u')
-                result.append(escaped)
-                
-        return ''.join(result)
-        
-    def _unescape_string(self, s):
-        """Convert an ASCII-encoded Unicode string back to regular Unicode.
-        
-        Args:
-            s (str): The ASCII-encoded Unicode string to convert
-            
-        Returns:
-            str: The string in regular Unicode format
-        """
-        if not isinstance(s, str):
-            return str(s)
-            
-        # Replace \u00 with \x for short sequences
-        s = s.replace('\\u00', '\\x')
-        # Replace \u with \U for long sequences
-        s = s.replace('\\u', '\\U')
-        
-        try:
-            # Decode the escaped string back to Unicode
-            return s.encode('ascii').decode('unicode_escape')
-        except Exception as e:
-            logger.warning(f"Error unescaping string: {e}")
-            return s
-
     def write_po_file(self, po_file, locale):
         """Write translations to a PO file for a specific locale.
         
@@ -311,18 +259,18 @@ class I18NManager():
                     f.write(group.usage_comment)
                     
                 # Write msgid
-                f.write(f'msgid "{self._escape_string(msgid)}"\n')
+                f.write(f'msgid "{msgid}"\n')
                 
                 # Write msgstr
-                translation = group.get_translation(locale)
+                translation = group.get_translation_escaped(locale)
                 if translation:
                     if "\n" in translation:
                         f.write(f"{I18NManager.MSGSTR} \"\"\n")
                         for line in translation.split("\n"):
                             if line != "":
-                                f.write(f"\"{self._escape_string(line)}\"\n")
+                                f.write(f"\"{line}\"\n")
                     else:
-                        f.write(f"{I18NManager.MSGSTR} \"{self._escape_string(translation)}\"\n")
+                        f.write(f"{I18NManager.MSGSTR} \"{translation}\"\n")
                 else:
                     f.write('msgstr ""\n')
                     
