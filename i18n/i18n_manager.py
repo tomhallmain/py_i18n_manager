@@ -106,7 +106,7 @@ class I18NManager():
 
     def _create_mo_file(self, locale: str):
         try:
-            po_directory = os.path.join(self._directory, locale, "LC_MESSAGES")
+            po_directory = os.path.join(self._directory, "locale", locale, "LC_MESSAGES")
             os.chdir(po_directory)
             
             # Find msgfmt.py

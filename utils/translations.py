@@ -12,7 +12,7 @@ elif _locale is not None and "_" in _locale:
 class I18N:
     localedir = os.path.join(os.path.dirname(os.path.abspath(os.path.dirname(__file__))), 'locale')
     locale = "en"
-    translate = None #gettext.translation('base', localedir, languages=[_locale])
+    translate = gettext.translation('base', localedir, languages=[_locale])
 
     @staticmethod
     def install_locale(locale, verbose=True):
