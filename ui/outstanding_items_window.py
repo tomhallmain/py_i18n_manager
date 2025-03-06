@@ -24,7 +24,7 @@ class OutstandingItemsWindow(QDialog):
         self.translation_service = TranslationService(default_locale=default_locale)
         
         self.is_translating = False
-        self.show_escaped = False
+        self.show_escaped = True  # Set to True by default
         self.setup_ui()
         
     def closeEvent(self, event):
@@ -71,6 +71,7 @@ class OutstandingItemsWindow(QDialog):
         
         # Add Unicode display toggle
         self.unicode_toggle = QCheckBox(_("Show Escaped Unicode"))
+        self.unicode_toggle.setChecked(True)  # Set to checked by default
         self.unicode_toggle.stateChanged.connect(self.toggle_unicode_display)
         
         button_layout.addWidget(self.translate_all_btn)

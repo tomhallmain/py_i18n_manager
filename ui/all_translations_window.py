@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QMessageBox, QLineEdit, QComboBox, QCheckBox)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from utils.translations import I18N
+from PyQt6.QtGui import QColor
 
 _ = I18N._
 
@@ -13,7 +14,7 @@ class AllTranslationsWindow(QDialog):
         super().__init__(parent)
         self.setWindowTitle(_("All Translations"))
         self.setMinimumSize(1000, 700)
-        self.show_escaped = False
+        self.show_escaped = True  # Set to True by default
         self.setup_ui()
         
     def setup_ui(self):
@@ -62,6 +63,7 @@ class AllTranslationsWindow(QDialog):
         
         # Add Unicode display toggle
         self.unicode_toggle = QCheckBox(_("Show Escaped Unicode"))
+        self.unicode_toggle.setChecked(True)  # Set to checked by default
         self.unicode_toggle.stateChanged.connect(self.toggle_unicode_display)
         
         button_layout.addWidget(save_btn)
@@ -72,6 +74,11 @@ class AllTranslationsWindow(QDialog):
         # Store original data
         self.all_translations = None
         self.all_locales = None
+
+        # Define custom colors
+        self.missing_color = QColor(255, 255, 200)  # Light yellow
+        self.unicode_color = QColor(255, 200, 200)    # Light red
+        self.index_color = QColor(255, 200, 201)    # Light red
         
     def load_data(self, translations, locales):
         """Load translation data into the table.
@@ -90,7 +97,7 @@ class AllTranslationsWindow(QDialog):
         self.table.setHorizontalHeaderLabels(headers)
         
         # Set up rows
-        self.table.setRowCount(len(translations))
+        self.table.setRowCount(len(translations))        
         
         # Fill in data
         for row, (msgid, group) in enumerate(translations.items()):
@@ -106,11 +113,11 @@ class AllTranslationsWindow(QDialog):
                 
                 # Highlight problematic cells
                 if locale in group.get_missing_locales(locales):
-                    item.setBackground(Qt.GlobalColor.red)
+                    item.setBackground(self.missing_color)
                 elif locale in group.get_invalid_unicode_locales():
-                    item.setBackground(Qt.GlobalColor.yellow)
+                    item.setBackground(self.unicode_color)
                 elif locale in group.get_invalid_index_locales():
-                    item.setBackground(Qt.GlobalColor.cyan)
+                    item.setBackground(self.index_color)
                 
                 self.table.setItem(row, col, item)
         
@@ -139,13 +146,13 @@ class AllTranslationsWindow(QDialog):
                 has_status = False
                 for col in range(1, self.table.columnCount()):
                     item = self.table.item(row, col)
-                    if status_filter == "Missing" and item.background().color() == Qt.GlobalColor.red:
+                    if status_filter == "Missing" and item.background().color() == self.missing_color:
                         has_status = True
                         break
-                    elif status_filter == "Invalid Unicode" and item.background().color() == Qt.GlobalColor.yellow:
+                    elif status_filter == "Invalid Unicode" and item.background().color() == self.unicode_color:
                         has_status = True
                         break
-                    elif status_filter == "Invalid Indices" and item.background().color() == Qt.GlobalColor.cyan:
+                    elif status_filter == "Invalid Indices" and item.background().color() == self.index_color:
                         has_status = True
                         break
                 if not has_status:
@@ -200,7 +207,7 @@ class AllTranslationsWindow(QDialog):
                             if self.show_escaped:
                                 item.setText(group.get_translation_escaped(locale))
                             else:
-                                item.setText(value.get_translation_unescaped(locale))
+                                item.setText(group.get_translation_unescaped(locale))
 
     def toggle_unicode_display(self):
         """Toggle the Unicode display mode."""
