@@ -2,6 +2,7 @@
 
 from PyQt6.QtCore import QThread, pyqtSignal
 from i18n.i18n_manager import I18NManager
+from i18n.translation_manager_results import TranslationAction, TranslationManagerResults
 import sys
 import io
 import logging
@@ -21,19 +22,20 @@ class PrintCapture:
         pass
 
 class TranslationWorker(QThread):
-    finished = pyqtSignal(int)
+    finished = pyqtSignal(TranslationManagerResults)
     output = pyqtSignal(str)
     stats_updated = pyqtSignal(int, int, int)  # total_translations, total_locales, missing_translations
     translations_ready = pyqtSignal(dict, list)  # translations, locales
     
-    def __init__(self, directory, mode=None, modified_locales=None, intro_details=None, manager=None):
+    def __init__(self, directory, action: TranslationAction = TranslationAction.CHECK_STATUS, 
+                 modified_locales=None, intro_details=None, manager=None):
         super().__init__()
         self.directory = directory
-        self.mode = mode
+        self.action = action
         self.modified_locales = modified_locales or set()
         self.intro_details = intro_details
         self.manager = manager
-        logger.debug(f"Initialized TranslationWorker with directory: {directory}, mode: {mode}, modified_locales: {modified_locales}")
+        logger.debug(f"Initialized TranslationWorker with directory: {directory}, action: {action.name}, modified_locales: {modified_locales}")
         
     def run(self):
         try:
@@ -50,21 +52,8 @@ class TranslationWorker(QThread):
             else:
                 logger.debug("Using existing I18NManager instance")
             
-            if self.mode == 0:  # Update PO files
-                if self.modified_locales:
-                    logger.debug(f"Updating specific locales: {self.modified_locales}")
-                    # Only update specific locales
-                    result = self.manager.update_po_files(self.modified_locales)
-                else:
-                    logger.debug("Updating all PO files")
-                    # Update all PO files
-                    result = self.manager.manage_translations(create_new_po_files=True)
-            elif self.mode == 1:  # Create MO files
-                logger.debug("Creating MO files")
-                result = self.manager.manage_translations(create_mo_files=True)
-            else:  # Check status
-                logger.debug("Checking translation status")
-                result = self.manager.manage_translations()
+            # Run the translation management task with the specified action
+            result = self.manager.manage_translations(self.action, self.modified_locales)
                 
             # Calculate statistics
             total_translations = len(self.manager.translations)
@@ -81,11 +70,17 @@ class TranslationWorker(QThread):
                 
             # Restore stdout
             sys.stdout = old_stdout
-            logger.debug(f"Translation worker finished with result: {result}")
+            logger.debug(f"Translation worker finished with result.action_successful: {result.action_successful}")
             self.finished.emit(result)
+            
         except Exception as e:
             # Restore stdout even if there's an error
             sys.stdout = old_stdout
             logger.error(f"Error in translation worker: {e}", exc_info=True)
             self.output.emit(f"Error: {str(e)}")
-            self.finished.emit(1)
+            
+            # Create error result
+            error_result = TranslationManagerResults.create(self.directory, self.action)
+            error_result.action_successful = False
+            error_result.error_message = str(e)
+            self.finished.emit(error_result)

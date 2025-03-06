@@ -7,6 +7,7 @@ import logging
 import re
 
 from i18n.translation_group import TranslationGroup
+from .translation_manager_results import TranslationManagerResults, TranslationAction, LocaleStatus
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,25 @@ class I18NManager():
             "version": "1.0"
         }
 
+    def set_directory(self, directory):
+        """Set a new project directory and reset translation state.
+        
+        Args:
+            directory (str): The new project directory path
+        """
+        logger.debug(f"Setting new project directory: {directory}")
+        self._directory = directory
+        # Reset translation state
+        self.translations = {}
+        self.written_locales = set()
+        self.locales = []
+        self.intro_details = {
+            "first_author": "AUTHOR NAME <author@example.com>",
+            "last_translator": "Translator Name <translator@example.com>",
+            "application_name": "APPLICATION",
+            "version": "1.0"
+        }
+
     def create_mo_files(self):
         for locale in self.locales:
             self._create_mo_file(locale)
@@ -80,31 +100,68 @@ class I18NManager():
         else:
             print("Created mo for locale " + locale)
 
-    def manage_translations(self, create_new_po_files=False, create_mo_files=False):
+    def manage_translations(self, action: TranslationAction = TranslationAction.CHECK_STATUS, modified_locales=None):
+        """Manage translations based on the specified action.
+        
+        Args:
+            action (TranslationAction): The action to perform. Defaults to CHECK_STATUS.
+            modified_locales (set, optional): Set of locales that have been modified and need updating.
+            
+        Returns:
+            TranslationManagerResults: Results of the translation management operation.
+        """
+        results = TranslationManagerResults.create(self._directory, action)
+        results.default_locale = self.intro_details.get('translation.default_locale', 'en')
+        
         try:
-            POT_file, PO_files = self.gather_files()
-            print("POT file found: " + POT_file)
-            print("PO files found: " + str(len(PO_files)))
-            self._parse_pot(POT_file)
+            # Get POT and PO files
+            pot_file, po_files = self.gather_files()
+            logger.debug(f"Found POT file: {pot_file}")
+            logger.debug(f"Found PO files: {len(po_files)}")
+            
+            # Parse POT file if it exists
+            if results.has_pot_file:
+                self._parse_pot(pot_file)
+            
+            # Parse existing PO files
+            if results.has_locale_dir:
+                self._fill_translations(po_files)
+            
+            # Update statistics
+            if self.translations:
+                results.total_strings = len(self.translations)
+                results.total_locales = len(results.locale_statuses)
+                
+                # Get invalid translations info
+                not_in_base, missing_locale_groups, invalid_unicode_groups, invalid_index_groups = self.get_invalid_translations()
+                results.stale_translations = len(not_in_base)
+                results.missing_translations = len(missing_locale_groups)
+                results.invalid_unicode = len(invalid_unicode_groups)
+                results.invalid_indices = len(invalid_index_groups)
+            
+            # Perform requested action
+            if action == TranslationAction.WRITE_PO_FILES:  # Write PO files
+                locales_to_update = modified_locales or results.locale_statuses.keys()
+                for locale in locales_to_update:
+                    if locale in results.locale_statuses:
+                        self.write_locale_po_file(locale)
+            
+            elif action == TranslationAction.WRITE_MO_FILES:  # Create MO files
+                for locale in results.locale_statuses:
+                    if results.locale_statuses[locale].has_po_file:
+                        self._create_mo_file(locale)
+            
+            elif action == TranslationAction.GENERATE_POT:  # Generate POT file
+                if not self.generate_pot_file():
+                    raise Exception("Failed to generate POT file")
+            
+            results.action_successful = True
+            return results
+        
         except Exception as e:
-            logger.error(f"Error gathering files: {e}")
-            return 2
-
-        self._fill_translations(PO_files)
-
-        if create_mo_files:
-            self.create_mo_files()
-            return 0
-
-        self.print_translations()
-
-        if self.print_invalid_translations():
-           return 1
-
-        if create_new_po_files:
-            self.write_new_files(PO_files)
-
-        return 0
+            results.action_successful = False
+            results.error_message = str(e)
+            return results
 
     def get_po_file_path(self, locale):
         return os.path.join(self._directory, locale, "LC_MESSAGES", "base.po")
@@ -112,17 +169,18 @@ class I18NManager():
     def gather_files(self):
         POT_files = glob.glob(os.path.join(self._directory, "*.pot"))
         if len(POT_files) != 1:
-            self._directory = os.path.join(self._directory, "locale")
-            if os.path.exists(self._directory):
-                POT_files = glob.glob(os.path.join(self._directory, "*.pot"))
+            locale_dir = os.path.join(self._directory, "locale")
+            if os.path.exists(locale_dir):
+                POT_files = glob.glob(os.path.join(locale_dir, "*.pot"))
             if len(POT_files) != 1:
                 raise Exception("Invalid number of POT files found: " + str(len(POT_files)))
         base_name = os.path.splitext(os.path.basename(POT_files[0]))[0]
-        PO_files = glob.glob(os.path.join(self._directory, "**/*.po"), recursive=True)
+        search_dir = os.path.dirname(POT_files[0])  # Use the directory where POT was found
+        PO_files = glob.glob(os.path.join(search_dir, "**/*.po"), recursive=True)
         i = 0
         while i < len(PO_files):
             if os.path.splitext(os.path.basename(PO_files[i]))[0] != base_name:
-                print("Invalid PO file found in directory: " + os.path.basename(PO_files[i]))
+                logger.warning(f"Invalid PO file found in directory: {os.path.basename(PO_files[i])}")
                 PO_files.remove(PO_files[i])
             else:
                 i += 1

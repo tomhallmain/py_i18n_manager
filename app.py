@@ -15,6 +15,7 @@ from ui.setup_translation_project_window import SetupTranslationProjectWindow
 from utils.settings_manager import SettingsManager
 from utils.translations import I18N
 from workers.translation_worker import TranslationWorker
+from i18n.translation_manager_results import TranslationManagerResults, TranslationAction
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -104,8 +105,8 @@ class MainWindow(QMainWindow):
         self.find_untranslated_btn = QPushButton(_("Find Untranslated"))
         
         self.check_status_btn.clicked.connect(lambda: self.run_translation_task())
-        self.update_po_btn.clicked.connect(lambda: self.run_translation_task(0))
-        self.create_mo_btn.clicked.connect(lambda: self.run_translation_task(1))
+        self.update_po_btn.clicked.connect(lambda: self.run_translation_task(TranslationAction.WRITE_PO_FILES))
+        self.create_mo_btn.clicked.connect(lambda: self.run_translation_task(TranslationAction.WRITE_MO_FILES))
         self.show_outstanding_btn.clicked.connect(self.show_outstanding_items)
         self.show_all_btn.clicked.connect(self.show_all_translations)
         self.write_default_btn.clicked.connect(self.write_default_locale)
@@ -171,6 +172,10 @@ class MainWindow(QMainWindow):
         self.status_text.clear()
         self.status_text.append(f"Loading project: {directory}")
         
+        # Update i18n_manager with new directory if it exists
+        if self.i18n_manager:
+            self.i18n_manager.set_directory(directory)
+        
         # Run status check
         self.run_translation_task()
         
@@ -197,13 +202,18 @@ class MainWindow(QMainWindow):
         self.generate_pot_btn.setEnabled(has_project and has_translations)
         self.find_untranslated_btn.setEnabled(has_project and has_translations)
         
-    def run_translation_task(self, mode=None):
+    def run_translation_task(self, action: TranslationAction = TranslationAction.CHECK_STATUS):
+        """Run a translation task with the specified action.
+        
+        Args:
+            action (TranslationAction): The action to perform. Defaults to CHECK_STATUS.
+        """
         if not self.current_project:
             logger.warning("No project selected, cannot run translation task")
             QMessageBox.warning(self, "Error", "Please select a project first")
             return
             
-        logger.debug(f"Starting translation task with mode: {mode}, modified locales: {self.modified_locales}")
+        logger.debug(f"Starting translation task with action: {action.name}, modified locales: {self.modified_locales}")
         
         # Check if project needs setup
         if self.needs_project_setup():
@@ -220,7 +230,7 @@ class MainWindow(QMainWindow):
             
         self.worker = TranslationWorker(
             self.current_project, 
-            mode, 
+            action, 
             self.modified_locales,
             intro_details=intro_details,
             manager=self.i18n_manager
@@ -234,26 +244,26 @@ class MainWindow(QMainWindow):
         # Disable buttons while task is running
         self.update_button_states()
         
-    def handle_task_finished(self, result):
-        logger.debug(f"Translation task finished with result: {result}")
+    def handle_task_finished(self, results: TranslationManagerResults):
+        """Handle completion of a translation task."""
+        logger.debug(f"Translation task finished - action: {results.action.name}, success: {results.action_successful}")
         self.update_button_states()
         
         # Clear modified locales after task is complete
         self.modified_locales.clear()
         
-        if result != 0 and result != 1:
-            # Get the last few lines of output for the error message
-            last_lines = self.status_text.toPlainText().split('\n')[-5:]
-            error_msg = "Task completed with warnings or errors:\n\n" + '\n'.join(last_lines)
+        if not results.action_successful:
+            error_msg = "Task completed with warnings or errors:\n\n" + results.error_message
             logger.warning(f"Translation task completed with errors: {error_msg}")
             QMessageBox.warning(self, "Warning", error_msg)
             
             # If this was a status check and it failed, remove the project from recent projects
-            if self.current_project and not self.worker.mode:
+            if results.action == TranslationAction.CHECK_STATUS:
                 logger.warning(f"Status check failed for project {self.current_project}, removing from recent projects")
                 self.handle_project_removal(self.current_project)
                 
     def handle_translations_ready(self, translations, locales):
+        """Handle when translations are ready to be displayed."""
         logger.debug(f"Translations ready - count: {len(translations)}, locales: {locales}")
         self.locales = locales
         self.update_button_states()
@@ -334,7 +344,7 @@ class MainWindow(QMainWindow):
         self.pending_updates[locale] = changes
         
         # Reset the timer
-        self.update_timer.start(500)  # 100ms debounce time
+        self.update_timer.start(1000)  # debounce time
         
     def process_batched_updates(self):
         """Process all pending translation updates in a single batch."""
@@ -346,7 +356,7 @@ class MainWindow(QMainWindow):
         # Start translation task for all modified locales
         if self.modified_locales:
             logger.debug(f"Starting translation task for locales: {self.modified_locales}")
-            self.run_translation_task(0)  # Mode 0 updates PO files
+            self.run_translation_task(TranslationAction.WRITE_PO_FILES)
             
         # Update the UI with the new translations
         if hasattr(self, 'outstanding_window') and self.outstanding_window:
@@ -458,22 +468,11 @@ class MainWindow(QMainWindow):
 
     def needs_project_setup(self):
         """Check if the project needs initial setup."""
-        locale_dir = os.path.join(self.current_project, 'locale')
-        pot_file = os.path.join(locale_dir, 'base.pot')
-        
-        # If POT file doesn't exist, no setup needed (normal first run)
-        if not os.path.exists(pot_file):
+        if not self.i18n_manager:
             return False
-            
-        # Check if any locale directories exist
-        has_locales = False
-        if os.path.exists(locale_dir):
-            for item in os.listdir(locale_dir):
-                if os.path.isdir(os.path.join(locale_dir, item)) and not item.startswith('__'):
-                    has_locales = True
-                    break
-                    
-        return not has_locales
+        
+        results = self.i18n_manager.manage_translations()
+        return results.needs_setup()
 
     def show_project_setup(self):
         """Show the project setup window."""
