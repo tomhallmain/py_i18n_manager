@@ -173,7 +173,7 @@ class SetupTranslationProjectWindow(QDialog):
             os.makedirs(locale_dir, exist_ok=True)
             
             for i in range(self.locales_list.count()):
-                locale_code = self.locales_list.item(i).text()
+                locale_code = self.locales_list.item(i).text().strip()
                 locale_path = os.path.join(locale_dir, locale_code, 'LC_MESSAGES')
                 os.makedirs(locale_path, exist_ok=True)
                 

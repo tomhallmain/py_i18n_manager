@@ -86,21 +86,38 @@ class I18NManager():
             "version": "1.0"
         }
 
-    def create_mo_files(self):
-        for locale in self.locales:
-            self._create_mo_file(locale)
+    def create_mo_files(self, results: TranslationManagerResults):
+        for locale in results.locale_statuses:
+            if results.locale_statuses[locale].has_po_file:
+                if not self._create_mo_file(locale):
+                    results.failed_locales.append(locale)
+            else:
+                results.failed_locales.append(locale)
+        if results.failed_locales:
+            results.extend_error_message(f"Failed to create MO files for locales: {results.failed_locales}")
 
-    def _create_mo_file(self, locale):
-        po_directory = os.path.join(self._directory, locale, "LC_MESSAGES")
-        os.chdir(po_directory)
-        retval = subprocess.call(args=["python", r"C:\Python310\Tools\i18n\msgfmt.py", "-o", "base.mo", "base"], shell=True)
-        if retval != 0:
-            print("Error while creating mo file for locale " + locale)
-            sys.exit(1)
-        else:
-            print("Created mo for locale " + locale)
+    def _create_mo_file(self, locale: str):
+        try:
+            po_directory = os.path.join(self._directory, locale, "LC_MESSAGES")
+            os.chdir(po_directory)
+            
+            # Find msgfmt.py
+            msgfmt_path = self._find_python_i18n_tool("msgfmt.py")
+            if not msgfmt_path:
+                return False
+                
+            retval = subprocess.call(args=["python", msgfmt_path, "-o", "base.mo", "base"], shell=True)
+            if retval != 0:
+                print("Error while creating mo file for locale " + locale)
+                return False
+            else:
+                print("Created mo for locale " + locale)
+                return True
+        except Exception as e:
+            print("Error while creating mo file for locale " + locale + ": " + str(e))
+            return False
 
-    def manage_translations(self, action: TranslationAction = TranslationAction.CHECK_STATUS, modified_locales=None):
+    def manage_translations(self, action: TranslationAction = TranslationAction.CHECK_STATUS, modified_locales: set[str] = None):
         """Manage translations based on the specified action.
         
         Args:
@@ -112,6 +129,8 @@ class I18NManager():
         """
         results = TranslationManagerResults.create(self._directory, action)
         results.default_locale = self.intro_details.get('translation.default_locale', 'en')
+        results.failed_locales = []
+        results.action_successful = True
         
         try:
             # Get POT and PO files
@@ -140,22 +159,16 @@ class I18NManager():
                 results.invalid_indices = len(invalid_index_groups)
             
             # Perform requested action
-            if action == TranslationAction.WRITE_PO_FILES:  # Write PO files
-                locales_to_update = modified_locales or results.locale_statuses.keys()
-                for locale in locales_to_update:
-                    if locale in results.locale_statuses:
-                        self.write_locale_po_file(locale)
-            
-            elif action == TranslationAction.WRITE_MO_FILES:  # Create MO files
-                for locale in results.locale_statuses:
-                    if results.locale_statuses[locale].has_po_file:
-                        self._create_mo_file(locale)
-            
-            elif action == TranslationAction.GENERATE_POT:  # Generate POT file
+            if action == TranslationAction.WRITE_PO_FILES:
+                self.write_po_files(modified_locales, results)
+            elif action == TranslationAction.WRITE_MO_FILES:
+                self.create_mo_files(results)
+            elif action == TranslationAction.GENERATE_POT:
                 if not self.generate_pot_file():
-                    raise Exception("Failed to generate POT file")
+                    results.action_successful = False
+                    results.extend_error_message("Failed to generate POT file")
             
-            results.action_successful = True
+            results.determine_action_successful()
             return results
         
         except Exception as e:
@@ -164,7 +177,7 @@ class I18NManager():
             return results
 
     def get_po_file_path(self, locale):
-        return os.path.join(self._directory, locale, "LC_MESSAGES", "base.po")
+        return os.path.join(self._directory, "locale", locale, "LC_MESSAGES", "base.po")
 
     def gather_files(self):
         POT_files = glob.glob(os.path.join(self._directory, "*.pot"))
@@ -330,6 +343,15 @@ class I18NManager():
             print(f"Writing new file {locale} to {PO}")
             self.write_po_file(PO, locale)
 
+    def write_po_files(self, modified_locales: set[str], results: TranslationManagerResults):
+        locales_to_update = modified_locales or results.locale_statuses.keys()
+        for locale in locales_to_update:
+            if locale in results.locale_statuses:
+                if not self.write_locale_po_file(locale):
+                    results.failed_locales.append(locale)
+        if results.failed_locales:
+            results.extend_error_message(f"Failed to write PO files for locales: {results.failed_locales}")
+
     def write_po_file(self, po_file, locale):
         """Write translations to a PO file for a specific locale.
         
@@ -465,13 +487,11 @@ msgstr ""
             bool: True if successful, False otherwise
         """
         try:
-            # Construct the PO file path
-            po_file = os.path.join(self._directory, locale, "LC_MESSAGES", "base.po")
+            po_file = self.get_po_file_path(locale)
             if not os.path.exists(po_file):
                 logger.warning(f"PO file not found for locale {locale}: {po_file}")
                 return False
                 
-            logger.debug(f"Writing PO file for locale {locale}: {po_file}")
             self.write_po_file(po_file, locale)
             return True
         except Exception as e:
@@ -496,32 +516,21 @@ msgstr ""
             
             logger.info(f"Generating POT file in directory: {project_dir}")
             
-            # Try different possible locations for pygettext
-            python_version = f"Python{sys.version_info.major}{sys.version_info.minor}"
-            possible_paths = [
-                os.path.join(sys.prefix, "Tools", "i18n", "pygettext.py"),  # Current Python installation
-                rf"C:\{python_version}\Tools\i18n\pygettext.py",            # Windows specific Python version
-                r"C:\Python310\Tools\i18n\pygettext.py",                    # Hardcoded fallback
-                "pygettext.py"                                              # Assume it's in PATH
-            ]
-            
-            for pygettext_path in possible_paths:
-                try:
-                    if os.path.exists(pygettext_path) or pygettext_path == "pygettext.py":
-                        result = subprocess.run(
-                            ["python", pygettext_path, "-d", "base", "-o", "locale\\base.pot", "."],
-                            cwd=project_dir,
-                            capture_output=True,
-                            text=True
-                        )
-                        if result.returncode == 0:
-                            logger.info(f"Successfully generated base.pot file using {pygettext_path}")
-                            return True
-                except Exception as e:
-                    logger.debug(f"Failed to use pygettext at {pygettext_path}: {e}")
-                    continue
-            
-            logger.error("Could not find a working pygettext.py installation")
+            # Find pygettext.py
+            pygettext_path = self._find_python_i18n_tool("pygettext.py")
+            if not pygettext_path:
+                return False
+                
+            result = subprocess.run(
+                ["python", pygettext_path, "-d", "base", "-o", "locale\\base.pot", "."],
+                cwd=project_dir,
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0:
+                logger.info(f"Successfully generated base.pot file using {pygettext_path}")
+                return True
+                
             return False
                 
         except Exception as e:
@@ -595,6 +604,35 @@ msgstr ""
                     logger.error(f"Error processing file {file_path}: {e}")
                     
         return results
+
+    def _find_python_i18n_tool(self, tool_name: str) -> str:
+        """Find a valid Python i18n tool script.
+        
+        Args:
+            tool_name (str): Name of the tool to find (e.g., 'pygettext.py' or 'msgfmt.py')
+            
+        Returns:
+            str: Path to the tool if found, empty string if not found
+        """
+        python_version = f"Python{sys.version_info.major}{sys.version_info.minor}"
+        possible_paths = [
+            os.path.join(sys.prefix, "Tools", "i18n", tool_name),  # Current Python installation
+            rf"C:\{python_version}\Tools\i18n\{tool_name}",        # Windows specific Python version
+            rf"C:\Python310\Tools\i18n\{tool_name}",               # Hardcoded fallback
+            tool_name                                              # Assume it's in PATH
+        ]
+        
+        for tool_path in possible_paths:
+            try:
+                if os.path.exists(tool_path) or tool_path == tool_name:
+                    logger.debug(f"Found {tool_name} at {tool_path}")
+                    return tool_path
+            except Exception as e:
+                logger.debug(f"Failed to access {tool_name} at {tool_path}: {e}")
+                continue
+                
+        logger.error(f"Could not find {tool_name} installation")
+        return ""
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

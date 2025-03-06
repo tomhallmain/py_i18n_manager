@@ -250,11 +250,12 @@ class MainWindow(QMainWindow):
             error_msg = "Task completed with warnings or errors:\n\n" + results.error_message
             logger.warning(f"Translation task completed with errors: {error_msg}")
             QMessageBox.warning(self, "Warning", error_msg)
-            
-            # If this was a status check and it failed, remove the project from recent projects
-            if results.action == TranslationAction.CHECK_STATUS:
-                logger.warning(f"Status check failed for project {self.current_project}, removing from recent projects")
-                self.handle_project_removal(self.current_project)
+
+            # TODO maybe implement this with other condition: if not self.needs_project_setup()            
+            # # If this was a status check and it failed, remove the project from recent projects
+            # if results.action == TranslationAction.CHECK_STATUS:
+            #     logger.warning(f"Status check failed for project {self.current_project}, removing from recent projects")
+            #     self.handle_project_removal(self.current_project)
 
         # Check if project needs setup
         if self.needs_project_setup():

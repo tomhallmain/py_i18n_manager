@@ -54,6 +54,7 @@ class TranslationManagerResults:
     action_timestamp: datetime
     action_successful: bool
     locale_statuses: Dict[str, LocaleStatus]
+    failed_locales: List[str]
     default_locale: str
     has_locale_dir: bool
     has_pot_file: bool
@@ -94,11 +95,12 @@ class TranslationManagerResults:
             action_timestamp=datetime.now(),
             action_successful=True,  # Will be updated after action completes
             locale_statuses=locale_statuses,
+            failed_locales=[],
             default_locale='en',  # Will be updated from settings
             has_locale_dir=has_locale,
             has_pot_file=has_pot,
             pot_file_path=pot_file if has_pot else None,
-            pot_last_modified=pot_modified
+            pot_last_modified=pot_modified,
         )
     
     def needs_setup(self) -> bool:
@@ -150,6 +152,17 @@ class TranslationManagerResults:
             locale for locale, status in self.locale_statuses.items()
             if status.last_modified and status.last_modified < self.pot_last_modified
         ]
+
+    def extend_error_message(self, message: str):
+        """Extend the error message with a new message."""
+        if self.error_message:
+            self.error_message += "\n" + message
+        else:
+            self.error_message = message
+
+    def determine_action_successful(self):
+        """Determine if the action was successful based on the results."""
+        self.action_successful = self.action_successful and not self.error_message and not self.failed_locales
     
     def format_status_report(self) -> str:
         """Generate a human-readable status report."""

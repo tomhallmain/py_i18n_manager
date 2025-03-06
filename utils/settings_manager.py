@@ -11,7 +11,25 @@ class SettingsManager:
     def __init__(self):
         self.settings_file = Path.home() / '.i18n_manager' / 'settings.json'
         self.settings_file.parent.mkdir(parents=True, exist_ok=True)
+        self.default_config_path = Path(__file__).parent.parent / 'configs' / 'default_config.json'
         
+    def load_config(self):
+        """Load configuration from default config file.
+        
+        Returns:
+            dict: Configuration dictionary
+        """
+        try:
+            if self.default_config_path.exists():
+                with open(self.default_config_path, 'r') as f:
+                    return json.load(f)
+            else:
+                logger.warning(f"Default config file not found at {self.default_config_path}")
+                return {}
+        except Exception as e:
+            logger.error(f"Error loading config: {e}")
+            return {}
+            
     def load_last_project(self):
         """Load the last selected project path from settings.
         
@@ -150,4 +168,23 @@ class SettingsManager:
                 "last_translator": "Thomas Hall <tomhall.main@gmail.com>",
                 "application_name": "APPLICATION",
                 "version": "1.0"
-            } 
+            }
+
+    def save_intro_details(self, intro_details):
+        """Save intro details to settings.
+        
+        Args:
+            intro_details (dict): Dictionary containing intro details
+        """
+        try:
+            settings = {}
+            if self.settings_file.exists():
+                with open(self.settings_file, 'r') as f:
+                    settings = json.load(f)
+                    
+            settings['intro_details'] = intro_details
+            
+            with open(self.settings_file, 'w') as f:
+                json.dump(settings, f, indent=4)
+        except Exception as e:
+            logger.error(f"Error saving intro details: {e}") 
