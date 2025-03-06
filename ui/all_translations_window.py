@@ -132,13 +132,24 @@ class AllTranslationsWindow(QDialog):
         search_text = self.search_box.text().lower()
         status_filter = self.status_filter.currentText()
         
+        # First, apply status filter and collect row data with priorities
+        visible_rows = []
         for row in range(self.table.rowCount()):
             show_row = True
+            priority = 3  # Default priority (no match)
             
-            # Apply search filter
+            msgid = self.table.item(row, 0).text()
+            msgid_lower = msgid.lower()
+            
+            # Determine search match priority
             if search_text:
-                msgid = self.table.item(row, 0).text().lower()
-                if search_text not in msgid:
+                if msgid_lower.startswith(search_text):
+                    priority = 0  # Highest priority - starts with search text
+                elif any(word.startswith(search_text) for word in msgid_lower.split()):
+                    priority = 1  # Medium priority - word starts with search text
+                elif search_text in msgid_lower:
+                    priority = 2  # Low priority - contains search text
+                else:
                     show_row = False
             
             # Apply status filter
@@ -158,7 +169,24 @@ class AllTranslationsWindow(QDialog):
                 if not has_status:
                     show_row = False
             
-            self.table.setRowHidden(row, not show_row)
+            if show_row:
+                visible_rows.append((priority, row))
+        
+        # Sort rows by priority
+        visible_rows.sort()  # Sort by priority (first element of tuple)
+        
+        # Reorder and show/hide rows
+        for display_index, (priority, original_row) in enumerate(visible_rows):
+            self.table.setRowHidden(original_row, False)
+            self.table.verticalHeader().moveSection(
+                self.table.verticalHeader().visualIndex(original_row),
+                display_index
+            )
+        
+        # Hide all rows that didn't match
+        for row in range(self.table.rowCount()):
+            if row not in [r for _, r in visible_rows]:
+                self.table.setRowHidden(row, True)
         
     def save_changes(self):
         """Save all changes made in the table."""
