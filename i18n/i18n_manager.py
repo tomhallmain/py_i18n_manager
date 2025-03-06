@@ -18,6 +18,7 @@ class I18NManager():
         self._directory = directory
         self.locales = locales[:]
         self.translations = {}
+        self.written_locales = set()  # Track which locales have been written to
         # Store intro details if provided, otherwise use defaults
         self.intro_details = intro_details or {
             "first_author": "THOMAS HALL <tomhall.main@gmail.com>",
@@ -95,8 +96,10 @@ class I18NManager():
             for line in f:
                 if line.startswith(I18NManager.MSGID):
                     msgid = self.get_msgid(line)
-                    group = TranslationGroup(msgid, is_in_base=True, usage_comment=usage_comment)
-                    self.translations[msgid] = group
+                    # Skip empty or whitespace-only msgids (including the header entry with empty msgid)
+                    if msgid and msgid.strip():
+                        group = TranslationGroup(msgid, is_in_base=True, usage_comment=usage_comment)
+                        self.translations[msgid] = group
                     usage_comment = ""
                     in_usage_comment = False
                 elif line.startswith("#") or in_usage_comment:
@@ -132,12 +135,13 @@ class I18NManager():
                         print("Line: " + line)
                     msgstr += line[8:-2]
                 elif line.strip() == "" and msgstr != "":
-                    if msgid in self.translations:
-                        self.translations[msgid].add_translation(locale, msgstr)
-                    else:
-                        group = TranslationGroup(msgid, is_in_base=False, usage_comment=usage_comment)
-                        group.add_translation(locale, msgstr)
-                        self.translations[msgid] = group
+                    if msgid and msgid.strip():
+                        if msgid in self.translations:
+                            self.translations[msgid].add_translation(locale, msgstr)
+                        else:
+                            group = TranslationGroup(msgid, is_in_base=False, usage_comment=usage_comment)
+                            group.add_translation(locale, msgstr)
+                            self.translations[msgid] = group
                     is_in_msgstr = False
                     msgstr = ""
                     usage_comment = ""
@@ -164,7 +168,9 @@ class I18NManager():
         
         for msgid, group in self.translations.items():
             if not group.is_in_base:
-                not_in_base.append(msgid)
+                # Only report not_in_base if we haven't written to all locales yet
+                if not self.written_locales.issuperset(self.locales):
+                    not_in_base.append(msgid)
             else:
                 missing_locales = group.get_missing_locales(self.locales)
                 if len(missing_locales) > 0:
@@ -278,6 +284,20 @@ class I18NManager():
                 translation_count += 1
                 
             logger.debug(f"Wrote {translation_count} translations to PO file")
+            # Mark this locale as having been written to
+            self.written_locales.add(locale)
+            
+            # If all locales have been written to at least once, purge stale translations
+            if self.written_locales.issuperset(self.locales):
+                self._purge_stale_translations()
+                
+    def _purge_stale_translations(self):
+        """Remove translations that are not in base once all locales have been written."""
+        stale_msgids = [msgid for msgid, group in self.translations.items() if not group.is_in_base]
+        for msgid in stale_msgids:
+            del self.translations[msgid]
+        if stale_msgids:
+            logger.debug(f"Purged {len(stale_msgids)} stale translations")
 
     def get_POT_intro_details(self, locale="en", first_author="THOMAS HALL", year=None, application_name="APPLICATION", version="1.0", last_translator=""):
         timestamp = time.strftime('%Y-%m-%d %H:%M%z')
