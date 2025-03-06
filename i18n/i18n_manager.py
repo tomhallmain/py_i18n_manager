@@ -369,12 +369,22 @@ class I18NManager():
             results (TranslationManagerResults): Results object to track failures
         """
         locales_to_update = modified_locales or results.locale_statuses.keys()
+        successful_updates = []
+        
         for locale in locales_to_update:
             if locale in results.locale_statuses:
-                if not self.write_locale_po_file(locale):
+                if self.write_locale_po_file(locale):
+                    successful_updates.append(locale)
+                else:
                     results.failed_locales.append(locale)
+                    
         if results.failed_locales:
             results.extend_error_message(f"Failed to write PO files for locales: {results.failed_locales}")
+            
+        # Set flag if any PO files were successfully updated
+        if successful_updates:
+            results.po_files_updated = True
+            results.updated_locales = successful_updates
 
     def write_po_file(self, po_file, locale):
         """Write translations to a PO file for a specific locale.

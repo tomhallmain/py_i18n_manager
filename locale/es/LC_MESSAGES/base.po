@@ -4,8 +4,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2025-03-06 18:17-0500\n"
-"PO-Revision-Date: 2025-03-06 18:17-0500\n"
+"POT-Creation-Date: 2025-03-06 18:44-0500\n"
+"PO-Revision-Date: 2025-03-06 18:44-0500\n"
 "Last-Translator: Thomas Hall <tomhall.main@gmail.com>\n"
 "Language: es\n"
 "Language-Team: es Team <<EMAIL>>\n"
@@ -65,6 +65,18 @@ msgstr "Crear archivos MO"
 #: .\app.py:125
 msgid "Status"
 msgstr "Estado"
+
+#: .\app.py:490
+msgid "MO Files Need Update"
+msgstr "Archivos MO necesitan actualizaci\u00f3n"
+
+#: .\app.py:491
+msgid "PO files have been updated for the following locales:"
+msgstr "Los archivos .po se han actualizado para los siguientes idiomas:"
+
+#: .\app.py:493
+msgid "Remember to run Create MO Files to apply these changes."
+msgstr "Recuerda ejecutar Create MO Files para aplicar estos cambios."
 
 #: .\ui\all_translations_window.py:15
 msgid "All Translations"
@@ -190,10 +202,6 @@ msgstr "Nombre de la aplicaci\u00f3n"
 #: .\ui\setup_translation_project_window.py:34
 msgid "Application Name:"
 msgstr "Nombre de la aplicaci\u00f3n:"
-
-#: .\ui\setup_translation_project_window.py:37
-msgid "1.0"
-msgstr "1.0"
 
 #: .\ui\setup_translation_project_window.py:38
 msgid "Version:"

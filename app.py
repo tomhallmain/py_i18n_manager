@@ -263,6 +263,8 @@ class MainWindow(QMainWindow):
             self.show_project_setup()
             return
 
+        # Handle translation results
+        self.handle_translation_results(results)
 
     def handle_translations_ready(self, translations, locales):
         """Handle when translations are ready to be displayed."""
@@ -474,6 +476,22 @@ class MainWindow(QMainWindow):
         """Handle completion of project setup."""
         logger.debug("Project setup completed, running translation task")
         self.run_translation_task()
+
+    def handle_translation_results(self, results):
+        """Handle results from translation management operations."""
+        if not results.action_successful:
+            return
+            
+        # Show reminder if PO files were updated
+        if results.po_files_updated:
+            locales_str = ", ".join(results.updated_locales)
+            QMessageBox.information(
+                self,
+                _("MO Files Need Update"),
+                _("PO files have been updated for the following locales:")
+                + f"\n{locales_str}\n\n"
+                + _("Remember to run Create MO Files to apply these changes.")
+            )
 
 def main():
     app = QApplication(sys.argv)

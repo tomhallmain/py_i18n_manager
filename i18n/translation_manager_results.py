@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from typing import Dict, List, Optional
@@ -69,6 +69,10 @@ class TranslationManagerResults:
     stale_translations: int = 0
     invalid_unicode: int = 0
     invalid_indices: int = 0
+    
+    # PO/MO file update tracking
+    po_files_updated: bool = False
+    updated_locales: List[str] = field(default_factory=list)
     
     @classmethod
     def create(cls, project_dir: str, action: TranslationAction) -> 'TranslationManagerResults':
