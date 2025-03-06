@@ -39,7 +39,6 @@ class MainWindow(QMainWindow):
         self.locales = None
         self.outstanding_window = None
         self.all_translations_window = None
-        self.modified_locales = set()  # Track modified locales
         self.i18n_manager = None  # Store I18NManager instance
         
         # Initialize debounce timer for translation updates
@@ -213,7 +212,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Error", "Please select a project first")
             return
             
-        logger.debug(f"Starting translation task with action: {action.name}, modified locales: {self.modified_locales}")
+        logger.debug(f"Starting translation task with action: {action.name}, modified locales: {self.pending_updates.keys()}")
         
         # Get intro details from config
         intro_details = self.settings_manager.get_intro_details()
@@ -225,12 +224,10 @@ class MainWindow(QMainWindow):
         self.worker = TranslationWorker(
             self.current_project, 
             action, 
-            self.modified_locales,
+            pending_updates=self.pending_updates.copy(),
             intro_details=intro_details,
             manager=self.i18n_manager
         )
-        # Pass pending updates to worker
-        self.worker.pending_updates = self.pending_updates.copy() if self.pending_updates else {}
         
         self.worker.finished.connect(self.handle_task_finished)
         self.worker.output.connect(self.update_status)
@@ -247,7 +244,7 @@ class MainWindow(QMainWindow):
         self.update_button_states()
         
         # Clear modified locales after task is complete
-        self.modified_locales.clear()
+        self.pending_updates.clear()
         
         if not results.action_successful:
             error_msg = "Task completed with warnings or errors:\n\n" + results.error_message
@@ -341,10 +338,6 @@ class MainWindow(QMainWindow):
             else:
                 logger.warning(f"Translation key {msgid} not found in translations")
         
-        # Track the modified locale
-        if locale not in self.modified_locales:
-            self.modified_locales.add(locale)
-            
         # Add to pending updates
         self.pending_updates[locale] = changes
         
@@ -357,11 +350,8 @@ class MainWindow(QMainWindow):
             return
             
         logger.debug(f"Processing batched updates for {len(self.pending_updates)} locales")
-        
-        # Start translation task for all modified locales
-        if self.modified_locales:
-            logger.debug(f"Starting translation task for locales: {self.modified_locales}")
-            self.run_translation_task(TranslationAction.WRITE_PO_FILES)
+        logger.debug(f"Starting translation task for locales: {self.pending_updates.keys()}")
+        self.run_translation_task(TranslationAction.WRITE_PO_FILES)
             
         # Update the UI with the new translations
         if hasattr(self, 'outstanding_window') and self.outstanding_window:

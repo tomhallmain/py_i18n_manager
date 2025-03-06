@@ -28,14 +28,14 @@ class TranslationWorker(QThread):
     translations_ready = pyqtSignal(dict, list)  # translations, locales
     
     def __init__(self, directory, action: TranslationAction = TranslationAction.CHECK_STATUS, 
-                 modified_locales=None, intro_details=None, manager=None):
+                 pending_updates=None, intro_details=None, manager=None):
         super().__init__()
         self.directory = directory
         self.action = action
-        self.modified_locales = modified_locales or set()
+        self.pending_updates = pending_updates or {}
         self.intro_details = intro_details
         self.manager = manager
-        logger.debug(f"Initialized TranslationWorker with directory: {directory}, action: {action.name}, modified_locales: {modified_locales}")
+        logger.debug(f"Initialized TranslationWorker with directory: {directory}, action: {action.name}, pending_updates: {pending_updates}")
         
     def run(self):
         try:
@@ -53,7 +53,7 @@ class TranslationWorker(QThread):
                 logger.debug("Using existing I18NManager instance")
             
             # Apply any pending in-memory updates before running manage_translations
-            if hasattr(self, 'pending_updates'):
+            if self.pending_updates:
                 logger.debug("Applying pending in-memory updates before manage_translations")
                 for locale, changes in self.pending_updates.items():
                     for msgid, new_value in changes:
@@ -62,8 +62,8 @@ class TranslationWorker(QThread):
                             self.manager.translations[msgid].add_translation(locale, new_value)
             
             # Run the translation management task with the specified action
-            result = self.manager.manage_translations(self.action, self.modified_locales)
-                
+            result = self.manager.manage_translations(self.action, set(self.pending_updates.keys()))
+            
             # Calculate statistics
             total_translations = len(self.manager.translations)
             total_locales = len(self.manager.locales)

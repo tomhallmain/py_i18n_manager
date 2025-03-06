@@ -346,6 +346,12 @@ class I18NManager():
             self.write_po_file(PO, locale)
 
     def write_po_files(self, modified_locales: set[str], results: TranslationManagerResults):
+        """Write PO files for modified locales.
+        
+        Args:
+            modified_locales (set[str]): Set of locales to update. If None, updates all locales.
+            results (TranslationManagerResults): Results object to track failures
+        """
         locales_to_update = modified_locales or results.locale_statuses.keys()
         for locale in locales_to_update:
             if locale in results.locale_statuses:

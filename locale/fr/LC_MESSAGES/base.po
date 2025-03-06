@@ -4,8 +4,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2025-03-06 16:34-0500\n"
-"PO-Revision-Date: 2025-03-06 16:34-0500\n"
+"POT-Creation-Date: 2025-03-06 16:49-0500\n"
+"PO-Revision-Date: 2025-03-06 16:49-0500\n"
 "Last-Translator: Thomas Hall <tomhall.main@gmail.com>\n"
 "Language: fr\n"
 "Language-Team: fr Team <<EMAIL>>\n"
@@ -72,7 +72,7 @@ msgstr ""
 
 #: .\ui\all_translations_window.py:27
 msgid "Search:"
-msgstr ""
+msgstr "Rechercher :"
 
 #: .\ui\all_translations_window.py:29
 msgid "Search translation keys..."
@@ -104,7 +104,7 @@ msgstr ""
 
 #: .\ui\all_translations_window.py:60 .\ui\outstanding_items_window.py:66
 msgid "Close"
-msgstr ""
+msgstr "Fermer"
 
 #: .\ui\all_translations_window.py:64 .\ui\outstanding_items_window.py:70
 msgid "Show Escaped Unicode"
