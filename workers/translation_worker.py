@@ -30,7 +30,7 @@ class TranslationWorker(QThread):
         super().__init__()
         self.directory = directory
         self.mode = mode
-        self.modified_locales = modified_locales or []
+        self.modified_locales = modified_locales or set()
         self.intro_details = intro_details
         self.manager = manager
         logger.debug(f"Initialized TranslationWorker with directory: {directory}, mode: {mode}, modified_locales: {modified_locales}")

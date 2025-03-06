@@ -3,7 +3,7 @@ import os
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                             QTextEdit, QTabWidget, QMessageBox, QFrame)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from i18n.i18n_manager import I18NManager
 from ui.stats_widget import StatsWidget
 from ui.outstanding_items_window import OutstandingItemsWindow
@@ -34,6 +34,12 @@ class MainWindow(QMainWindow):
         self.all_translations_window = None
         self.modified_locales = set()  # Track modified locales
         self.i18n_manager = None  # Store I18NManager instance
+        
+        # Initialize debounce timer for translation updates
+        self.update_timer = QTimer()
+        self.update_timer.setSingleShot(True)
+        self.update_timer.timeout.connect(self.process_batched_updates)
+        self.pending_updates = {}  # Dictionary to store pending updates by locale
         
         # Main widget and layout
         main_widget = QWidget()
@@ -87,18 +93,21 @@ class MainWindow(QMainWindow):
         self.create_mo_btn = QPushButton("Create MO Files")
         self.show_outstanding_btn = QPushButton("Show Outstanding Items")
         self.show_all_btn = QPushButton("Show All Translations")
+        self.write_default_btn = QPushButton("Write Default Locale")
         
         self.check_status_btn.clicked.connect(lambda: self.run_translation_task())
         self.update_po_btn.clicked.connect(lambda: self.run_translation_task(0))
         self.create_mo_btn.clicked.connect(lambda: self.run_translation_task(1))
         self.show_outstanding_btn.clicked.connect(self.show_outstanding_items)
         self.show_all_btn.clicked.connect(self.show_all_translations)
+        self.write_default_btn.clicked.connect(self.write_default_locale)
         
         button_layout.addWidget(self.check_status_btn)
         button_layout.addWidget(self.update_po_btn)
         button_layout.addWidget(self.create_mo_btn)
         button_layout.addWidget(self.show_outstanding_btn)
         button_layout.addWidget(self.show_all_btn)
+        button_layout.addWidget(self.write_default_btn)
         status_layout.addLayout(button_layout)
         
         self.tab_widget.addTab(status_tab, "Status")
@@ -172,6 +181,7 @@ class MainWindow(QMainWindow):
         self.create_mo_btn.setEnabled(has_project)
         self.show_outstanding_btn.setEnabled(has_project and has_translations)
         self.show_all_btn.setEnabled(has_project and has_translations)
+        self.write_default_btn.setEnabled(has_project and has_translations)
         
     def run_translation_task(self, mode=None):
         if not self.current_project:
@@ -206,7 +216,11 @@ class MainWindow(QMainWindow):
     def handle_task_finished(self, result):
         logger.debug(f"Translation task finished with result: {result}")
         self.update_button_states()
-        if result != 0:
+        
+        # Clear modified locales after task is complete
+        self.modified_locales.clear()
+        
+        if result != 0 and result != 1:
             # Get the last few lines of output for the error message
             last_lines = self.status_text.toPlainText().split('\n')[-5:]
             error_msg = "Task completed with warnings or errors:\n\n" + '\n'.join(last_lines)
@@ -274,26 +288,53 @@ class MainWindow(QMainWindow):
                 if len(group.get_missing_locales(self.locales)) > 0)
         )
         
-    def handle_translation_update(self, msgid, locale, new_value):
-        """Handle a translation update from the outstanding items window."""
-        logger.debug(f"Handling translation update - msgid: {msgid}, locale: {locale}")
-        # Update the translation in memory
-        if msgid in self.i18n_manager.translations:
-            logger.debug(f"Updating translation in memory for {msgid} in {locale}")
-            self.i18n_manager.translations[msgid].add_translation(locale, new_value)
-            self.modified_locales.add(locale)  # Track the modified locale
-        else:
-            logger.warning(f"Translation key {msgid} not found in translations")
-            
-        # Re-run the translation task to update files
-        logger.debug(f"Starting translation task with modified locales: {self.modified_locales}")
-        self.run_translation_task(0)  # Mode 0 updates PO files
+    def handle_translation_update(self, locale, changes):
+        """Handle batched translation updates from the outstanding items window.
         
+        Args:
+            locale (str): The locale code
+            changes (list): List of (msgid, new_value) tuples for this locale
+        """
+        logger.debug(f"Handling translation updates for locale {locale} - {len(changes)} changes")
+        
+        # Update the translations in memory
+        for msgid, new_value in changes:
+            if msgid in self.i18n_manager.translations:
+                logger.debug(f"Updating translation in memory for {msgid} in {locale}")
+                self.i18n_manager.translations[msgid].add_translation(locale, new_value)
+            else:
+                logger.warning(f"Translation key {msgid} not found in translations")
+        
+        # Track the modified locale
+        if locale not in self.modified_locales:
+            self.modified_locales.add(locale)
+            
+        # Add to pending updates
+        self.pending_updates[locale] = changes
+        
+        # Reset the timer
+        self.update_timer.start(500)  # 100ms debounce time
+        
+    def process_batched_updates(self):
+        """Process all pending translation updates in a single batch."""
+        if not self.pending_updates:
+            return
+            
+        logger.debug(f"Processing batched updates for {len(self.pending_updates)} locales")
+        
+        # Start translation task for all modified locales
+        if self.modified_locales:
+            logger.debug(f"Starting translation task for locales: {self.modified_locales}")
+            self.run_translation_task(0)  # Mode 0 updates PO files
+            
         # Update the UI with the new translations
         if hasattr(self, 'outstanding_window') and self.outstanding_window:
             logger.debug("Updating outstanding items window with new translations")
             self.outstanding_window.load_data(self.i18n_manager.translations, self.locales)
             
+        # Clear pending updates
+        self.pending_updates.clear()
+        
     def show_all_translations(self):
         if not self.i18n_manager or not self.i18n_manager.translations or not self.locales:
             QMessageBox.warning(self, "Error", "Please check status first to load translation data")
@@ -328,6 +369,27 @@ class MainWindow(QMainWindow):
         if self.current_project and not self.i18n_manager:
             self.handle_project_removal(self.current_project)
         event.accept()
+
+    def write_default_locale(self):
+        """Write the PO file for the default locale."""
+        if not self.i18n_manager or not self.i18n_manager.translations:
+            QMessageBox.warning(self, "Error", "No translation data available")
+            return
+            
+        try:
+            default_locale = self.settings_manager.get_intro_details().get('translation.default_locale', 'en')
+            if default_locale in self.locales:
+                self.status_text.append(f"\nWriting PO file for default locale ({default_locale})...")
+                if self.i18n_manager.write_locale_po_file(default_locale):
+                    self.status_text.append("Default locale PO file written successfully!")
+                else:
+                    QMessageBox.warning(self, "Error", f"Failed to write PO file for default locale ({default_locale})")
+            else:
+                QMessageBox.warning(self, "Error", f"Default locale ({default_locale}) not found in project")
+        except Exception as e:
+            error_msg = f"Failed to write default locale PO file: {e}"
+            logger.error(error_msg)
+            QMessageBox.critical(self, "Error", error_msg)
 
 def main():
     app = QApplication(sys.argv)

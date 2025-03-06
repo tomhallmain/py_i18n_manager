@@ -1,14 +1,15 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                             QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
                             QMessageBox, QMenu)
-from PyQt6.QtCore import Qt, pyqtSignal, QThread
+from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer
 from PyQt6.QtGui import QColor, QAction
 from utils.config import ConfigManager
 from lib.translation_service import TranslationService
 from utils.utils import Utils
 
 class OutstandingItemsWindow(QDialog):
-    translation_updated = pyqtSignal(str, str, str)  # msgid, locale, new_value
+    # Signal now takes a list of (msgid, new_value) tuples for each locale
+    translation_updated = pyqtSignal(str, list)  # locale, [(msgid, new_value), ...]
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -16,10 +17,18 @@ class OutstandingItemsWindow(QDialog):
         self.setMinimumSize(800, 600)
         self.config = ConfigManager()
         self.translation_service = TranslationService()
+        self.is_translating = False
         self.setup_ui()
         
     def closeEvent(self, event):
         """Handle cleanup when the window is closed."""
+        if self.is_translating:
+            reply = QMessageBox.question(self, 'Translation in Progress',
+                                       'Translation is in progress. Are you sure you want to close?',
+                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.No:
+                event.ignore()
+                return
         if hasattr(self, 'translation_service'):
             del self.translation_service
         super().closeEvent(event)
@@ -41,15 +50,20 @@ class OutstandingItemsWindow(QDialog):
         button_layout = QHBoxLayout()
         
         # Translation buttons
-        translate_all_btn = QPushButton("Translate All Missing")
-        translate_all_btn.clicked.connect(self.translate_all_missing)
+        self.translate_all_btn = QPushButton("Translate All Missing")
+        self.translate_all_btn.clicked.connect(self.translate_all_missing)
+        
+        self.cancel_btn = QPushButton("Cancel Translation")
+        self.cancel_btn.clicked.connect(self.cancel_translation)
+        self.cancel_btn.setEnabled(False)
         
         save_btn = QPushButton("Save Changes")
         save_btn.clicked.connect(self.save_changes)
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(self.close)
         
-        button_layout.addWidget(translate_all_btn)
+        button_layout.addWidget(self.translate_all_btn)
+        button_layout.addWidget(self.cancel_btn)
         button_layout.addWidget(save_btn)
         button_layout.addWidget(close_btn)
         layout.addLayout(button_layout)
@@ -97,6 +111,8 @@ class OutstandingItemsWindow(QDialog):
                 if translated:
                     item = QTableWidgetItem(translated)
                     self.table.setItem(row, col, item)
+                    # Force UI update
+                    QTimer.singleShot(0, lambda: self.table.viewport().update())
                     return
             except Exception as e:
                 if attempt == 0:  # First attempt failed, will retry
@@ -105,6 +121,12 @@ class OutstandingItemsWindow(QDialog):
                 
     def translate_all_missing(self):
         """Translate all missing items."""
+        self.is_translating = True
+        self.translate_all_btn.setEnabled(False)
+        self.cancel_btn.setEnabled(True)
+        
+        # Create a list of items to translate
+        self.translation_queue = []
         for row in range(self.table.rowCount()):
             msgid = self.table.item(row, 0).text()
             for col in range(1, self.table.columnCount()):
@@ -115,7 +137,31 @@ class OutstandingItemsWindow(QDialog):
                 if item and item.text().strip():
                     continue
                     
-                self.translate_item(row, col, msgid, locale)
+                self.translation_queue.append((row, col, msgid, locale))
+        
+        # Start processing the queue
+        self.process_translation_queue()
+        
+    def process_translation_queue(self):
+        """Process the next item in the translation queue."""
+        if not self.is_translating or not self.translation_queue:
+            self.is_translating = False
+            self.translate_all_btn.setEnabled(True)
+            self.cancel_btn.setEnabled(False)
+            return
+            
+        row, col, msgid, locale = self.translation_queue.pop(0)
+        self.translate_item(row, col, msgid, locale)
+        
+        # Schedule the next item to be processed
+        QTimer.singleShot(100, self.process_translation_queue)
+        
+    def cancel_translation(self):
+        """Cancel the ongoing translation process."""
+        self.is_translating = False
+        self.translation_queue.clear()
+        self.translate_all_btn.setEnabled(True)
+        self.cancel_btn.setEnabled(False)
         
     def load_data(self, translations, locales):
         """Load translation data into the table."""
@@ -198,8 +244,8 @@ class OutstandingItemsWindow(QDialog):
                     Utils.log_red(f"Error during translation service cleanup: {e}")
             
             Utils.log("Processing table changes...")
-            # Collect all changes first
-            changes = []
+            # Collect all changes first, grouped by locale
+            changes_by_locale = {}
             for row in range(self.table.rowCount()):
                 msgid = self.table.item(row, 0).text()
                 for col in range(1, self.table.columnCount()):
@@ -210,17 +256,19 @@ class OutstandingItemsWindow(QDialog):
                         # Only include if the value is non-empty
                         if len(new_value) > 0:
                             Utils.log(f"Collecting translation update for {msgid} in {locale}")
-                            changes.append((msgid, locale, new_value))
+                            if locale not in changes_by_locale:
+                                changes_by_locale[locale] = []
+                            changes_by_locale[locale].append((msgid, new_value))
                         elif len(item.text()) > 0:
                             Utils.log_yellow(f"Empty translation with spaces for {msgid} in {locale}")
             
-            # Emit all changes after collection with delays between each
-            Utils.log(f"Emitting {len(changes)} translation updates...")
-            for i, (msgid, locale, new_value) in enumerate(changes):
-                self.translation_updated.emit(msgid, locale, new_value)
-                Utils.log(f"Emitted update {i+1}/{len(changes)}")
-                if i < len(changes) - 1:  # Don't sleep after the last one
-                    QThread.msleep(100)  # 100ms delay between emissions
+            # Emit one batch per locale
+            Utils.log(f"Emitting batches for {len(changes_by_locale)} locales...")
+            for i, (locale, changes) in enumerate(changes_by_locale.items()):
+                Utils.log(f"Emitting batch of {len(changes)} updates for locale {locale}")
+                self.translation_updated.emit(locale, changes)
+                if i < len(changes_by_locale) - 1:  # Don't sleep after the last one
+                    QThread.msleep(100)  # 100ms delay between locales
             
             Utils.log("All changes processed, accepting dialog...")
             self.accept()

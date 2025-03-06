@@ -41,15 +41,20 @@ class I18NManager():
             print("Created mo for locale " + locale)
 
     def manage_translations(self, create_new_po_files=False, create_mo_files=False):
-        POT_file, PO_files = self.gather_files()
-        print("POT file found: " + POT_file)
-        print("PO files found: " + str(len(PO_files)))
-        self._parse_pot(POT_file)
+        try:
+            POT_file, PO_files = self.gather_files()
+            print("POT file found: " + POT_file)
+            print("PO files found: " + str(len(PO_files)))
+            self._parse_pot(POT_file)
+        except Exception as e:
+            logger.error(f"Error gathering files: {e}")
+            return 2
+
         self._fill_translations(PO_files)
 
         if create_mo_files:
             self.create_mo_files()
-            return
+            return 0
 
         self.print_translations()
 
@@ -60,6 +65,9 @@ class I18NManager():
             self.write_new_files(PO_files)
 
         return 0
+
+    def get_po_file_path(self, locale):
+        return os.path.join(self._directory, locale, "LC_MESSAGES", "base.po")
 
     def gather_files(self):
         POT_files = glob.glob(os.path.join(self._directory, "*.pot"))
@@ -220,20 +228,57 @@ class I18NManager():
             self.write_po_file(PO, locale)
 
     def _escape_string(self, s):
-        """Convert a string to non-encoded Unicode format for PO files.
+        """Convert a string to ASCII-encoded Unicode format for PO files.
         
         Args:
             s (str): The string to convert
             
         Returns:
-            str: The string in non-encoded Unicode format
+            str: The string in ASCII-encoded Unicode format
         """
         if not isinstance(s, str):
             return str(s)
             
-        # Convert to bytes and back to get non-encoded Unicode
-        return s.encode('unicode_escape').decode('unicode_escape')
+        result = []
+        for c in s:
+            if ord(c) <= 0x7F:  # ASCII character
+                result.append(c)
+            else:
+                # Get Python's escaped version
+                escaped = c.encode('ascii', 'backslashreplace').decode()
+                # Convert \x to \u00 for short sequences, \u for long ones
+                if len(escaped) < 6:  # e.g., \xE9
+                    escaped = escaped.replace('\\x', '\\u00')
+                else:  # e.g., \U0001F600
+                    escaped = escaped.replace('\\U', '\\u')
+                result.append(escaped)
+                
+        return ''.join(result)
         
+    def _unescape_string(self, s):
+        """Convert an ASCII-encoded Unicode string back to regular Unicode.
+        
+        Args:
+            s (str): The ASCII-encoded Unicode string to convert
+            
+        Returns:
+            str: The string in regular Unicode format
+        """
+        if not isinstance(s, str):
+            return str(s)
+            
+        # Replace \u00 with \x for short sequences
+        s = s.replace('\\u00', '\\x')
+        # Replace \u with \U for long sequences
+        s = s.replace('\\u', '\\U')
+        
+        try:
+            # Decode the escaped string back to Unicode
+            return s.encode('ascii').decode('unicode_escape')
+        except Exception as e:
+            logger.warning(f"Error unescaping string: {e}")
+            return s
+
     def write_po_file(self, po_file, locale):
         """Write translations to a PO file for a specific locale.
         
@@ -307,43 +352,66 @@ msgstr ""
 
 '''
 
-    def update_po_files(self, modified_locales):
-        """Update PO files for specific locales that have been modified.
+    def update_po_files(self, modified_locales=None):
+        """Update PO files for modified locales.
         
         Args:
-            modified_locales (list): List of locale codes that need to be updated
-            
-        Returns:
-            int: 0 for success, non-zero for failure
+            modified_locales (set, optional): Set of locale codes to update. If None, updates all locales.
         """
         try:
+            if modified_locales is None:
+                modified_locales = set(self.locales)
+            else:
+                # Create a copy to avoid modification during iteration
+                modified_locales = set(modified_locales)
+                
             logger.debug(f"Starting PO file update for locales: {modified_locales}")
             
-            # Update only the specified locales
             for locale in modified_locales:
                 if locale not in self.locales:
                     logger.warning(f"Locale {locale} not found in project")
-                    print(f"Warning: Locale {locale} not found in project")
                     continue
                     
-                # Construct the correct path including LC_MESSAGES directory
-                po_file = os.path.join(self._directory, locale, "LC_MESSAGES", "base.po")
-                if not os.path.exists(po_file):
-                    logger.warning(f"PO file not found for locale {locale}: {po_file}")
-                    print(f"Warning: PO file not found for locale {locale}")
+                po_file = self.get_po_file_path(locale)
+                if not po_file:
+                    logger.warning(f"Could not determine PO file path for locale {locale}")
                     continue
-
-                # Write updated translations to PO file
+                    
                 logger.debug(f"Writing updated translations to PO file: {po_file}")
-                self.write_po_file(po_file, locale)
-                logger.info(f"Successfully updated PO file for locale {locale}")
-                print(f"Updated PO file for locale {locale}")
-
-            return 0
+                if self.write_po_file(po_file, locale):
+                    logger.info(f"Successfully updated PO file for locale {locale}")
+                else:
+                    logger.error(f"Failed to update PO file for locale {locale}")
+                    
+            return True
+            
         except Exception as e:
-            logger.error(f"Error updating PO files: {e}", exc_info=True)
-            print(f"Error updating PO files: {e}")
-            return 1
+            logger.error(f"Error updating PO files: {e}")
+            logger.exception("Full traceback:")
+            return False
+
+    def write_locale_po_file(self, locale):
+        """Write the PO file for a specific locale.
+        
+        Args:
+            locale (str): The locale code to write the PO file for
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Construct the PO file path
+            po_file = os.path.join(self._directory, locale, "LC_MESSAGES", "base.po")
+            if not os.path.exists(po_file):
+                logger.warning(f"PO file not found for locale {locale}: {po_file}")
+                return False
+                
+            logger.debug(f"Writing PO file for locale {locale}: {po_file}")
+            self.write_po_file(po_file, locale)
+            return True
+        except Exception as e:
+            logger.error(f"Error writing PO file for locale {locale}: {e}")
+            return False
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
