@@ -215,12 +215,6 @@ class MainWindow(QMainWindow):
             
         logger.debug(f"Starting translation task with action: {action.name}, modified locales: {self.modified_locales}")
         
-        # Check if project needs setup
-        if self.needs_project_setup():
-            logger.debug("Project needs setup, showing setup window")
-            self.show_project_setup()
-            return
-            
         # Get intro details from config
         intro_details = self.settings_manager.get_intro_details()
         
@@ -261,7 +255,14 @@ class MainWindow(QMainWindow):
             if results.action == TranslationAction.CHECK_STATUS:
                 logger.warning(f"Status check failed for project {self.current_project}, removing from recent projects")
                 self.handle_project_removal(self.current_project)
-                
+
+        # Check if project needs setup
+        if self.needs_project_setup():
+            logger.debug("Project needs setup, showing setup window")
+            self.show_project_setup()
+            return
+
+
     def handle_translations_ready(self, translations, locales):
         """Handle when translations are ready to be displayed."""
         logger.debug(f"Translations ready - count: {len(translations)}, locales: {locales}")

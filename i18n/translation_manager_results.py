@@ -102,8 +102,30 @@ class TranslationManagerResults:
         )
     
     def needs_setup(self) -> bool:
-        """Check if the project needs initial setup."""
-        return self.has_pot_file and not bool(self.locale_statuses)
+        """Check if the project needs initial setup.
+        
+        A project needs setup if:
+        1. There is no POT file, or
+        2. There are no locale directories, or
+        3. There are locale directories but some are missing PO files
+        
+        Returns:
+            bool: True if the project needs setup, False otherwise
+        """
+        # No POT file means we need setup
+        if not self.has_pot_file:
+            return True
+            
+        # No locale directories means we need setup
+        if not self.has_locale_dir or not self.locale_statuses:
+            return True
+            
+        # Check if any locale directory is missing its PO file
+        for status in self.locale_statuses.values():
+            if not status.has_po_file:
+                return True
+                
+        return False
     
     def get_missing_po_files(self) -> List[str]:
         """Get list of locales that are missing PO files."""
