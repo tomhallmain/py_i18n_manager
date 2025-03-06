@@ -1,3 +1,7 @@
+import logging
+import os
+import sys
+
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                             QTextEdit, QTabWidget, QMessageBox, QFrame)
@@ -7,10 +11,10 @@ from ui.stats_widget import StatsWidget
 from ui.outstanding_items_window import OutstandingItemsWindow
 from ui.all_translations_window import AllTranslationsWindow
 from ui.recent_projects_dialog import RecentProjectsDialog
+from ui.setup_translation_project_window import SetupTranslationProjectWindow
 from utils.settings_manager import SettingsManager
 from utils.translations import I18N
 from workers.translation_worker import TranslationWorker
-import logging
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -200,6 +204,13 @@ class MainWindow(QMainWindow):
             return
             
         logger.debug(f"Starting translation task with mode: {mode}, modified locales: {self.modified_locales}")
+        
+        # Check if project needs setup
+        if self.needs_project_setup():
+            logger.debug("Project needs setup, showing setup window")
+            self.show_project_setup()
+            return
+            
         # Get intro details from config
         intro_details = self.settings_manager.get_intro_details()
         
@@ -444,6 +455,36 @@ class MainWindow(QMainWindow):
             error_msg = f"Error finding untranslated strings: {e}"
             logger.error(error_msg)
             QMessageBox.critical(self, "Error", error_msg)
+
+    def needs_project_setup(self):
+        """Check if the project needs initial setup."""
+        locale_dir = os.path.join(self.current_project, 'locale')
+        pot_file = os.path.join(locale_dir, 'base.pot')
+        
+        # If POT file doesn't exist, no setup needed (normal first run)
+        if not os.path.exists(pot_file):
+            return False
+            
+        # Check if any locale directories exist
+        has_locales = False
+        if os.path.exists(locale_dir):
+            for item in os.listdir(locale_dir):
+                if os.path.isdir(os.path.join(locale_dir, item)) and not item.startswith('__'):
+                    has_locales = True
+                    break
+                    
+        return not has_locales
+
+    def show_project_setup(self):
+        """Show the project setup window."""
+        setup_window = SetupTranslationProjectWindow(self.current_project, self)
+        setup_window.project_configured.connect(self.handle_project_setup_complete)
+        setup_window.exec()
+        
+    def handle_project_setup_complete(self):
+        """Handle completion of project setup."""
+        logger.debug("Project setup completed, running translation task")
+        self.run_translation_task()
 
 def main():
     app = QApplication(sys.argv)

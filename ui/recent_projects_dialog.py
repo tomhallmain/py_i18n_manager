@@ -37,7 +37,7 @@ class ProjectListItem(QWidget):
         button_layout.addWidget(select_btn)
         
         # Remove button
-        remove_btn = QPushButton(_("×"))
+        remove_btn = QPushButton("×")
         remove_btn.setFixedSize(24, 24)
         remove_btn.setStyleSheet("""
             QPushButton {
