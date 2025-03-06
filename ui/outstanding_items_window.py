@@ -261,6 +261,9 @@ class OutstandingItemsWindow(QDialog):
         try:
             Utils.log("Starting save changes process...")
             
+            # Store current column widths
+            column_widths = [self.table.columnWidth(i) for i in range(self.table.columnCount())]
+            
             # First, ensure translation service is cleaned up
             if hasattr(self, 'translation_service'):
                 Utils.log("Cleaning up translation service...")
@@ -280,8 +283,13 @@ class OutstandingItemsWindow(QDialog):
             Utils.log("Processing table changes...")
             # Collect all changes first, grouped by locale
             changes_by_locale = {}
+            has_remaining_empty = False
+            rows_to_remove = []
+            
             for row in range(self.table.rowCount()):
                 msgid = self.table.item(row, 0).text()
+                row_complete = True
+                
                 for col in range(1, self.table.columnCount()):
                     locale = self.table.horizontalHeaderItem(col).text()
                     item = self.table.item(row, col)
@@ -293,8 +301,15 @@ class OutstandingItemsWindow(QDialog):
                             if locale not in changes_by_locale:
                                 changes_by_locale[locale] = []
                             changes_by_locale[locale].append((msgid, new_value))
-                        elif len(item.text()) > 0:
-                            Utils.log_yellow(f"Empty translation with spaces for {msgid} in {locale}")
+                        else:
+                            row_complete = False
+                            has_remaining_empty = True
+                            if len(item.text()) > 0:
+                                Utils.log_yellow(f"Empty translation with spaces for {msgid} in {locale}")
+                
+                # If all cells in this row have translations, mark it for removal
+                if row_complete:
+                    rows_to_remove.append(row)
             
             # Emit one batch per locale
             Utils.log(f"Emitting batches for {len(changes_by_locale)} locales...")
@@ -304,8 +319,21 @@ class OutstandingItemsWindow(QDialog):
                 if i < len(changes_by_locale) - 1:  # Don't sleep after the last one
                     QThread.msleep(100)  # 100ms delay between locales
             
-            Utils.log("All changes processed, accepting dialog...")
-            self.accept()
+            # Remove completed rows in reverse order to maintain correct indices
+            for row in sorted(rows_to_remove, reverse=True):
+                self.table.removeRow(row)
+            
+            # Restore column widths
+            for i, width in enumerate(column_widths):
+                self.table.setColumnWidth(i, width)
+            
+            # Only close the dialog if there are no remaining empty translations
+            if has_remaining_empty:
+                Utils.log("There are still empty translations remaining...")
+            else:
+                Utils.log("No remaining empty translations, accepting dialog...")
+                self.accept()
+                
         except Exception as e:
             Utils.log_red(f"Error during save changes: {e}")
             QMessageBox.critical(self, "Error", f"Failed to save changes: {e}")

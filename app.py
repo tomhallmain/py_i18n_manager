@@ -353,11 +353,6 @@ class MainWindow(QMainWindow):
         logger.debug(f"Starting translation task for locales: {self.pending_updates.keys()}")
         self.run_translation_task(TranslationAction.WRITE_PO_FILES)
             
-        # Update the UI with the new translations
-        if hasattr(self, 'outstanding_window') and self.outstanding_window:
-            logger.debug("Updating outstanding items window with new translations")
-            self.outstanding_window.load_data(self.i18n_manager.translations, self.locales)
-            
         # Clear pending updates
         self.pending_updates.clear()
         

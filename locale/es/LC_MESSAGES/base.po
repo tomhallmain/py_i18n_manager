@@ -4,8 +4,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2025-03-06 16:49-0500\n"
-"PO-Revision-Date: 2025-03-06 16:49-0500\n"
+"POT-Creation-Date: 2025-03-06 17:03-0500\n"
+"PO-Revision-Date: 2025-03-06 17:03-0500\n"
 "Last-Translator: Thomas Hall <tomhall.main@gmail.com>\n"
 "Language: es\n"
 "Language-Team: es Team <<EMAIL>>\n"
@@ -112,7 +112,7 @@ msgstr ""
 
 #: .\ui\all_translations_window.py:173
 msgid "Info"
-msgstr ""
+msgstr "Info"
 
 #: .\ui\all_translations_window.py:173
 msgid "No changes to save."
@@ -124,7 +124,7 @@ msgstr ""
 
 #: .\ui\all_translations_window.py:180
 msgid "Success"
-msgstr ""
+msgstr "\u00c9xito"
 
 #: .\ui\outstanding_items_window.py:19
 msgid "Outstanding Translation Items"
@@ -152,7 +152,7 @@ msgstr ""
 
 #: .\ui\recent_projects_dialog.py:30 .\ui\recent_projects_dialog.py:84
 msgid "Select"
-msgstr ""
+msgstr "Seleccionar"
 
 #: .\ui\recent_projects_dialog.py:67
 msgid "Select a Recent Project"
