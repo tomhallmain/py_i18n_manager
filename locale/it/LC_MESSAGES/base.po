@@ -4,8 +4,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2025-03-06 17:44-0500\n"
-"PO-Revision-Date: 2025-03-06 17:44-0500\n"
+"POT-Creation-Date: 2025-03-06 18:17-0500\n"
+"PO-Revision-Date: 2025-03-06 18:17-0500\n"
 "Last-Translator: Thomas Hall <tomhall.main@gmail.com>\n"
 "Language: it\n"
 "Language-Team: it Team <<EMAIL>>\n"
@@ -14,41 +14,37 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 
-#: .\app.py:29
+#: .\app.py:31
 msgid "i18n Translation Manager"
 msgstr "i18n Responsabile di traduzione"
 
-#: .\app.py:61
+#: .\app.py:62
 msgid "Current Project:"
 msgstr "Progetto attuale:"
 
-#: .\app.py:63
+#: .\app.py:64
 msgid "No project selected"
 msgstr "Nessun progetto selezionato"
 
-#: .\app.py:70 .\ui\recent_projects_dialog.py:59
+#: .\app.py:71 .\ui\recent_projects_dialog.py:68
 msgid "Select Project"
 msgstr "Selezionare il progetto"
 
-#: .\app.py:96
+#: .\app.py:97
 msgid "Check Status"
 msgstr "Verifica dello Stato"
 
-#: .\app.py:97
-msgid "Update PO Files"
-msgstr "Aggiornare i file PO"
-
 #: .\app.py:98
-msgid "Create MO Files"
-msgstr "Crea file MO"
+msgid "Show All Translations"
+msgstr "Mostra tutte le traduzioni"
 
 #: .\app.py:99
 msgid "Show Outstanding Items"
 msgstr "Mostra articoli in sospeso"
 
 #: .\app.py:100
-msgid "Show All Translations"
-msgstr "Mostra tutte le traduzioni"
+msgid "Find Untranslated"
+msgstr "Trova Non Tradotto"
 
 #: .\app.py:101
 msgid "Write Default Locale"
@@ -59,70 +55,74 @@ msgid "Generate POT"
 msgstr "Generare POT"
 
 #: .\app.py:103
-msgid "Find Untranslated"
-msgstr "Trova Non Tradotto"
+msgid "Update PO Files"
+msgstr "Aggiornare i file PO"
 
-#: .\app.py:124
+#: .\app.py:104
+msgid "Create MO Files"
+msgstr "Crea file MO"
+
+#: .\app.py:125
 msgid "Status"
 msgstr "Stato"
 
-#: .\ui\all_translations_window.py:14
+#: .\ui\all_translations_window.py:15
 msgid "All Translations"
 msgstr "Tutte le traduzioni"
 
-#: .\ui\all_translations_window.py:27
+#: .\ui\all_translations_window.py:28
 msgid "Search:"
 msgstr "Ricerca:"
 
-#: .\ui\all_translations_window.py:29
+#: .\ui\all_translations_window.py:30
 msgid "Search translation keys..."
 msgstr "Cerca chiavi di traduzione..."
 
-#: .\ui\all_translations_window.py:37
+#: .\ui\all_translations_window.py:38
 msgid "Filter:"
 msgstr "Filtro:"
 
-#: .\ui\all_translations_window.py:39
+#: .\ui\all_translations_window.py:40
 msgid "All"
 msgstr "Tutti"
 
-#: .\ui\all_translations_window.py:39
+#: .\ui\all_translations_window.py:40
 msgid "Invalid Indices"
 msgstr "Indici non validi"
 
-#: .\ui\all_translations_window.py:39
+#: .\ui\all_translations_window.py:40
 msgid "Invalid Unicode"
 msgstr "Non valido Unicode"
 
-#: .\ui\all_translations_window.py:39
+#: .\ui\all_translations_window.py:40
 msgid "Missing"
 msgstr "Mancanti"
 
-#: .\ui\all_translations_window.py:58 .\ui\outstanding_items_window.py:64
+#: .\ui\all_translations_window.py:59 .\ui\outstanding_items_window.py:70
 msgid "Save Changes"
 msgstr "Salvare le modifiche"
 
-#: .\ui\all_translations_window.py:60 .\ui\outstanding_items_window.py:66
+#: .\ui\all_translations_window.py:61 .\ui\outstanding_items_window.py:72
 msgid "Close"
 msgstr "Chiudi"
 
-#: .\ui\all_translations_window.py:64 .\ui\outstanding_items_window.py:70
+#: .\ui\all_translations_window.py:65 .\ui\outstanding_items_window.py:76
 msgid "Show Escaped Unicode"
 msgstr "Mostra Unicode scappato"
 
-#: .\ui\all_translations_window.py:173
+#: .\ui\all_translations_window.py:208
 msgid "Info"
 msgstr "Info"
 
-#: .\ui\all_translations_window.py:173
+#: .\ui\all_translations_window.py:208
 msgid "No changes to save."
 msgstr "Nessun cambiamento da salvare."
 
-#: .\ui\all_translations_window.py:180
+#: .\ui\all_translations_window.py:215
 msgid "Saved {} changes successfully!"
 msgstr "Salvate {} modifiche con successo!"
 
-#: .\ui\all_translations_window.py:180
+#: .\ui\all_translations_window.py:215
 msgid "Success"
 msgstr "Successo"
 
@@ -130,45 +130,155 @@ msgstr "Successo"
 msgid "Outstanding Translation Items"
 msgstr "Voci di traduzione in sospeso"
 
-#: .\ui\outstanding_items_window.py:30
+#: .\ui\outstanding_items_window.py:33
 msgid "Translation in Progress"
 msgstr "Traduzione in progresso"
 
-#: .\ui\outstanding_items_window.py:31
+#: .\ui\outstanding_items_window.py:34
 msgid "Translation is in progress. Are you sure you want to close?"
 msgstr "La traduzione \u00e8 in corso. Sei sicuro di voler chiudere?"
 
-#: .\ui\outstanding_items_window.py:57
+#: .\ui\outstanding_items_window.py:63
 msgid "Translate All Missing"
 msgstr "Traduci tutto ci\u00f2 che manca"
 
-#: .\ui\outstanding_items_window.py:60
+#: .\ui\outstanding_items_window.py:66
 msgid "Cancel Translation"
 msgstr "Annulla traduzione"
 
-#: .\ui\outstanding_items_window.py:87
-msgid "Translate This Item"
-msgstr "Traduci questo oggetto"
+#: .\ui\outstanding_items_window.py:96 .\ui\outstanding_items_window.py:126
+msgid "Copy Text"
+msgstr "Copia testo"
 
-#: .\ui\recent_projects_dialog.py:30 .\ui\recent_projects_dialog.py:84
+#: .\ui\outstanding_items_window.py:104
+msgid "Translate with Argos Translate"
+msgstr "Traduci con Argos Translate"
+
+#: .\ui\outstanding_items_window.py:109
+msgid "Translate with LLM"
+msgstr "Traduci con LLM"
+
+#: .\ui\recent_projects_dialog.py:30 .\ui\recent_projects_dialog.py:93
 msgid "Select"
 msgstr "Selezionare"
 
-#: .\ui\recent_projects_dialog.py:67
+#: .\ui\recent_projects_dialog.py:76
 msgid "Select a Recent Project"
 msgstr "Seleziona un progetto recente"
 
-#: .\ui\recent_projects_dialog.py:88
+#: .\ui\recent_projects_dialog.py:97
 msgid "Browse..."
 msgstr "Esplora..."
 
-#: .\ui\recent_projects_dialog.py:91
+#: .\ui\recent_projects_dialog.py:100
+#: .\ui\setup_translation_project_window.py:98
 msgid "Cancel"
 msgstr "Annulla"
 
-#: .\ui\recent_projects_dialog.py:134
+#: .\ui\recent_projects_dialog.py:143
 msgid "Select Project Directory"
 msgstr "Seleziona la directory del progetto"
+
+#: .\ui\setup_translation_project_window.py:19
+msgid "Setup Translation Project"
+msgstr "Traduzione di configurazione Progetto"
+
+#: .\ui\setup_translation_project_window.py:33
+msgid "Application name"
+msgstr "Nome dell'applicazione"
+
+#: .\ui\setup_translation_project_window.py:34
+msgid "Application Name:"
+msgstr "Nome dell'applicazione:"
+
+#: .\ui\setup_translation_project_window.py:37
+msgid "1.0"
+msgstr "1.0"
+
+#: .\ui\setup_translation_project_window.py:38
+msgid "Version:"
+msgstr "Versione:"
+
+#: .\ui\setup_translation_project_window.py:41
+msgid "Author Name <author@example.com>"
+msgstr "Nome dell'autore <autore@example.com>"
+
+#: .\ui\setup_translation_project_window.py:42
+msgid "Author:"
+msgstr "Autore:"
+
+#: .\ui\setup_translation_project_window.py:45
+msgid "Translator Name <translator@example.com>"
+msgstr "Nome del traduttore <translator@example.com>"
+
+#: .\ui\setup_translation_project_window.py:46
+msgid "Default Translator:"
+msgstr "Traduttore predefinito:"
+
+#: .\ui\setup_translation_project_window.py:53
+msgid "Default Locale:"
+msgstr "Locale predefinito:"
+
+#: .\ui\setup_translation_project_window.py:63
+msgid "Project Locales"
+msgstr "Luoghi del progetto"
+
+#: .\ui\setup_translation_project_window.py:71
+msgid "Enter locale code (e.g., fr, de, es)"
+msgstr "Inserisci il codice locale (ad esempio, fr, de, es)"
+
+#: .\ui\setup_translation_project_window.py:74
+msgid "Add Locale"
+msgstr "Aggiungi Locale"
+
+#: .\ui\setup_translation_project_window.py:87
+msgid "Remove Selected Locale"
+msgstr "Elimina Locale Selezionato"
+
+#: .\ui\setup_translation_project_window.py:96
+msgid "Save Configuration"
+msgstr "Salva configurazione"
+
+#: .\ui\setup_translation_project_window.py:118
+msgid "Please enter a locale code."
+msgstr "Inserisci un codice locale."
+
+#: .\ui\setup_translation_project_window.py:118
+#: .\ui\setup_translation_project_window.py:123
+#: .\ui\setup_translation_project_window.py:130
+#: .\ui\setup_translation_project_window.py:141
+#: .\ui\setup_translation_project_window.py:146
+#: .\ui\setup_translation_project_window.py:190
+msgid "Error"
+msgstr "Errore"
+
+#: .\ui\setup_translation_project_window.py:124
+msgid "Invalid locale code. Use format 'xx' or 'xx_YY' (e.g., 'fr' or 'fr_FR')."
+msgstr "Codice di locale non valido. Utilizza il formato 'xx' o 'xx_YY' (ad esempio, 'fr' o 'fr_FR')."
+
+#: .\ui\setup_translation_project_window.py:130
+msgid "This locale already exists."
+msgstr "Questa lingua locale esiste gi\u00e0."
+
+#: .\ui\setup_translation_project_window.py:141
+msgid "Please select a locale to remove."
+msgstr "Si prega di selezionare un locale da rimuovere."
+
+#: .\ui\setup_translation_project_window.py:146
+msgid "Cannot remove the default locale."
+msgstr "Non \u00e8 possibile rimuovere il locale predefinito."
+
+#: .\ui\setup_translation_project_window.py:149
+msgid "Confirm Removal"
+msgstr "Confermare la rimozione"
+
+#: .\ui\setup_translation_project_window.py:150
+msgid "Are you sure you want to remove locale '{}'? This will delete the locale directory and all its translations."
+msgstr "Sei sicuro di voler rimuovere locale '{}? Questo canceller\u00e0 la directory locale e tutte le sue traduzioni."
+
+#: .\ui\setup_translation_project_window.py:191
+msgid "Failed to save configuration: {}"
+msgstr "Non salvare la configurazione: {}"
 
 #: .\ui\stats_widget.py:29
 msgid "Translation Statistics"

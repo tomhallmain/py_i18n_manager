@@ -34,7 +34,7 @@ class SetupTranslationProjectWindow(QDialog):
         info_layout.addRow(_("Application Name:"), self.app_name)
         
         self.version = QLineEdit(self.intro_details.get("version", "1.0"))
-        self.version.setPlaceholderText(_("1.0"))
+        self.version.setPlaceholderText("1.0")
         info_layout.addRow(_("Version:"), self.version)
         
         self.author = QLineEdit(self.intro_details.get("first_author", ""))

@@ -317,8 +317,13 @@ class OutstandingItemsWindow(QDialog):
                             self.translation_service.llm._loop.close()
                     Utils.log("Deleting translation service...")
                     del self.translation_service
+                    
+                    # Reinitialize translation service
+                    Utils.log("Reinitializing translation service...")
+                    default_locale = self.config.get('translation.default_locale', 'en')
+                    self.translation_service = TranslationService(default_locale=default_locale)
                 except Exception as e:
-                    Utils.log_red(f"Error during translation service cleanup: {e}")
+                    Utils.log_red(f"Error during translation service cleanup/reinitialization: {e}")
             
             Utils.log("Processing table changes...")
             # Collect all changes first, grouped by locale
