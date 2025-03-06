@@ -229,6 +229,9 @@ class MainWindow(QMainWindow):
             intro_details=intro_details,
             manager=self.i18n_manager
         )
+        # Pass pending updates to worker
+        self.worker.pending_updates = self.pending_updates.copy() if self.pending_updates else {}
+        
         self.worker.finished.connect(self.handle_task_finished)
         self.worker.output.connect(self.update_status)
         self.worker.stats_updated.connect(self.update_stats)

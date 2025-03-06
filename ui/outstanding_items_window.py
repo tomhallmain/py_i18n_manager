@@ -308,7 +308,7 @@ class OutstandingItemsWindow(QDialog):
             self.accept()
         except Exception as e:
             Utils.log_red(f"Error during save changes: {e}")
-            QMessageBox.critical(self, "Error", f"Failed to save changes: {e}") 
+            QMessageBox.critical(self, "Error", f"Failed to save changes: {e}")
 
     def update_table_display(self):
         """Update the table display based on current Unicode display mode."""

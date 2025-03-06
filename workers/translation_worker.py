@@ -52,6 +52,15 @@ class TranslationWorker(QThread):
             else:
                 logger.debug("Using existing I18NManager instance")
             
+            # Apply any pending in-memory updates before running manage_translations
+            if hasattr(self, 'pending_updates'):
+                logger.debug("Applying pending in-memory updates before manage_translations")
+                for locale, changes in self.pending_updates.items():
+                    for msgid, new_value in changes:
+                        if msgid in self.manager.translations:
+                            logger.debug(f"Updating translation in memory for {msgid} in {locale}")
+                            self.manager.translations[msgid].add_translation(locale, new_value)
+            
             # Run the translation management task with the specified action
             result = self.manager.manage_translations(self.action, self.modified_locales)
                 

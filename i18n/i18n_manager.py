@@ -138,13 +138,15 @@ class I18NManager():
             logger.debug(f"Found POT file: {pot_file}")
             logger.debug(f"Found PO files: {len(po_files)}")
             
-            # Parse POT file if it exists
-            if results.has_pot_file:
-                self._parse_pot(pot_file)
-            
-            # Parse existing PO files
-            if results.has_locale_dir:
-                self._fill_translations(po_files)
+            # Only parse files and fill translations during CHECK_STATUS
+            if action == TranslationAction.CHECK_STATUS:
+                # Parse POT file if it exists
+                if results.has_pot_file:
+                    self._parse_pot(pot_file)
+                
+                # Parse existing PO files
+                if results.has_locale_dir:
+                    self._fill_translations(po_files)
             
             # Update statistics
             if self.translations:

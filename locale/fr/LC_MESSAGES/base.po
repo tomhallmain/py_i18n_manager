@@ -4,8 +4,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2025-03-06 16:07-0500\n"
-"PO-Revision-Date: 2025-03-06 16:07-0500\n"
+"POT-Creation-Date: 2025-03-06 16:34-0500\n"
+"PO-Revision-Date: 2025-03-06 16:34-0500\n"
 "Last-Translator: Thomas Hall <tomhall.main@gmail.com>\n"
 "Language: fr\n"
 "Language-Team: fr Team <<EMAIL>>\n"
@@ -64,7 +64,7 @@ msgstr ""
 
 #: .\app.py:124
 msgid "Status"
-msgstr ""
+msgstr "\u00c9tat"
 
 #: .\ui\all_translations_window.py:14
 msgid "All Translations"
@@ -84,7 +84,7 @@ msgstr ""
 
 #: .\ui\all_translations_window.py:39
 msgid "All"
-msgstr ""
+msgstr "Tous"
 
 #: .\ui\all_translations_window.py:39
 msgid "Invalid Indices"
