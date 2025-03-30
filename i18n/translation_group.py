@@ -258,6 +258,40 @@ class TranslationGroup():
             if locale in invalid_locales:
                 self.values[locale] = escape_unicode(self.values[locale])
 
+    def fix_leading_and_trailing_spaces(self, invalid_locales):
+        """Fix leading and trailing spaces in translations to match the default locale.
+        
+        Args:
+            invalid_locales (list): List of locales to fix
+        """
+        default_translation = self.get_translation(self.default_locale)
+        default_leading_spaces = len(default_translation) - len(default_translation.lstrip())
+        default_trailing_spaces = len(default_translation) - len(default_translation.rstrip())
+        
+        for locale in self.values:
+            if locale in invalid_locales and locale != self.default_locale:
+                translation = self.values[locale]
+                # Get current space counts
+                current_leading_spaces = len(translation) - len(translation.lstrip())
+                current_trailing_spaces = len(translation) - len(translation.rstrip())
+                
+                # Calculate how many spaces to add/remove
+                leading_diff = default_leading_spaces - current_leading_spaces
+                trailing_diff = default_trailing_spaces - current_trailing_spaces
+                
+                # Apply the fixes
+                if leading_diff > 0:
+                    translation = " " * leading_diff + translation.lstrip()
+                elif leading_diff < 0:
+                    translation = translation[abs(leading_diff):]
+                    
+                if trailing_diff > 0:
+                    translation = translation.rstrip() + " " * trailing_diff
+                elif trailing_diff < 0:
+                    translation = translation[:len(translation) + trailing_diff]
+                    
+                self.values[locale] = translation
+
     def get_invalid_translations(self, locales) -> InvalidTranslationGroupLocales:
         """Get all invalid translation locales for this group.
         

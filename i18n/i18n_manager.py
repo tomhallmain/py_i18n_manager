@@ -359,7 +359,8 @@ class I18NManager():
             one_invalid_translation_found = True
             
         for msgid, invalid_locales in invalid_groups.invalid_leading_space_locale_groups:
-            print(f"Invalid leading spaces: \"{msgid}\" in locales: {invalid_locales}")
+            print(f"Invalid leading/trailing spaces: \"{msgid}\" in locales: {invalid_locales}")
+            self.translations[msgid].fix_leading_and_trailing_spaces(invalid_locales)
             one_invalid_translation_found = True
             
         for msgid, invalid_locales in invalid_groups.invalid_newline_locale_groups:
