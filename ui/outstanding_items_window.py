@@ -28,13 +28,14 @@ class OutstandingItemsWindow(QDialog):
 
         self.config = ConfigManager()
 
-        default_locale = self.config.get('translation.default_locale', 'en')
-        self.translation_service = TranslationService(default_locale=default_locale)
-        self.default_locale = default_locale
-
-        self.is_translating = False
         self.show_escaped = True  # Set to True by default
+        self.setup_properties()
         self.setup_ui()
+
+    def setup_properties(self):
+        self.default_locale = self.config.get('translation.default_locale', 'en')
+        self.translation_service = TranslationService(default_locale=self.default_locale)
+        self.is_translating = False
 
     def closeEvent(self, event):
         """Handle cleanup when the window is closed."""
@@ -47,8 +48,6 @@ class OutstandingItemsWindow(QDialog):
                 return
         if hasattr(self, 'translation_service'):
             del self.translation_service
-        # Reinitialize translation service, for some reason it does not get recreated when re-opening the window after closing once.
-        self.translation_service = TranslationService(default_locale=self.default_locale)
         super().closeEvent(event)
 
     def setup_ui(self):

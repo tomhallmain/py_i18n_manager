@@ -299,6 +299,7 @@ class MainWindow(QMainWindow):
             self.outstanding_window.translation_updated.connect(self.handle_translation_update)
 
         self.outstanding_window.load_data(self.i18n_manager.translations, self.locales)
+        self.outstanding_window.setup_properties()
         self.outstanding_window.exec()
 
         # The timer will handle running the translation task when needed
@@ -348,6 +349,8 @@ class MainWindow(QMainWindow):
             self.all_translations_window.translation_updated.connect(self.handle_translation_update)
             
         self.all_translations_window.load_data(self.i18n_manager.translations, self.locales)
+        # NOTE if there are properties that need to be re-initialized, below method will need to be implemented
+        # self.all_translations_window.setup_properties()
         self.all_translations_window.show()
 
     def handle_project_removal(self, project_path):
