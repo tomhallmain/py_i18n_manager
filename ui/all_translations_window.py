@@ -142,6 +142,9 @@ class AllTranslationsWindow(QDialog):
                 # Store status in cache
                 self.status_cache[(row, col)] = cell_statuses
 
+                item.setToolTip("\n".join(
+                    [status.get_translated_value() for status in cell_statuses]))
+
                 # Highlight problematic cells with custom colors based on severity
                 if TranslationStatus.MISSING in cell_statuses:
                     item.setBackground(self.missing_color)

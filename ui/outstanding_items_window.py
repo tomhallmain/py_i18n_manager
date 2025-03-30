@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QApplication
 
 from lib.translation_service import TranslationService
 from utils.config import ConfigManager
+from utils.globals import TranslationStatus
 from utils.translations import I18N
 from utils.utils import Utils
 
@@ -298,23 +299,40 @@ class OutstandingItemsWindow(QDialog):
             msgid_item.setFlags(msgid_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(row, 0, msgid_item)
 
-            invalid_locale_set = set(invalid_locales.get_invalid_locales())
-
             # Add translations for each locale (excluding default)
             for col, locale in enumerate(display_locales, 1):
                 value = group.get_translation(locale)
                 item = QTableWidgetItem(value)
 
+                # Build tooltip text for invalid statuses
+                tooltip_parts = []
+
                 # Highlight problematic cells with custom colors
                 if locale in invalid_locales.missing_locales:
                     item.setBackground(missing_color)
+                    tooltip_parts.append(TranslationStatus.MISSING.get_translated_value())
+
                 elif (locale in invalid_locales.invalid_unicode_locales or 
                       locale in invalid_locales.invalid_index_locales):
                     item.setBackground(critical_color)
+                    if locale in invalid_locales.invalid_unicode_locales:
+                        tooltip_parts.append(TranslationStatus.INVALID_UNICODE.get_translated_value())
+                    else:
+                        tooltip_parts.append(TranslationStatus.INVALID_INDICES.get_translated_value())
+
                 elif (locale in invalid_locales.invalid_brace_locales or
                       locale in invalid_locales.invalid_leading_space_locales or
                       locale in invalid_locales.invalid_newline_locales):
                     item.setBackground(style_color)
+                    if locale in invalid_locales.invalid_brace_locales:
+                        tooltip_parts.append(TranslationStatus.INVALID_BRACES.get_translated_value())
+                    if locale in invalid_locales.invalid_leading_space_locales:
+                        tooltip_parts.append(TranslationStatus.INVALID_LEADING_SPACE.get_translated_value())
+                    if locale in invalid_locales.invalid_newline_locales:
+                        tooltip_parts.append(TranslationStatus.INVALID_NEWLINE.get_translated_value())
+
+                if tooltip_parts:
+                    item.setToolTip("\n".join(tooltip_parts))
 
                 self.table.setItem(row, col, item)
 

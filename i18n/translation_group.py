@@ -160,22 +160,24 @@ class TranslationGroup():
         default_translation = self.get_translation(self.default_locale)
         
         # Define structural brace pairs to check
+        # Parentheses are treated more leniently (only check closure)
+        # Other braces are checked against default locale
         brace_pairs = [
-            ('(', ')'),
-            ('[', ']'),
-            ('<', '>'),
-            ('{', '}')
+            ('(', ')'),  # Parentheses - only check closure
+            ('[', ']'),  # Square brackets - check against default
+            ('<', '>'),  # Angle brackets - check against default
+            ('{', '}')   # Curly braces - check against default
         ]
         
-        # Get default locale brace counts
+        # Get default locale brace counts for non-parentheses braces
         default_counts = {}
-        for open_brace, close_brace in brace_pairs:
+        for open_brace, close_brace in brace_pairs[1:]:  # Skip parentheses
             default_counts[(open_brace, close_brace)] = (
                 default_translation.count(open_brace),
                 default_translation.count(close_brace)
             )
         
-        # Check each locale against default
+        # Check each locale
         for locale, translation in self.values.items():
             if locale == self.default_locale:
                 continue
@@ -183,31 +185,43 @@ class TranslationGroup():
             for open_brace, close_brace in brace_pairs:
                 open_count = translation.count(open_brace)
                 close_count = translation.count(close_brace)
-                default_open, default_close = default_counts[(open_brace, close_brace)]
                 
-                # Check if counts match default locale
-                if open_count != default_open or close_count != default_close:
-                    invalid_brace_locales.append(locale)
-                    break  # No need to check other braces if one is invalid
+                if open_brace == '(':  # Parentheses - only check closure
+                    if open_count != close_count:
+                        invalid_brace_locales.append(locale)
+                        break
+                else:  # Other braces - check against default
+                    default_open, default_close = default_counts[(open_brace, close_brace)]
+                    if open_count != default_open or close_count != default_close:
+                        invalid_brace_locales.append(locale)
+                        break
                     
         return invalid_brace_locales
 
     def get_invalid_leading_space_locales(self):
-        """Check if leading spaces match the default locale.
+        """Check if leading and trailing spaces match the default locale.
         
         Returns:
-            list: List of locales with mismatched leading spaces compared to default locale
+            list: List of locales with mismatched leading or trailing spaces compared to default locale
         """
         invalid_space_locales = []
         default_translation = self.get_translation(self.default_locale)
+        
+        # Get default locale space counts
         default_leading_spaces = len(default_translation) - len(default_translation.lstrip())
+        default_trailing_spaces = len(default_translation) - len(default_translation.rstrip())
         
         for locale, translation in self.values.items():
             if locale == self.default_locale:
                 continue
                 
+            # Get this locale's space counts
             leading_spaces = len(translation) - len(translation.lstrip())
-            if leading_spaces != default_leading_spaces:
+            trailing_spaces = len(translation) - len(translation.rstrip())
+            
+            # Check if either leading or trailing spaces don't match default
+            if (leading_spaces != default_leading_spaces or 
+                trailing_spaces != default_trailing_spaces):
                 invalid_space_locales.append(locale)
                 
         return invalid_space_locales
