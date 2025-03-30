@@ -98,6 +98,12 @@ class OutstandingItemsWindow(QDialog):
         copy_text.triggered.connect(lambda: self.copy_cell_text(item))
         menu.addAction(copy_text)
         
+        # Add Copy Default Translation option
+        default_locale = self.config.get('translation.default_locale', 'en')
+        copy_default = QAction(_("Copy Default Translation"), self)
+        copy_default.triggered.connect(lambda: self.copy_default_translation(item, default_locale))
+        menu.addAction(copy_default)
+        
         # Only show translation options for non-key column cells
         if item.column() > 0:
             menu.addSeparator()
@@ -141,6 +147,20 @@ class OutstandingItemsWindow(QDialog):
         from PyQt6.QtWidgets import QApplication
         QApplication.clipboard().setText(text)
 
+    def copy_default_translation(self, item, default_locale):
+        """Copy the default locale's translation for the selected item.
+        
+        Args:
+            item: The table item that was right-clicked
+            default_locale (str): The default locale code
+        """
+        row = item.row()
+        msgid = self.table.item(row, 0).text()
+        if msgid in self.translations:
+            default_text = self.translations[msgid].get_translation(default_locale)
+            if default_text:
+                self.copy_text_to_clipboard(default_text)
+
     def translate_selected_item(self, item, use_llm=False):
         """Translate a single selected item.
         
@@ -170,10 +190,10 @@ class OutstandingItemsWindow(QDialog):
         # Get the English translation if available, otherwise use default locale
         default_locale = self.config.get('translation.default_locale', 'en')
         source_text = self.translations[msgid].get_translation('en') or self.translations[msgid].get_translation(default_locale)
-        
+
         if not source_text:
             return
-            
+
         # Try translation once, retry once if it fails
         for attempt in range(2):
             try:
