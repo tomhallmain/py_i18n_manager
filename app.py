@@ -30,33 +30,33 @@ class MainWindow(QMainWindow):
         logger.debug("Initializing MainWindow")
         self.setWindowTitle(_("i18n Translation Manager"))
         self.setMinimumSize(800, 600)
-        
+
         # Initialize settings manager
         self.settings_manager = SettingsManager()
-        
+
         # Initialize state
         self.current_project = None
         self.locales = None
         self.outstanding_window = None
         self.all_translations_window = None
         self.i18n_manager = None  # Store I18NManager instance
-        
+
         # Initialize debounce timer for translation updates
         self.update_timer = QTimer()
         self.update_timer.setSingleShot(True)
         self.update_timer.timeout.connect(self.process_batched_updates)
         self.pending_updates = {}  # Dictionary to store pending updates by locale
-        
+
         # Main widget and layout
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         layout = QVBoxLayout(main_widget)
-        
+
         # Project selection with frame
         project_frame = QFrame()
         project_frame.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
         project_layout = QVBoxLayout(project_frame)
-        
+
         # Project title
         title_layout = QHBoxLayout()
         title_label = QLabel(_("Current Project:"))
@@ -66,32 +66,32 @@ class MainWindow(QMainWindow):
         title_layout.addWidget(title_label)
         title_layout.addWidget(self.project_label)
         title_layout.addStretch()
-        
+
         # Project selection button
         select_project_btn = QPushButton(_("Select Project"))
         select_project_btn.clicked.connect(self.show_project_selector)
-        
+
         project_layout.addLayout(title_layout)
         project_layout.addWidget(select_project_btn)
         layout.addWidget(project_frame)
-        
+
         # Stats widget
         self.stats_widget = StatsWidget()
         layout.addWidget(self.stats_widget)
-        
+
         # Tab widget for different views
         self.tab_widget = QTabWidget()
         layout.addWidget(self.tab_widget)
-        
+
         # Status tab
         status_tab = QWidget()
         status_layout = QVBoxLayout(status_tab)
-        
+
         # Status text area
         self.status_text = QTextEdit()
         self.status_text.setReadOnly(True)
         status_layout.addWidget(self.status_text)
-        
+
         # Action buttons
         button_layout = QHBoxLayout()
         self.check_status_btn = QPushButton(_("Check Status"))
@@ -102,7 +102,7 @@ class MainWindow(QMainWindow):
         self.generate_pot_btn = QPushButton(_("Generate POT"))
         self.update_po_btn = QPushButton(_("Update PO Files"))
         self.create_mo_btn = QPushButton(_("Create MO Files"))
-        
+
         self.check_status_btn.clicked.connect(lambda: self.run_translation_task())
         self.show_all_btn.clicked.connect(self.show_all_translations)
         self.show_outstanding_btn.clicked.connect(self.show_outstanding_items)
@@ -111,7 +111,7 @@ class MainWindow(QMainWindow):
         self.generate_pot_btn.clicked.connect(self.generate_pot)
         self.update_po_btn.clicked.connect(lambda: self.run_translation_task(TranslationAction.WRITE_PO_FILES))
         self.create_mo_btn.clicked.connect(lambda: self.run_translation_task(TranslationAction.WRITE_MO_FILES))
-        
+
         button_layout.addWidget(self.check_status_btn)
         button_layout.addWidget(self.show_all_btn)
         button_layout.addWidget(self.show_outstanding_btn)
@@ -121,15 +121,15 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(self.update_po_btn)
         button_layout.addWidget(self.create_mo_btn)
         status_layout.addLayout(button_layout)
-        
+
         self.tab_widget.addTab(status_tab, _("Status"))
-        
+
         # Update button states after all buttons are created
         self.update_button_states()
-        
+
         # Load last project if available
         self.load_last_project()
-        
+
     def load_last_project(self):
         """Load the last selected project if it exists."""
         last_project = self.settings_manager.load_last_project()
@@ -137,18 +137,18 @@ class MainWindow(QMainWindow):
             self.current_project = last_project
             self.project_label.setText(f"Project: {os.path.basename(last_project)}")
             self.update_button_states()
-            
+
             # Clear previous status
             self.status_text.clear()
             self.status_text.append(f"Loading project: {last_project}")
-            
+
             # Run status check
             self.run_translation_task()
-        
+
     def show_project_selector(self):
         """Show the project selection dialog."""
         recent_projects = self.settings_manager.load_recent_projects()
-        
+
         if recent_projects:
             dialog = RecentProjectsDialog(recent_projects, self)
             dialog.project_selected.connect(self.handle_project_selection)
@@ -157,27 +157,27 @@ class MainWindow(QMainWindow):
         else:
             # If no recent projects, show directory picker directly
             self.select_project()
-            
+
     def handle_project_selection(self, directory):
         """Handle project selection from either recent projects or directory picker."""
         self.current_project = directory
         self.project_label.setText(f"Project: {os.path.basename(directory)}")
         self.update_button_states()
-        
+
         # Save the selected project
         self.settings_manager.save_last_project(directory)
-        
+
         # Clear previous status
         self.status_text.clear()
         self.status_text.append(f"Loading project: {directory}")
-        
+
         # Update i18n_manager with new directory if it exists
         if self.i18n_manager:
             self.i18n_manager.set_directory(directory)
-        
+
         # Run status check
         self.run_translation_task()
-        
+
     def select_project(self):
         """Show directory picker for project selection."""
         directory = QFileDialog.getExistingDirectory(
@@ -188,7 +188,7 @@ class MainWindow(QMainWindow):
         )
         if directory:
             self.handle_project_selection(directory)
-        
+
     def update_button_states(self):
         has_project = self.current_project is not None
         has_translations = self.i18n_manager is not None and self.i18n_manager.translations is not None
@@ -200,7 +200,7 @@ class MainWindow(QMainWindow):
         self.write_default_btn.setEnabled(has_project and has_translations)
         self.generate_pot_btn.setEnabled(has_project and has_translations)
         self.find_untranslated_btn.setEnabled(has_project and has_translations)
-        
+
     def run_translation_task(self, action: TranslationAction = TranslationAction.CHECK_STATUS):
         """Run a translation task with the specified action.
         
@@ -271,7 +271,7 @@ class MainWindow(QMainWindow):
         logger.debug(f"Translations ready - count: {len(translations)}, locales: {locales}")
         self.locales = locales
         self.update_button_states()
-        
+
         # Add a success message if this was an automatic check
         if self.status_text.toPlainText().startswith("Loading project:"):
             self.status_text.append("\nProject loaded successfully!")
@@ -279,28 +279,10 @@ class MainWindow(QMainWindow):
             
     def update_status(self, text):
         self.status_text.append(text)
-        
-    def update_stats(self, total_translations, total_locales, missing_translations):
-        # Calculate stale translations and missing translations using I18NManager's logic
-        stale_translations = 0
-        missing_translations_count = 0
-        invalid_unicode_count = 0
-        invalid_indices_count = 0
-        if self.i18n_manager is not None:
-            not_in_base, missing_locale_groups, invalid_unicode_groups, invalid_index_groups = self.i18n_manager.get_invalid_translations()
-            stale_translations = len(not_in_base)
-            missing_translations_count = len(missing_locale_groups)
-            invalid_unicode_count = len(invalid_unicode_groups)
-            invalid_indices_count = len(invalid_index_groups)
-            
-        self.stats_widget.update_stats(
-            total_translations, 
-            total_locales, 
-            missing_translations_count, 
-            stale_translations,
-            invalid_unicode_count,
-            invalid_indices_count
-        )
+
+    def update_stats(self, results: TranslationManagerResults):
+        """Update the statistics display."""
+        self.stats_widget.update_stats(results)
         
     def show_outstanding_items(self):
         """Show the outstanding items window."""
@@ -316,12 +298,7 @@ class MainWindow(QMainWindow):
         self.outstanding_window.exec()
         
         # After the window is closed, update the UI
-        self.update_stats(
-            len(self.i18n_manager.translations),
-            len(self.locales),
-            sum(1 for group in self.i18n_manager.translations.values() 
-                if len(group.get_missing_locales(self.locales)) > 0)
-        )
+        self.run_translation_task()
         
     def handle_translation_update(self, locale, changes):
         """Handle batched translation updates from the outstanding items window.

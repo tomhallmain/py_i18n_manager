@@ -3,6 +3,7 @@ from datetime import datetime
 from enum import Enum, auto
 from typing import Dict, List, Optional
 import os
+from .invalid_translation_groups import InvalidTranslationGroups
 
 class TranslationAction(Enum):
     CHECK_STATUS = auto()
@@ -65,10 +66,9 @@ class TranslationManagerResults:
     error_message: Optional[str] = None
     total_strings: int = 0
     total_locales: int = 0
-    missing_translations: int = 0
-    stale_translations: int = 0
-    invalid_unicode: int = 0
-    invalid_indices: int = 0
+    
+    # Translation validation results
+    invalid_groups: InvalidTranslationGroups = field(default_factory=InvalidTranslationGroups)
     
     # PO/MO file update tracking
     po_files_updated: bool = False
@@ -195,16 +195,28 @@ class TranslationManagerResults:
                 if status.last_modified:
                     lines.append(f"  • Last Modified: {status.last_modified}")
                     
-        if any([self.total_strings, self.total_locales, self.missing_translations,
-                self.stale_translations, self.invalid_unicode, self.invalid_indices]):
+        if any([self.total_strings, self.total_locales]) or self.invalid_groups.has_errors:
             lines.extend([
                 "\nTranslation Statistics:",
                 f"- Total Strings: {self.total_strings}",
-                f"- Total Locales: {self.total_locales}",
-                f"- Missing Translations: {self.missing_translations}",
-                f"- Stale Translations: {self.stale_translations}",
-                f"- Invalid Unicode: {self.invalid_unicode}",
-                f"- Invalid Indices: {self.invalid_indices}"
+                f"- Total Locales: {self.total_locales}"
             ])
+            
+            # Add invalid translation counts
+            error_counts = self.invalid_groups.get_total_errors()
+            if error_counts['not_in_base']:
+                lines.append(f"- Stale Translations: {error_counts['not_in_base']}")
+            if error_counts['missing_translations']:
+                lines.append(f"- Missing Translations: {error_counts['missing_translations']}")
+            if error_counts['invalid_unicode']:
+                lines.append(f"- Invalid Unicode: {error_counts['invalid_unicode']}")
+            if error_counts['invalid_indices']:
+                lines.append(f"- Invalid Indices: {error_counts['invalid_indices']}")
+            if error_counts['invalid_braces']:
+                lines.append(f"- Invalid Braces: {error_counts['invalid_braces']}")
+            if error_counts['invalid_leading_spaces']:
+                lines.append(f"- Invalid Leading Spaces: {error_counts['invalid_leading_spaces']}")
+            if error_counts['invalid_newlines']:
+                lines.append(f"- Invalid Newlines: {error_counts['invalid_newlines']}")
             
         return "\n".join(lines) 

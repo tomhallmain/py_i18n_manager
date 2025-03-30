@@ -2,8 +2,10 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
                             QMessageBox, QLineEdit, QComboBox, QCheckBox)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from utils.translations import I18N
 from PyQt6.QtGui import QColor
+
+from utils.translations import I18N
+from utils.globals import TranslationStatus, TranslationFilter
 
 _ = I18N._
 
@@ -37,7 +39,7 @@ class AllTranslationsWindow(QDialog):
         filter_layout = QHBoxLayout()
         filter_label = QLabel(_("Filter:"))
         self.status_filter = QComboBox()
-        self.status_filter.addItems([_("All"), _("Missing"), _("Invalid Unicode"), _("Invalid Indices")])
+        self.status_filter.addItems([filter.get_translated_value() for filter in TranslationFilter])
         self.status_filter.currentTextChanged.connect(self.filter_table)
         filter_layout.addWidget(filter_label)
         filter_layout.addWidget(self.status_filter)
@@ -74,12 +76,13 @@ class AllTranslationsWindow(QDialog):
         # Store original data
         self.all_translations = None
         self.all_locales = None
+        self.status_cache = {}  # (row, col) -> set[TranslationStatus]
 
         # Define custom colors
-        self.missing_color = QColor(255, 255, 200)  # Light yellow
-        self.unicode_color = QColor(255, 200, 200)    # Light red
-        self.index_color = QColor(255, 200, 201)    # Light red
-        
+        self.missing_color = QColor(255, 255, 200)    # Light yellow for missing translations
+        self.critical_color = QColor(255, 200, 200)   # Light red for critical issues (unicode/indices)
+        self.style_color = QColor(255, 220, 180)      # Light orange for style issues
+
     def load_data(self, translations, locales):
         """Load translation data into the table.
         
@@ -90,6 +93,7 @@ class AllTranslationsWindow(QDialog):
         # Store original data for filtering
         self.all_translations = translations
         self.all_locales = locales
+        self.status_cache.clear()  # Clear any existing cache
         
         # Set up columns (first column is msgid, then one for each locale)
         self.table.setColumnCount(len(locales) + 1)
@@ -98,49 +102,72 @@ class AllTranslationsWindow(QDialog):
         
         # Set up rows
         self.table.setRowCount(len(translations))        
-        
+
         # Fill in data
         for row, (msgid, group) in enumerate(translations.items()):
             # Add msgid
             msgid_item = QTableWidgetItem(msgid)
             msgid_item.setFlags(msgid_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(row, 0, msgid_item)
-            
+
+            # Get invalid translations once per row
+            invalid_locales = group.get_invalid_translations()
+
             # Add translations for each locale
             for col, locale in enumerate(locales, 1):
                 value = group.get_translation(locale)
                 item = QTableWidgetItem(value)
-                
-                # Highlight problematic cells
-                if locale in group.get_missing_locales(locales):
+
+                # Determine cell status
+                cell_statuses = set()
+                if locale in invalid_locales.missing_locales:
+                    cell_statuses.add(TranslationStatus.MISSING)
+                if locale in invalid_locales.invalid_unicode_locales:
+                    cell_statuses.add(TranslationStatus.INVALID_UNICODE)
+                if locale in invalid_locales.invalid_index_locales:
+                    cell_statuses.add(TranslationStatus.INVALID_INDICES)
+                if locale in invalid_locales.invalid_brace_locales:
+                    cell_statuses.add(TranslationStatus.INVALID_BRACES)
+                if locale in invalid_locales.invalid_leading_space_locales:
+                    cell_statuses.add(TranslationStatus.INVALID_LEADING_SPACE)
+                if locale in invalid_locales.invalid_newline_locales:
+                    cell_statuses.add(TranslationStatus.INVALID_NEWLINE)
+
+                # Store status in cache
+                self.status_cache[(row, col)] = cell_statuses
+
+                # Highlight problematic cells with custom colors based on severity
+                if TranslationStatus.MISSING in cell_statuses:
                     item.setBackground(self.missing_color)
-                elif locale in group.get_invalid_unicode_locales():
-                    item.setBackground(self.unicode_color)
-                elif locale in group.get_invalid_index_locales():
-                    item.setBackground(self.index_color)
-                
+                elif (TranslationStatus.INVALID_UNICODE in cell_statuses or 
+                      TranslationStatus.INVALID_INDICES in cell_statuses):
+                    item.setBackground(self.critical_color)
+                elif cell_statuses:  # Any style issues
+                    item.setBackground(self.style_color)
+
                 self.table.setItem(row, col, item)
-        
+
         # Adjust column widths
         self.table.resizeColumnsToContents()
-        
+
     def filter_table(self):
         """Filter the table based on search text and status filter."""
         if not self.all_translations or not self.all_locales:
             return
-            
+
         search_text = self.search_box.text().lower()
-        status_filter = self.status_filter.currentText()
-        
+        filter_value = TranslationFilter.from_translated_value(self.status_filter.currentText())
+        status_filter = filter_value.to_status()
+
         # First, apply status filter and collect row data with priorities
         visible_rows = []
         for row in range(self.table.rowCount()):
             show_row = True
             priority = 3  # Default priority (no match)
-            
+
             msgid = self.table.item(row, 0).text()
             msgid_lower = msgid.lower()
-            
+
             # Determine search match priority
             if search_text:
                 if msgid_lower.startswith(search_text):
@@ -151,30 +178,23 @@ class AllTranslationsWindow(QDialog):
                     priority = 2  # Low priority - contains search text
                 else:
                     show_row = False
-            
+
             # Apply status filter
-            if show_row and status_filter != "All":
+            if show_row and filter_value != TranslationFilter.ALL:
                 has_status = False
                 for col in range(1, self.table.columnCount()):
-                    item = self.table.item(row, col)
-                    if status_filter == "Missing" and item.background().color() == self.missing_color:
-                        has_status = True
-                        break
-                    elif status_filter == "Invalid Unicode" and item.background().color() == self.unicode_color:
-                        has_status = True
-                        break
-                    elif status_filter == "Invalid Indices" and item.background().color() == self.index_color:
+                    if status_filter in self.status_cache.get((row, col), set()):
                         has_status = True
                         break
                 if not has_status:
                     show_row = False
-            
+
             if show_row:
                 visible_rows.append((priority, row))
-        
+
         # Sort rows by priority
         visible_rows.sort()  # Sort by priority (first element of tuple)
-        
+
         # Reorder and show/hide rows
         for display_index, (priority, original_row) in enumerate(visible_rows):
             self.table.setRowHidden(original_row, False)
@@ -182,12 +202,12 @@ class AllTranslationsWindow(QDialog):
                 self.table.verticalHeader().visualIndex(original_row),
                 display_index
             )
-        
+
         # Hide all rows that didn't match
         for row in range(self.table.rowCount()):
             if row not in [r for _, r in visible_rows]:
                 self.table.setRowHidden(row, True)
-        
+
     def save_changes(self):
         """Save all changes made in the table."""
         if not self.all_translations or not self.all_locales:

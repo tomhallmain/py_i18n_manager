@@ -1,8 +1,50 @@
 import re
+from dataclasses import dataclass, field
+from typing import List
 from utils.config import ConfigManager
 
 # Initialize config manager
 config = ConfigManager()
+
+@dataclass
+class InvalidTranslationGroupLocales:
+    """Container for validation results of a single translation group."""
+    missing_locales: List[str] = field(default_factory=list)
+    invalid_unicode_locales: List[str] = field(default_factory=list)
+    invalid_index_locales: List[str] = field(default_factory=list)
+    invalid_brace_locales: List[str] = field(default_factory=list)
+    invalid_leading_space_locales: List[str] = field(default_factory=list)
+    invalid_newline_locales: List[str] = field(default_factory=list)
+    
+    @property
+    def has_errors(self) -> bool:
+        """Check if there are any invalid translations."""
+        return (len(self.missing_locales) > 0 or
+                len(self.invalid_unicode_locales) > 0 or
+                len(self.invalid_index_locales) > 0 or
+                len(self.invalid_brace_locales) > 0 or
+                len(self.invalid_leading_space_locales) > 0 or
+                len(self.invalid_newline_locales) > 0)
+    
+    def get_total_errors(self) -> dict[str, int]:
+        """Get a count of all error types."""
+        return {
+            'missing_translations': len(self.missing_locales),
+            'invalid_unicode': len(self.invalid_unicode_locales),
+            'invalid_indices': len(self.invalid_index_locales),
+            'invalid_braces': len(self.invalid_brace_locales),
+            'invalid_leading_spaces': len(self.invalid_leading_space_locales),
+            'invalid_newlines': len(self.invalid_newline_locales)
+        }
+    
+    def get_invalid_locales(self) -> List[str]:
+        """Get a list of all invalid locales."""
+        return list(set(self.missing_locales) |
+                    set(self.invalid_unicode_locales) |
+                    set(self.invalid_index_locales) |
+                    set(self.invalid_brace_locales) |
+                    set(self.invalid_leading_space_locales) |
+                    set(self.invalid_newline_locales))
 
 def escape_unicode(s):
     """Convert a string to ASCII-encoded Unicode format for PO files.
@@ -108,7 +150,111 @@ class TranslationGroup():
                     invalid_index_locales.append(locale)
         return invalid_index_locales
 
+    def get_invalid_brace_locales(self):
+        """Check for mismatched open/close brace counts across all locales.
+        
+        Returns:
+            list: List of locales with mismatched brace counts compared to default locale
+        """
+        invalid_brace_locales = []
+        default_translation = self.get_translation(self.default_locale)
+        
+        # Define structural brace pairs to check
+        brace_pairs = [
+            ('(', ')'),
+            ('[', ']'),
+            ('<', '>'),
+            ('{', '}')
+        ]
+        
+        # Get default locale brace counts
+        default_counts = {}
+        for open_brace, close_brace in brace_pairs:
+            default_counts[(open_brace, close_brace)] = (
+                default_translation.count(open_brace),
+                default_translation.count(close_brace)
+            )
+        
+        # Check each locale against default
+        for locale, translation in self.values.items():
+            if locale == self.default_locale:
+                continue
+                
+            for open_brace, close_brace in brace_pairs:
+                open_count = translation.count(open_brace)
+                close_count = translation.count(close_brace)
+                default_open, default_close = default_counts[(open_brace, close_brace)]
+                
+                # Check if counts match default locale
+                if open_count != default_open or close_count != default_close:
+                    invalid_brace_locales.append(locale)
+                    break  # No need to check other braces if one is invalid
+                    
+        return invalid_brace_locales
+
+    def get_invalid_leading_space_locales(self):
+        """Check if leading spaces match the default locale.
+        
+        Returns:
+            list: List of locales with mismatched leading spaces compared to default locale
+        """
+        invalid_space_locales = []
+        default_translation = self.get_translation(self.default_locale)
+        default_leading_spaces = len(default_translation) - len(default_translation.lstrip())
+        
+        for locale, translation in self.values.items():
+            if locale == self.default_locale:
+                continue
+                
+            leading_spaces = len(translation) - len(translation.lstrip())
+            if leading_spaces != default_leading_spaces:
+                invalid_space_locales.append(locale)
+                
+        return invalid_space_locales
+
+    def get_invalid_newline_locales(self):
+        """Check if newline characters match the default locale.
+        
+        Returns:
+            list: List of locales with mismatched newline characters compared to default locale
+        """
+        invalid_newline_locales = []
+        default_translation = self.get_translation(self.default_locale)
+        
+        # Count explicit newlines in default
+        default_explicit_newlines = default_translation.count('\\n')
+        default_encoded_newlines = default_translation.count('\n')
+        
+        for locale, translation in self.values.items():
+            if locale == self.default_locale:
+                continue
+                
+            # Count newlines in this locale
+            explicit_newlines = translation.count('\\n')
+            encoded_newlines = translation.count('\n')
+            
+            # Check if counts match default locale
+            if explicit_newlines != default_explicit_newlines or encoded_newlines != default_encoded_newlines:
+                invalid_newline_locales.append(locale)
+                
+        return invalid_newline_locales
+
     def fix_encoded_unicode_escape_strings(self, invalid_locales):
         for locale in self.values:
             if locale in invalid_locales:
                 self.values[locale] = escape_unicode(self.values[locale])
+
+    def get_invalid_translations(self) -> InvalidTranslationGroupLocales:
+        """Get all invalid translation locales for this group.
+        
+        Returns:
+            InvalidTranslationGroupLocales: Container with all types of invalid translations
+        """
+        invalid_locales = InvalidTranslationGroupLocales()
+        invalid_locales.missing_locales = self.get_missing_locales(self.locales)
+        invalid_locales.invalid_unicode_locales = self.get_invalid_unicode_locales()
+        invalid_locales.invalid_index_locales = self.get_invalid_index_locales()
+        invalid_locales.invalid_brace_locales = self.get_invalid_brace_locales()
+        invalid_locales.invalid_leading_space_locales = self.get_invalid_leading_space_locales()
+        invalid_locales.invalid_newline_locales = self.get_invalid_newline_locales()
+        return invalid_locales

@@ -3,10 +3,11 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QMessageBox, QMenu, QCheckBox)
 from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer
 from PyQt6.QtGui import QColor, QAction
-from utils.config import ConfigManager
+
 from lib.translation_service import TranslationService
-from utils.utils import Utils
+from utils.config import ConfigManager
 from utils.translations import I18N
+from utils.utils import Utils
 
 _ = I18N._
 
@@ -26,7 +27,7 @@ class OutstandingItemsWindow(QDialog):
         self.is_translating = False
         self.show_escaped = True  # Set to True by default
         self.setup_ui()
-        
+
     def closeEvent(self, event):
         """Handle cleanup when the window is closed."""
         if self.is_translating:
@@ -39,7 +40,7 @@ class OutstandingItemsWindow(QDialog):
         if hasattr(self, 'translation_service'):
             del self.translation_service
         super().closeEvent(event)
-        
+
     def setup_ui(self):
         layout = QVBoxLayout(self)
         
@@ -83,7 +84,7 @@ class OutstandingItemsWindow(QDialog):
         button_layout.addWidget(close_btn)
         button_layout.addWidget(self.unicode_toggle)
         layout.addLayout(button_layout)
-        
+
     def show_context_menu(self, position):
         """Show context menu for translation options."""
         item = self.table.itemAt(position)
@@ -155,7 +156,7 @@ class OutstandingItemsWindow(QDialog):
         msgid = self.table.item(row, 0).text()
         locale = self.table.horizontalHeaderItem(col).text()
         self.translate_item(row, col, msgid, locale, use_llm)
-        
+
     def translate_item(self, row, col, msgid, locale, use_llm=False):
         """Translate a single item and update the table.
         
@@ -192,7 +193,7 @@ class OutstandingItemsWindow(QDialog):
                 if attempt == 0:  # First attempt failed, will retry
                     continue
                 print(f"Translation failed for {msgid} to {locale}: {e}")
-                
+
     def translate_all_missing(self):
         """Translate all missing items."""
         self.is_translating = True
@@ -239,63 +240,61 @@ class OutstandingItemsWindow(QDialog):
         
     def load_data(self, translations, locales):
         """Load translation data into the table."""
-        # Store translations for later use
         self.translations = translations
-        
+
         # Get default locale and exclude it from the list
         default_locale = self.config.get('translation.default_locale', 'en')
         display_locales = [loc for loc in locales if loc != default_locale]
-        
+
         # Set up columns (first column is msgid, then one for each non-default locale)
         self.table.setColumnCount(len(display_locales) + 1)
         headers = ["Translation Key"] + display_locales
         self.table.setHorizontalHeaderLabels(headers)
-        
+
         # Find all translations with missing or invalid entries
-        rows = []
+        all_invalid_groups = {}
         for msgid, group in translations.items():
             if not group.is_in_base:
                 continue
-            missing_locales = group.get_missing_locales(locales)
-            invalid_unicode = group.get_invalid_unicode_locales()
-            invalid_indices = group.get_invalid_index_locales()
-            
-            if missing_locales or invalid_unicode or invalid_indices:
-                rows.append((msgid, group))
-        
-        # Set up rows
-        self.table.setRowCount(len(rows))
+
+            invalid_locales = group.get_invalid_translations()
+            if invalid_locales.has_errors:
+                all_invalid_groups[group.key] = (invalid_locales, group)
+
+        self.table.setRowCount(len(all_invalid_groups))
         
         # Define custom colors
-        missing_color = QColor(255, 200, 200)  # Light pink
-        unicode_color = QColor(255, 255, 200)  # Light yellow
-        index_color = QColor(200, 255, 255)    # Light cyan
-        
-        # Fill in data
-        for row, (msgid, group) in enumerate(rows):
-            # Add msgid
-            msgid_item = QTableWidgetItem(msgid)
+        missing_color = QColor(255, 255, 200)    # Light yellow for missing translations
+        critical_color = QColor(255, 200, 200)   # Light red for critical issues (unicode/indices)
+        style_color = QColor(255, 220, 180)      # Light orange for style issues
+
+        for row, (invalid_locales, group) in enumerate(all_invalid_groups.values()):
+            msgid_item = QTableWidgetItem(group.key)
             msgid_item.setFlags(msgid_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(row, 0, msgid_item)
-            
+
+            invalid_locale_set = set(invalid_locales.get_invalid_locales())
+
             # Add translations for each locale (excluding default)
             for col, locale in enumerate(display_locales, 1):
                 value = group.get_translation(locale)
                 item = QTableWidgetItem(value)
-                
+
                 # Highlight problematic cells with custom colors
-                if locale in group.get_missing_locales(locales):
+                if locale in invalid_locales.missing_locales:
                     item.setBackground(missing_color)
-                elif locale in group.get_invalid_unicode_locales():
-                    item.setBackground(unicode_color)
-                elif locale in group.get_invalid_index_locales():
-                    item.setBackground(index_color)
-                
+                elif (locale in invalid_locales.invalid_unicode_locales or 
+                      locale in invalid_locales.invalid_index_locales):
+                    item.setBackground(critical_color)
+                elif (locale in invalid_locales.invalid_brace_locales or
+                      locale in invalid_locales.invalid_leading_space_locales or
+                      locale in invalid_locales.invalid_newline_locales):
+                    item.setBackground(style_color)
+
                 self.table.setItem(row, col, item)
-        
-        # Adjust column widths
+
         self.table.resizeColumnsToContents()
-        
+
     def save_changes(self):
         """Save changes to the translations."""
         try:

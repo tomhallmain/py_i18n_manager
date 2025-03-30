@@ -8,6 +8,7 @@ import re
 
 from i18n.translation_group import TranslationGroup
 from .translation_manager_results import TranslationManagerResults, TranslationAction, LocaleStatus
+from .invalid_translation_groups import InvalidTranslationGroups
 
 logger = logging.getLogger(__name__)
 
@@ -170,11 +171,7 @@ class I18NManager():
                 results.total_locales = len(results.locale_statuses)
                 
                 # Get invalid translations info
-                not_in_base, missing_locale_groups, invalid_unicode_groups, invalid_index_groups = self.get_invalid_translations()
-                results.stale_translations = len(not_in_base)
-                results.missing_translations = len(missing_locale_groups)
-                results.invalid_unicode = len(invalid_unicode_groups)
-                results.invalid_indices = len(invalid_index_groups)
+                results.invalid_groups = self.get_invalid_translations()
             
             # Perform requested action
             if action == TranslationAction.WRITE_PO_FILES:
@@ -283,48 +280,63 @@ class I18NManager():
                 self.locales.append(locale)
             self._parse_po(PO, locale)
 
-    def get_invalid_translations(self):
+    def get_invalid_translations(self) -> InvalidTranslationGroups:
         """Calculate invalid translations and return them in a structured format.
         
         Returns:
-            tuple: (not_in_base, missing_locale_groups, invalid_unicode_locale_groups, invalid_index_locale_groups)
+            InvalidTranslationGroups: Container with all types of invalid translations found
         """
-        not_in_base = []
-        missing_locale_groups = []
-        invalid_unicode_locale_groups = []
-        invalid_index_locale_groups = []
-        
+        invalid_groups = InvalidTranslationGroups()
+
         for msgid, group in self.translations.items():
             if not group.is_in_base:
                 # Only report not_in_base if we haven't written to all locales yet
                 if not self.written_locales.issuperset(self.locales):
-                    not_in_base.append(msgid)
+                    invalid_groups.not_in_base.append(msgid)
             else:
+                # Check for missing translations
                 missing_locales = group.get_missing_locales(self.locales)
-                if len(missing_locales) > 0:
-                    missing_locale_groups.append((msgid, missing_locales))
-                    
+                if missing_locales:
+                    invalid_groups.missing_locale_groups.append((msgid, missing_locales))
+
+                # Check for invalid unicode
                 invalid_unicode_locales = group.get_invalid_unicode_locales()
-                if len(invalid_unicode_locales) > 0:
-                    invalid_unicode_locale_groups.append((msgid, invalid_unicode_locales))
-                    
+                if invalid_unicode_locales:
+                    invalid_groups.invalid_unicode_locale_groups.append((msgid, invalid_unicode_locales))
+
+                # Check for invalid indices
                 invalid_index_locales = group.get_invalid_index_locales()
-                if len(invalid_index_locales) > 0:
-                    invalid_index_locale_groups.append((msgid, invalid_index_locales))
-                    
-        return not_in_base, missing_locale_groups, invalid_unicode_locale_groups, invalid_index_locale_groups
+                if invalid_index_locales:
+                    invalid_groups.invalid_index_locale_groups.append((msgid, invalid_index_locales))
+
+                # Check for invalid braces
+                invalid_brace_locales = group.get_invalid_brace_locales()
+                if invalid_brace_locales:
+                    invalid_groups.invalid_brace_locale_groups.append((msgid, invalid_brace_locales))
+
+                # Check for invalid leading spaces
+                invalid_space_locales = group.get_invalid_leading_space_locales()
+                if invalid_space_locales:
+                    invalid_groups.invalid_leading_space_locale_groups.append((msgid, invalid_space_locales))
+
+                # Check for invalid newlines
+                invalid_newline_locales = group.get_invalid_newline_locales()
+                if invalid_newline_locales:
+                    invalid_groups.invalid_newline_locale_groups.append((msgid, invalid_newline_locales))
+
+        return invalid_groups
 
     def print_invalid_translations(self):
         """Print invalid translations to the console."""
-        not_in_base, missing_locale_groups, invalid_unicode_locale_groups, invalid_index_locale_groups = self.get_invalid_translations()
+        invalid_groups = self.get_invalid_translations()
         
         one_invalid_translation_found = False
         
-        for msgid in not_in_base:
+        for msgid in invalid_groups.not_in_base:
             print(f"Not in base: \"{msgid}\"")
             one_invalid_translation_found = True
 
-        for msgid, missing_locales in missing_locale_groups:
+        for msgid, missing_locales in invalid_groups.missing_locale_groups:
             print(f"Missing translations: \"{msgid}\"")
             found_locales = list(set(self.locales) - set(missing_locales))
             if len(found_locales) > 0:
@@ -333,13 +345,25 @@ class I18NManager():
                 print("Missing in ALL locales.")
             one_invalid_translation_found = True
 
-        for msgid, invalid_locales in invalid_unicode_locale_groups:
+        for msgid, invalid_locales in invalid_groups.invalid_unicode_locale_groups:
             print(f"Invalid unicode: \"{msgid}\" in locales: {invalid_locales}")
             self.translations[msgid].fix_encoded_unicode_escape_strings(invalid_locales)
             one_invalid_translation_found = True
 
-        for msgid, invalid_locales in invalid_index_locale_groups:
+        for msgid, invalid_locales in invalid_groups.invalid_index_locale_groups:
             print(f"Invalid indices: \"{msgid}\" in locales: {invalid_locales}")
+            one_invalid_translation_found = True
+            
+        for msgid, invalid_locales in invalid_groups.invalid_brace_locale_groups:
+            print(f"Invalid braces: \"{msgid}\" in locales: {invalid_locales}")
+            one_invalid_translation_found = True
+            
+        for msgid, invalid_locales in invalid_groups.invalid_leading_space_locale_groups:
+            print(f"Invalid leading spaces: \"{msgid}\" in locales: {invalid_locales}")
+            one_invalid_translation_found = True
+            
+        for msgid, invalid_locales in invalid_groups.invalid_newline_locale_groups:
+            print(f"Invalid newlines: \"{msgid}\" in locales: {invalid_locales}")
             one_invalid_translation_found = True
 
         if not one_invalid_translation_found:
