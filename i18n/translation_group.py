@@ -244,14 +244,14 @@ class TranslationGroup():
             if locale in invalid_locales:
                 self.values[locale] = escape_unicode(self.values[locale])
 
-    def get_invalid_translations(self) -> InvalidTranslationGroupLocales:
+    def get_invalid_translations(self, locales) -> InvalidTranslationGroupLocales:
         """Get all invalid translation locales for this group.
         
         Returns:
             InvalidTranslationGroupLocales: Container with all types of invalid translations
         """
         invalid_locales = InvalidTranslationGroupLocales()
-        invalid_locales.missing_locales = self.get_missing_locales(self.locales)
+        invalid_locales.missing_locales = self.get_missing_locales(locales)
         invalid_locales.invalid_unicode_locales = self.get_invalid_unicode_locales()
         invalid_locales.invalid_index_locales = self.get_invalid_index_locales()
         invalid_locales.invalid_brace_locales = self.get_invalid_brace_locales()

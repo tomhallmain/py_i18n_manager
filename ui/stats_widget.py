@@ -131,9 +131,9 @@ class StatsWidget(QWidget):
             results: TranslationManagerResults object containing all translation data
         """
         # Calculate basic stats
-        total_translations = len(results.translations) if results.translations else 0
-        total_locales = len(results.locales) if results.locales else 0
-        
+        total_translations = results.total_strings
+        total_locales = results.total_locales
+
         # Update basic stats
         self.total_translations_value.setText(str(total_translations))
         self.total_locales_value.setText(str(total_locales))

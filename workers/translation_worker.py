@@ -24,7 +24,7 @@ class PrintCapture:
 class TranslationWorker(QThread):
     finished = pyqtSignal(TranslationManagerResults)
     output = pyqtSignal(str)
-    stats_updated = pyqtSignal(int, int, int)  # total_translations, total_locales, missing_translations
+    stats_updated = pyqtSignal(TranslationManagerResults)  # total_translations, total_locales, missing_translations
     translations_ready = pyqtSignal(dict, list)  # translations, locales
 
     def __init__(self, directory, action: TranslationAction = TranslationAction.CHECK_STATUS, 

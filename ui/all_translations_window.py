@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QMessageBox, QLineEdit, QComboBox, QCheckBox)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QApplication
 
 from utils.translations import I18N
 from utils.globals import TranslationStatus, TranslationFilter
@@ -15,7 +16,12 @@ class AllTranslationsWindow(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(_("All Translations"))
-        self.setMinimumSize(1000, 700)
+        
+        # Get screen dimensions and set window size
+        screen = QApplication.primaryScreen().geometry()
+        self.setMinimumSize(int(screen.width() * 0.8), int(screen.height() * 0.8))  # 80% of screen size
+        self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))  # 90% of screen size
+        
         self.show_escaped = True  # Set to True by default
         self.setup_ui()
         
@@ -111,7 +117,7 @@ class AllTranslationsWindow(QDialog):
             self.table.setItem(row, 0, msgid_item)
 
             # Get invalid translations once per row
-            invalid_locales = group.get_invalid_translations()
+            invalid_locales = group.get_invalid_translations(locales)
 
             # Add translations for each locale
             for col, locale in enumerate(locales, 1):

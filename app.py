@@ -29,7 +29,11 @@ class MainWindow(QMainWindow):
         super().__init__()
         logger.debug("Initializing MainWindow")
         self.setWindowTitle(_("i18n Translation Manager"))
-        self.setMinimumSize(800, 600)
+        
+        # Get screen dimensions and set window size
+        screen = QApplication.primaryScreen().geometry()
+        self.setMinimumSize(int(screen.width() * 0.8), int(screen.height() * 0.8))  # 80% of screen size
+        self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))  # 90% of screen size
 
         # Initialize settings manager
         self.settings_manager = SettingsManager()

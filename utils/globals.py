@@ -1,16 +1,17 @@
 from enum import Enum
 import os
 
-from utils.config import config
+from utils.config import ConfigManager
 from utils.translations import I18N
 
 _ = I18N._
 
+config_manager = ConfigManager()
 
 class Globals:
     HOME = os.path.expanduser("~")
-    DEFAULT_WORKFLOW = config.dict["default_workflow"]
-    SKIP_CONFIRMATIONS = config.dict["skip_confirmations"]
+    DEFAULT_WORKFLOW = config_manager.get("default_workflow", "audit")
+    SKIP_CONFIRMATIONS = config_manager.get("skip_confirmations", False)
 
 class WorkflowType(Enum):
     AUDIT = "audit"

@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QMessageBox, QMenu, QCheckBox)
 from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer
 from PyQt6.QtGui import QColor, QAction
+from PyQt6.QtWidgets import QApplication
 
 from lib.translation_service import TranslationService
 from utils.config import ConfigManager
@@ -14,16 +15,21 @@ _ = I18N._
 class OutstandingItemsWindow(QDialog):
     # Signal now takes a list of (msgid, new_value) tuples for each locale
     translation_updated = pyqtSignal(str, list)  # locale, [(msgid, new_value), ...]
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(_("Outstanding Translation Items"))
-        self.setMinimumSize(800, 600)
+
+        # Get screen dimensions and set window size
+        screen = QApplication.primaryScreen().geometry()
+        self.setMinimumSize(int(screen.width() * 0.8), int(screen.height() * 0.8))  # 80% of screen size
+        self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))  # 90% of screen size
+
         self.config = ConfigManager()
-        
+
         default_locale = self.config.get('translation.default_locale', 'en')
         self.translation_service = TranslationService(default_locale=default_locale)
-        
+
         self.is_translating = False
         self.show_escaped = True  # Set to True by default
         self.setup_ui()
@@ -144,7 +150,6 @@ class OutstandingItemsWindow(QDialog):
 
     def copy_text_to_clipboard(self, text):
         """Copy the given text to the clipboard."""
-        from PyQt6.QtWidgets import QApplication
         QApplication.clipboard().setText(text)
 
     def copy_default_translation(self, item, default_locale):
@@ -277,7 +282,7 @@ class OutstandingItemsWindow(QDialog):
             if not group.is_in_base:
                 continue
 
-            invalid_locales = group.get_invalid_translations()
+            invalid_locales = group.get_invalid_translations(locales)
             if invalid_locales.has_errors:
                 all_invalid_groups[group.key] = (invalid_locales, group)
 
