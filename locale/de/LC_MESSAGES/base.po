@@ -4,8 +4,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2025-03-06 18:44-0500\n"
-"PO-Revision-Date: 2025-03-06 18:44-0500\n"
+"POT-Creation-Date: 2025-03-30 16:23-0400\n"
+"PO-Revision-Date: 2025-03-30 16:23-0400\n"
 "Last-Translator: Thomas Hall <tomhall.main@gmail.com>\n"
 "Language: de\n"
 "Language-Team: de Team <<EMAIL>>\n"
@@ -18,155 +18,143 @@ msgstr ""
 msgid "i18n Translation Manager"
 msgstr "i18n \u00dcbersetzungsleiter"
 
-#: .\app.py:62
+#: .\app.py:66
 msgid "Current Project:"
 msgstr "Aktuelles Projekt:"
 
-#: .\app.py:64
+#: .\app.py:68
 msgid "No project selected"
 msgstr "Kein Projekt ausgew\u00e4hlt"
 
-#: .\app.py:71 .\ui\recent_projects_dialog.py:68
+#: .\app.py:75 .\ui\recent_projects_dialog.py:68
 msgid "Select Project"
 msgstr "Projekt ausw\u00e4hlen"
 
-#: .\app.py:97
+#: .\app.py:101
 msgid "Check Status"
 msgstr "\u00dcberpr\u00fcfungsstatus"
 
-#: .\app.py:98
+#: .\app.py:102
 msgid "Show All Translations"
 msgstr "Alle \u00dcbersetzungen anzeigen"
 
-#: .\app.py:99
+#: .\app.py:103
 msgid "Show Outstanding Items"
 msgstr "Offene Posten anzeigen"
 
-#: .\app.py:100
+#: .\app.py:104
 msgid "Find Untranslated"
 msgstr "Un\u00fcbersetztes finden"
 
-#: .\app.py:101
+#: .\app.py:105
 msgid "Write Default Locale"
 msgstr "Standard-Sprachumgebung schreiben"
 
-#: .\app.py:102
+#: .\app.py:106
 msgid "Generate POT"
 msgstr "POT generieren"
 
-#: .\app.py:103
+#: .\app.py:107
 msgid "Update PO Files"
 msgstr "PO-Dateien aktualisieren"
 
-#: .\app.py:104
+#: .\app.py:108
 msgid "Create MO Files"
 msgstr "MO-Dateien erstellen"
 
-#: .\app.py:125
+#: .\app.py:129
 msgid "Status"
 msgstr "Status"
 
-#: .\app.py:490
+#: .\app.py:470
 msgid "MO Files Need Update"
 msgstr "MO-Dateien erfordern ein Update"
 
-#: .\app.py:491
+#: .\app.py:471
 msgid "PO files have been updated for the following locales:"
 msgstr "Die PO-Dateien wurden f\u00fcr die folgenden Lokalisationen aktualisiert:"
 
-#: .\app.py:493
+#: .\app.py:473
 msgid "Remember to run Create MO Files to apply these changes."
 msgstr "Denken Sie daran, die Create-MO-Dateien zu erstellen, um diese \u00c4nderungen zu aktivieren."
 
-#: .\ui\all_translations_window.py:15
+#: .\ui\all_translations_window.py:18
 msgid "All Translations"
 msgstr "Alle \u00dcbersetzungen"
 
-#: .\ui\all_translations_window.py:28
+#: .\ui\all_translations_window.py:36
 msgid "Search:"
 msgstr "Suche:"
 
-#: .\ui\all_translations_window.py:30
+#: .\ui\all_translations_window.py:38
 msgid "Search translation keys..."
 msgstr "\u00dcbersetzungsschl\u00fcssel suchen..."
 
-#: .\ui\all_translations_window.py:38
+#: .\ui\all_translations_window.py:46
 msgid "Filter:"
 msgstr "Filtern:"
 
-#: .\ui\all_translations_window.py:40
-msgid "All"
-msgstr "Alle"
-
-#: .\ui\all_translations_window.py:40
-msgid "Invalid Indices"
-msgstr "Invalide Indizes"
-
-#: .\ui\all_translations_window.py:40
-msgid "Invalid Unicode"
-msgstr "Invalid Unicode"
-
-#: .\ui\all_translations_window.py:40
-msgid "Missing"
-msgstr "Fehlende"
-
-#: .\ui\all_translations_window.py:59 .\ui\outstanding_items_window.py:70
+#: .\ui\all_translations_window.py:67 .\ui\outstanding_items_window.py:78
 msgid "Save Changes"
 msgstr "\u00c4nderungen speichern"
 
-#: .\ui\all_translations_window.py:61 .\ui\outstanding_items_window.py:72
+#: .\ui\all_translations_window.py:69 .\ui\outstanding_items_window.py:80
 msgid "Close"
 msgstr "Schlie\u00dfen"
 
-#: .\ui\all_translations_window.py:65 .\ui\outstanding_items_window.py:76
+#: .\ui\all_translations_window.py:73 .\ui\outstanding_items_window.py:84
 msgid "Show Escaped Unicode"
 msgstr "Entkommener Unicode anzeigen"
 
-#: .\ui\all_translations_window.py:208
+#: .\ui\all_translations_window.py:237
 msgid "Info"
 msgstr "Info"
 
-#: .\ui\all_translations_window.py:208
+#: .\ui\all_translations_window.py:237
 msgid "No changes to save."
 msgstr "Keine \u00c4nderungen zum Speichern."
 
-#: .\ui\all_translations_window.py:215
+#: .\ui\all_translations_window.py:244
 msgid "Saved {} changes successfully!"
 msgstr "Erfolgreich {} \u00c4nderungen gespeichert!"
 
-#: .\ui\all_translations_window.py:215
+#: .\ui\all_translations_window.py:244
 msgid "Success"
 msgstr "Erfolg"
 
-#: .\ui\outstanding_items_window.py:19
+#: .\ui\outstanding_items_window.py:22
 msgid "Outstanding Translation Items"
 msgstr "Ausstehende \u00dcbersetzungsposten"
 
-#: .\ui\outstanding_items_window.py:33
+#: .\ui\outstanding_items_window.py:41
 msgid "Translation in Progress"
 msgstr "\u00dcbersetzung l\u00e4uft"
 
-#: .\ui\outstanding_items_window.py:34
+#: .\ui\outstanding_items_window.py:42
 msgid "Translation is in progress. Are you sure you want to close?"
 msgstr "Die \u00dcbersetzung ist in Arbeit. Sind Sie sicher, dass Sie schlie\u00dfen m\u00f6chten?"
 
-#: .\ui\outstanding_items_window.py:63
+#: .\ui\outstanding_items_window.py:71
 msgid "Translate All Missing"
 msgstr "Alles vermissen \u00fcbersetzen"
 
-#: .\ui\outstanding_items_window.py:66
+#: .\ui\outstanding_items_window.py:74
 msgid "Cancel Translation"
 msgstr "\u00dcbersetzungsabbruch"
 
-#: .\ui\outstanding_items_window.py:96 .\ui\outstanding_items_window.py:126
+#: .\ui\outstanding_items_window.py:104 .\ui\outstanding_items_window.py:140
 msgid "Copy Text"
 msgstr "Text kopieren"
 
-#: .\ui\outstanding_items_window.py:104
+#: .\ui\outstanding_items_window.py:110
+msgid "Copy Default Translation"
+msgstr "Standard\u00fcbersetzung kopieren"
+
+#: .\ui\outstanding_items_window.py:118
 msgid "Translate with Argos Translate"
 msgstr "\u00dcbersetzen mit Argos Translate"
 
-#: .\ui\outstanding_items_window.py:109
+#: .\ui\outstanding_items_window.py:123
 msgid "Translate with LLM"
 msgstr "\u00dcbersetzen mit LLM"
 
@@ -288,39 +276,85 @@ msgstr "Sind Sie sicher, dass Sie die Lokalisierungseinheit '{}' entfernen m\u00
 msgid "Failed to save configuration: {}"
 msgstr "Fehler beim Speichern der Konfiguration: {}"
 
-#: .\ui\stats_widget.py:29
+#: .\ui\stats_widget.py:36
 msgid "Translation Statistics"
 msgstr "\u00dcbersetzungsstatistik"
 
-#: .\ui\stats_widget.py:38
+#: .\ui\stats_widget.py:45
 msgid "Total Translations:"
 msgstr "\u00dcbersetzungen insgesamt:"
 
-#: .\ui\stats_widget.py:47
+#: .\ui\stats_widget.py:54
 msgid "Total Locales:"
 msgstr "Sprachen insgesamt:"
 
-#: .\ui\stats_widget.py:56
+#: .\ui\stats_widget.py:63
 msgid "Missing Translations:"
 msgstr "Vermisste \u00dcbersetzungen:"
 
-#: .\ui\stats_widget.py:65
+#: .\ui\stats_widget.py:72
 msgid "Invalid Unicode:"
 msgstr "Ung\u00fcltiger Unicode:"
 
-#: .\ui\stats_widget.py:74
+#: .\ui\stats_widget.py:81
 msgid "Invalid Indices:"
 msgstr "Ung\u00fcltige Indizes:"
 
-#: .\ui\stats_widget.py:83
+#: .\ui\stats_widget.py:90
+msgid "Invalid Braces:"
+msgstr "Ung\u00fcltige Klammern:"
+
+#: .\ui\stats_widget.py:99
+msgid "Invalid Leading Space:"
+msgstr "Ung\u00fcltige Leerzeichen:"
+
+#: .\ui\stats_widget.py:108
+msgid "Invalid Newline:"
+msgstr "Ung\u00fcltige Neue Zeile:"
+
+#: .\ui\stats_widget.py:117
 msgid "Stale Translations:"
 msgstr "\u00dcbersetzungen:"
 
+#: .\utils\globals.py:40 .\utils\globals.py:63 .\utils\globals.py:96
+#: .\utils\globals.py:121
+msgid "Missing"
+msgstr "Fehlende"
+
+#: .\utils\globals.py:42 .\utils\globals.py:65 .\utils\globals.py:98
+#: .\utils\globals.py:123
+msgid "Invalid Unicode"
+msgstr "Invalid Unicode"
+
+#: .\utils\globals.py:44 .\utils\globals.py:67 .\utils\globals.py:100
+#: .\utils\globals.py:125
+msgid "Invalid Indices"
+msgstr "Invalide Indizes"
+
+#: .\utils\globals.py:46 .\utils\globals.py:69 .\utils\globals.py:102
+#: .\utils\globals.py:127
+msgid "Invalid Braces"
+msgstr "Ung\u00fcltige Klammern"
+
+#: .\utils\globals.py:48 .\utils\globals.py:71 .\utils\globals.py:104
+#: .\utils\globals.py:129
+msgid "Invalid Leading Space"
+msgstr "Ung\u00fcltige Leerzeichen"
+
+#: .\utils\globals.py:50 .\utils\globals.py:73 .\utils\globals.py:106
+#: .\utils\globals.py:131
+msgid "Invalid Newline"
+msgstr "Ung\u00fcltige Neue Zeile"
+
+#: .\utils\globals.py:94 .\utils\globals.py:119
+msgid "All"
+msgstr "Alle"
+
 #: .\utils\job_queue.py:36
 msgid " (Pending runs: {0})"
-msgstr "(Ausgabe l\u00e4uft: {0})"
+msgstr " (Ausgabe l\u00e4uft: {0})"
 
 #: .\utils\job_queue.py:38
 msgid " (Pending schedules: {0})"
-msgstr "(Zeitpl\u00e4ne \u00e4ndern: {0})"
+msgstr " (Zeitpl\u00e4ne \u00e4ndern: {0})"
 

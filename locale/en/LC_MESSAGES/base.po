@@ -4,8 +4,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2025-03-06 18:40-0500\n"
-"PO-Revision-Date: 2025-03-06 18:40-0500\n"
+"POT-Creation-Date: 2025-03-30 16:04-0400\n"
+"PO-Revision-Date: 2025-03-30 16:04-0400\n"
 "Last-Translator: Thomas Hall <tomhall.main@gmail.com>\n"
 "Language: en\n"
 "Language-Team: en Team <<EMAIL>>\n"
@@ -18,147 +18,158 @@ msgstr ""
 msgid "i18n Translation Manager"
 msgstr "i18n Translation Manager"
 
-#: .\app.py:62
+#: .\app.py:66
 msgid "Current Project:"
 msgstr "Current Project:"
 
-#: .\app.py:64
+#: .\app.py:68
 msgid "No project selected"
 msgstr "No project selected"
 
-#: .\app.py:71 .\ui\recent_projects_dialog.py:68
+#: .\app.py:75 .\ui\recent_projects_dialog.py:68
 msgid "Select Project"
 msgstr "Select Project"
 
-#: .\app.py:97
+#: .\app.py:101
 msgid "Check Status"
 msgstr "Check Status"
 
-#: .\app.py:98
+#: .\app.py:102
 msgid "Show All Translations"
 msgstr "Show All Translations"
 
-#: .\app.py:99
+#: .\app.py:103
 msgid "Show Outstanding Items"
 msgstr "Show Outstanding Items"
 
-#: .\app.py:100
+#: .\app.py:104
 msgid "Find Untranslated"
 msgstr "Find Untranslated"
 
-#: .\app.py:101
+#: .\app.py:105
 msgid "Write Default Locale"
 msgstr "Write Default Locale"
 
-#: .\app.py:102
+#: .\app.py:106
 msgid "Generate POT"
 msgstr "Generate POT"
 
-#: .\app.py:103
+#: .\app.py:107
 msgid "Update PO Files"
 msgstr "Update PO Files"
 
-#: .\app.py:104
+#: .\app.py:108
 msgid "Create MO Files"
 msgstr "Create MO Files"
 
-#: .\app.py:125
+#: .\app.py:129
 msgid "Status"
 msgstr "Status"
 
-#: .\app.py:490
+#: .\app.py:470
 msgid "MO Files Need Update"
 msgstr "MO Files Need Update"
 
-#: .\ui\all_translations_window.py:15
+#: .\app.py:471
+msgid "PO files have been updated for the following locales:"
+msgstr "PO files have been updated for the following locales:"
+
+#: .\app.py:473
+msgid "Remember to run Create MO Files to apply these changes."
+msgstr "Remember to run Create MO Files to apply these changes."
+
+#: .\ui\all_translations_window.py:18
 msgid "All Translations"
 msgstr "All Translations"
 
-#: .\ui\all_translations_window.py:28
+#: .\ui\all_translations_window.py:36
 msgid "Search:"
 msgstr "Search:"
 
-#: .\ui\all_translations_window.py:30
+#: .\ui\all_translations_window.py:38
 msgid "Search translation keys..."
 msgstr "Search translation keys..."
 
-#: .\ui\all_translations_window.py:38
+#: .\ui\all_translations_window.py:46
 msgid "Filter:"
 msgstr "Filter:"
 
-#: .\ui\all_translations_window.py:40
+#: .\utils\globals.py:94 .\utils\globals.py:119
 msgid "All"
 msgstr "All"
 
-#: .\ui\all_translations_window.py:40
+#: .\utils\globals.py:44 .\utils\globals.py:67 .\utils\globals.py:100
+#: .\utils\globals.py:125
 msgid "Invalid Indices"
 msgstr "Invalid Indices"
 
-#: .\ui\all_translations_window.py:40
+#: .\utils\globals.py:42 .\utils\globals.py:65 .\utils\globals.py:98
+#: .\utils\globals.py:123
 msgid "Invalid Unicode"
 msgstr "Invalid Unicode"
 
-#: .\ui\all_translations_window.py:40
+#: .\utils\globals.py:40 .\utils\globals.py:63 .\utils\globals.py:96
+#: .\utils\globals.py:121
 msgid "Missing"
 msgstr "Missing"
 
-#: .\ui\all_translations_window.py:59 .\ui\outstanding_items_window.py:70
+#: .\ui\all_translations_window.py:67 .\ui\outstanding_items_window.py:78
 msgid "Save Changes"
 msgstr "Save Changes"
 
-#: .\ui\all_translations_window.py:61 .\ui\outstanding_items_window.py:72
+#: .\ui\all_translations_window.py:69 .\ui\outstanding_items_window.py:80
 msgid "Close"
 msgstr "Close"
 
-#: .\ui\all_translations_window.py:65 .\ui\outstanding_items_window.py:76
+#: .\ui\all_translations_window.py:73 .\ui\outstanding_items_window.py:84
 msgid "Show Escaped Unicode"
 msgstr "Show Escaped Unicode"
 
-#: .\ui\all_translations_window.py:208
+#: .\ui\all_translations_window.py:237
 msgid "Info"
 msgstr "Info"
 
-#: .\ui\all_translations_window.py:208
+#: .\ui\all_translations_window.py:237
 msgid "No changes to save."
 msgstr "No changes to save."
 
-#: .\ui\all_translations_window.py:215
+#: .\ui\all_translations_window.py:244
 msgid "Saved {} changes successfully!"
 msgstr "Saved {} changes successfully!"
 
-#: .\ui\all_translations_window.py:215
+#: .\ui\all_translations_window.py:244
 msgid "Success"
 msgstr "Success"
 
-#: .\ui\outstanding_items_window.py:19
+#: .\ui\outstanding_items_window.py:22
 msgid "Outstanding Translation Items"
 msgstr "Outstanding Translation Items"
 
-#: .\ui\outstanding_items_window.py:33
+#: .\ui\outstanding_items_window.py:41
 msgid "Translation in Progress"
 msgstr "Translation in Progress"
 
-#: .\ui\outstanding_items_window.py:34
+#: .\ui\outstanding_items_window.py:42
 msgid "Translation is in progress. Are you sure you want to close?"
 msgstr "Translation is in progress. Are you sure you want to close?"
 
-#: .\ui\outstanding_items_window.py:63
+#: .\ui\outstanding_items_window.py:71
 msgid "Translate All Missing"
 msgstr "Translate All Missing"
 
-#: .\ui\outstanding_items_window.py:66
+#: .\ui\outstanding_items_window.py:74
 msgid "Cancel Translation"
 msgstr "Cancel Translation"
 
-#: .\ui\outstanding_items_window.py:96 .\ui\outstanding_items_window.py:126
+#: .\ui\outstanding_items_window.py:104 .\ui\outstanding_items_window.py:140
 msgid "Copy Text"
 msgstr "Copy Text"
 
-#: .\ui\outstanding_items_window.py:104
+#: .\ui\outstanding_items_window.py:118
 msgid "Translate with Argos Translate"
 msgstr "Translate with Argos Translate"
 
-#: .\ui\outstanding_items_window.py:109
+#: .\ui\outstanding_items_window.py:123
 msgid "Translate with LLM"
 msgstr "Translate with LLM"
 
@@ -280,31 +291,31 @@ msgstr "Are you sure you want to remove locale '{}'? This will delete the locale
 msgid "Failed to save configuration: {}"
 msgstr "Failed to save configuration: {}"
 
-#: .\ui\stats_widget.py:29
+#: .\ui\stats_widget.py:36
 msgid "Translation Statistics"
 msgstr "Translation Statistics"
 
-#: .\ui\stats_widget.py:38
+#: .\ui\stats_widget.py:45
 msgid "Total Translations:"
 msgstr "Total Translations:"
 
-#: .\ui\stats_widget.py:47
+#: .\ui\stats_widget.py:54
 msgid "Total Locales:"
 msgstr "Total Locales:"
 
-#: .\ui\stats_widget.py:56
+#: .\ui\stats_widget.py:63
 msgid "Missing Translations:"
 msgstr "Missing Translations:"
 
-#: .\ui\stats_widget.py:65
+#: .\ui\stats_widget.py:72
 msgid "Invalid Unicode:"
 msgstr "Invalid Unicode:"
 
-#: .\ui\stats_widget.py:74
+#: .\ui\stats_widget.py:81
 msgid "Invalid Indices:"
 msgstr "Invalid Indices:"
 
-#: .\ui\stats_widget.py:83
+#: .\ui\stats_widget.py:117
 msgid "Stale Translations:"
 msgstr "Stale Translations:"
 
@@ -316,11 +327,34 @@ msgstr " (Pending runs: {0})"
 msgid " (Pending schedules: {0})"
 msgstr " (Pending schedules: {0})"
 
-#: .\app.py:491
-msgid "PO files have been updated for the following locales:"
-msgstr "PO files have been updated for the following locales:"
+#: .\ui\outstanding_items_window.py:110
+msgid "Copy Default Translation"
+msgstr "Copy Default Translation"
 
-#: .\app.py:493
-msgid "Remember to run Create MO Files to apply these changes."
-msgstr "Remember to run Create MO Files to apply these changes."
+#: .\ui\stats_widget.py:90
+msgid "Invalid Braces:"
+msgstr "Invalid Braces:"
+
+#: .\ui\stats_widget.py:99
+msgid "Invalid Leading Space:"
+msgstr "Invalid Leading Space:"
+
+#: .\ui\stats_widget.py:108
+msgid "Invalid Newline:"
+msgstr "Invalid Newline:"
+
+#: .\utils\globals.py:46 .\utils\globals.py:69 .\utils\globals.py:102
+#: .\utils\globals.py:127
+msgid "Invalid Braces"
+msgstr "Invalid Braces"
+
+#: .\utils\globals.py:48 .\utils\globals.py:71 .\utils\globals.py:104
+#: .\utils\globals.py:129
+msgid "Invalid Leading Space"
+msgstr "Invalid Leading Space"
+
+#: .\utils\globals.py:50 .\utils\globals.py:73 .\utils\globals.py:106
+#: .\utils\globals.py:131
+msgid "Invalid Newline"
+msgstr "Invalid Newline"
 

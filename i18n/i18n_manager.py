@@ -175,6 +175,9 @@ class I18NManager():
             
             # Perform requested action
             if action == TranslationAction.WRITE_PO_FILES:
+                # Fix any invalid translations that we can before writing files
+                if self.fix_invalid_translations():
+                    logger.debug("Applied fixes for invalid translations")
                 self.write_po_files(modified_locales, results)
             elif action == TranslationAction.WRITE_MO_FILES:
                 self.create_mo_files(results)
@@ -326,10 +329,35 @@ class I18NManager():
 
         return invalid_groups
 
+    def fix_invalid_translations(self):
+        """Fix invalid translations in memory.
+        
+        Returns:
+            bool: True if any fixes were applied, False otherwise
+        """
+        invalid_groups = self.get_invalid_translations()
+        fixes_applied = False
+        
+        # Fix invalid unicode
+        for msgid, invalid_locales in invalid_groups.invalid_unicode_locale_groups:
+            self.translations[msgid].fix_encoded_unicode_escape_strings(invalid_locales)
+            fixes_applied = True
+
+        # Fix invalid leading/trailing spaces
+        for msgid, invalid_locales in invalid_groups.invalid_leading_space_locale_groups:
+            self.translations[msgid].fix_leading_and_trailing_spaces(invalid_locales)
+            fixes_applied = True
+
+        # Fix invalid explicit newlines
+        for msgid, group in self.translations.items():
+            if group.fix_invalid_explicit_newlines():
+                fixes_applied = True
+
+        return fixes_applied
+
     def print_invalid_translations(self):
         """Print invalid translations to the console."""
         invalid_groups = self.get_invalid_translations()
-        
         one_invalid_translation_found = False
         
         for msgid in invalid_groups.not_in_base:
@@ -347,7 +375,6 @@ class I18NManager():
 
         for msgid, invalid_locales in invalid_groups.invalid_unicode_locale_groups:
             print(f"Invalid unicode: \"{msgid}\" in locales: {invalid_locales}")
-            self.translations[msgid].fix_encoded_unicode_escape_strings(invalid_locales)
             one_invalid_translation_found = True
 
         for msgid, invalid_locales in invalid_groups.invalid_index_locale_groups:
@@ -360,7 +387,6 @@ class I18NManager():
             
         for msgid, invalid_locales in invalid_groups.invalid_leading_space_locale_groups:
             print(f"Invalid leading/trailing spaces: \"{msgid}\" in locales: {invalid_locales}")
-            self.translations[msgid].fix_leading_and_trailing_spaces(invalid_locales)
             one_invalid_translation_found = True
             
         for msgid, invalid_locales in invalid_groups.invalid_newline_locale_groups:
@@ -369,9 +395,6 @@ class I18NManager():
 
         if not one_invalid_translation_found:
             print("No invalid translations found.")
-            return False
-
-        return False  # not a problem if there are invalid translations, we will overwrite them in the new POs
 
     def print_translations(self):
         for msgid, group in self.translations.items():
@@ -497,44 +520,6 @@ msgstr ""
 
 
 '''
-
-    def update_po_files(self, modified_locales=None):
-        """Update PO files for modified locales.
-        
-        Args:
-            modified_locales (set, optional): Set of locale codes to update. If None, updates all locales.
-        """
-        try:
-            if modified_locales is None:
-                modified_locales = set(self.locales)
-            else:
-                # Create a copy to avoid modification during iteration
-                modified_locales = set(modified_locales)
-                
-            logger.debug(f"Starting PO file update for locales: {modified_locales}")
-            
-            for locale in modified_locales:
-                if locale not in self.locales:
-                    logger.warning(f"Locale {locale} not found in project")
-                    continue
-                    
-                po_file = self.get_po_file_path(locale)
-                if not po_file:
-                    logger.warning(f"Could not determine PO file path for locale {locale}")
-                    continue
-                    
-                logger.debug(f"Writing updated translations to PO file: {po_file}")
-                if self.write_po_file(po_file, locale):
-                    logger.info(f"Successfully updated PO file for locale {locale}")
-                else:
-                    logger.error(f"Failed to update PO file for locale {locale}")
-                    
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error updating PO files: {e}")
-            logger.exception("Full traceback:")
-            return False
 
     def write_locale_po_file(self, locale):
         """Write the PO file for a specific locale.

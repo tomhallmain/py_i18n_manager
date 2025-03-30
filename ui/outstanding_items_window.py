@@ -30,6 +30,7 @@ class OutstandingItemsWindow(QDialog):
 
         default_locale = self.config.get('translation.default_locale', 'en')
         self.translation_service = TranslationService(default_locale=default_locale)
+        self.default_locale = default_locale
 
         self.is_translating = False
         self.show_escaped = True  # Set to True by default
@@ -46,6 +47,8 @@ class OutstandingItemsWindow(QDialog):
                 return
         if hasattr(self, 'translation_service'):
             del self.translation_service
+        # Reinitialize translation service, for some reason it does not get recreated when re-opening the window after closing once.
+        self.translation_service = TranslationService(default_locale=self.default_locale)
         super().closeEvent(event)
 
     def setup_ui(self):
@@ -381,7 +384,7 @@ class OutstandingItemsWindow(QDialog):
                     locale = self.table.horizontalHeaderItem(col).text()
                     item = self.table.item(row, col)
                     if item:
-                        new_value = item.text().strip()
+                        new_value = item.text()
                         # Only include if the value is non-empty
                         if len(new_value) > 0:
                             Utils.log(f"Collecting translation update for {msgid} in {locale}")

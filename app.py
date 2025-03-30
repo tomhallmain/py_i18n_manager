@@ -280,30 +280,29 @@ class MainWindow(QMainWindow):
         if self.status_text.toPlainText().startswith("Loading project:"):
             self.status_text.append("\nProject loaded successfully!")
             self.status_text.append(f"Found {len(translations)} translations in {len(locales)} locales.")
-            
+
     def update_status(self, text):
         self.status_text.append(text)
 
     def update_stats(self, results: TranslationManagerResults):
         """Update the statistics display."""
         self.stats_widget.update_stats(results)
-        
+
     def show_outstanding_items(self):
         """Show the outstanding items window."""
         if not self.i18n_manager or not self.i18n_manager.translations or not self.locales:
             QMessageBox.warning(self, "Error", "No translation data available")
             return
-            
+
         if not self.outstanding_window:
             self.outstanding_window = OutstandingItemsWindow(self)
             self.outstanding_window.translation_updated.connect(self.handle_translation_update)
-            
+
         self.outstanding_window.load_data(self.i18n_manager.translations, self.locales)
         self.outstanding_window.exec()
-        
-        # After the window is closed, update the UI
-        self.run_translation_task()
-        
+
+        # The timer will handle running the translation task when needed
+
     def handle_translation_update(self, locale, changes):
         """Handle batched translation updates from the outstanding items window.
         

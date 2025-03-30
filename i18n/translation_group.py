@@ -87,7 +87,6 @@ def unescape_unicode(s):
         return s
 
 
-
 def get_string_format_indices(s):
     indices = []
     for match in re.finditer(r"{[0-9]+}", s):
@@ -291,6 +290,17 @@ class TranslationGroup():
                     translation = translation[:len(translation) + trailing_diff]
                     
                 self.values[locale] = translation
+
+    def fix_invalid_explicit_newlines(self):
+        """Fix invalid newlines in translations by replacing explicit newlines with actual newlines."""
+        fixed = False
+
+        for locale, translation in self.values.items():
+            if "\\n" in translation:
+                self.values[locale] = translation.replace("\\n", "\n")
+                fixed = True
+
+        return fixed
 
     def get_invalid_translations(self, locales) -> InvalidTranslationGroupLocales:
         """Get all invalid translation locales for this group.
