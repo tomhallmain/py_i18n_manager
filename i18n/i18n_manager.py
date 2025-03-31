@@ -105,6 +105,45 @@ class I18NManager():
         if results.failed_locales:
             results.extend_error_message(f"Failed to create MO files for locales: {results.failed_locales}")
 
+    def _ensure_msgfmt_utf8_encoding(self, msgfmt_path: str) -> bool:
+        """Ensure msgfmt.py is configured to use UTF-8 encoding.
+        
+        Args:
+            msgfmt_path (str): Path to msgfmt.py
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            with open(msgfmt_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            found_encoding_line = False
+            
+            # Find and replace the encoding line
+            for i, line in enumerate(lines):
+                if line.startswith('    encoding = '):
+                    if line != "    encoding = 'utf-8'\n":
+                        lines[i] = "    encoding = 'utf-8'\n"
+                        found_encoding_line = True
+                        break
+                    else:
+                        logger.debug(f"msgfmt.py already uses UTF-8 encoding")
+                        return True
+
+            if not found_encoding_line:
+                raise Exception("Failed to find encoding line in msgfmt.py")
+
+            # Write back the modified file
+            with open(msgfmt_path, 'w', encoding='utf-8') as f:
+                f.writelines(lines)
+            
+            logger.debug(f"Updated {msgfmt_path} to use UTF-8 encoding")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to update msgfmt.py encoding: {e}")
+            return False
+
     def _create_mo_file(self, locale: str):
         try:
             po_directory = os.path.join(self._directory, "locale", locale, "LC_MESSAGES")
@@ -115,9 +154,16 @@ class I18NManager():
             if not msgfmt_path:
                 return False
                 
-            retval = subprocess.call(args=["python", msgfmt_path, "-o", "base.mo", "base"], shell=True)
-            if retval != 0:
-                print("Error while creating mo file for locale " + locale)
+            # Try to update encoding, but don't fail if it doesn't work
+            self._ensure_msgfmt_utf8_encoding(msgfmt_path)
+                
+            # Run msgfmt.py
+            cmd = f"python {msgfmt_path} -o base.mo base.po"
+            logger.debug(f"Running command: {cmd}")
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                logger.error(f"Failed to create .mo file: {result.stderr}")
                 return False
             else:
                 print("Created mo for locale " + locale)
@@ -125,6 +171,9 @@ class I18NManager():
         except Exception as e:
             print("Error while creating mo file for locale " + locale + ": " + str(e))
             return False
+        finally:
+            # Restore original working directory
+            os.chdir(self._directory)
 
     def manage_translations(self, action: TranslationAction = TranslationAction.CHECK_STATUS, modified_locales: set[str] = None):
         """Manage translations based on the specified action.
