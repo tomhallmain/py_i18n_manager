@@ -308,13 +308,8 @@ class I18NManager():
         
         # Log summary statistics
         logger.info(f"PO file {PO} statistics:")
-        logger.info(f"  Total entries: {total_entries}")
-        logger.info(f"  Entries with comments: {entries_with_comments}")
-        logger.info(f"  Entries with any newlines: {entries_with_newlines}")
-        logger.info(f"  Entries with explicit '\\n': {entries_with_explicit_newlines}")
-        logger.info(f"  Entries with actual newlines: {entries_with_actual_newlines}")
-        logger.info(f"  Total explicit '\\n' sequences: {total_explicit_newlines}")
-        logger.info(f"  Total actual newlines: {total_actual_newlines}")
+        logger.info(f"  Total entries: {total_entries}  Entries with comments: {entries_with_comments}")
+        logger.info(f"  Entries with any newlines: {entries_with_newlines}  Entries with explicit '\\n': {entries_with_explicit_newlines}  Entries with actual newlines: {entries_with_actual_newlines}  Total explicit '\\n' sequences: {total_explicit_newlines}  Total actual newlines: {total_actual_newlines}")
 
     def _fill_translations(self, PO_files):
         for PO in PO_files:

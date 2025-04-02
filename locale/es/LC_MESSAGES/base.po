@@ -1,22 +1,20 @@
-# APPLICATION TRANSLATIONS
-# THOMAS HALL <tomhall.main@gmail.com>, 2025.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2025-03-30 16:23-0400\n"
-"PO-Revision-Date: 2025-03-30 16:23-0400\n"
-"Last-Translator: Thomas Hall <tomhall.main@gmail.com>\n"
-"Language: es\n"
+"POT-Creation-Date: 2025-04-02 13:03-0400\n"
+"PO-Revision-Date: 2025-04-02 13:03-0400\n"
+"Last-Translator: Translator Name <translator@example.com>\n"
 "Language-Team: es Team <<EMAIL>>\n"
+"Language: es\n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=cp1252\n"
+"Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: .\app.py:31
 msgid "i18n Translation Manager"
-msgstr "i18n Gestor de Traducci\u00f3n"
+msgstr "i18n Gestor de Traducción"
 
 #: .\app.py:66
 msgid "Current Project:"
@@ -68,7 +66,7 @@ msgstr "Estado"
 
 #: .\app.py:470
 msgid "MO Files Need Update"
-msgstr "Archivos MO necesitan actualizaci\u00f3n"
+msgstr "Archivos MO necesitan actualización"
 
 #: .\app.py:471
 msgid "PO files have been updated for the following locales:"
@@ -88,7 +86,7 @@ msgstr "Buscar:"
 
 #: .\ui\all_translations_window.py:38
 msgid "Search translation keys..."
-msgstr "Buscar claves de traducci\u00f3n..."
+msgstr "Buscar claves de traducción..."
 
 #: .\ui\all_translations_window.py:46
 msgid "Filter:"
@@ -116,23 +114,23 @@ msgstr "No hay cambios que salvar."
 
 #: .\ui\all_translations_window.py:244
 msgid "Saved {} changes successfully!"
-msgstr "\u00a1Guardados {} cambios con \u00e9xito!"
+msgstr "¡Guardados {} cambios con éxito!"
 
 #: .\ui\all_translations_window.py:244
 msgid "Success"
-msgstr "\u00c9xito"
+msgstr "Éxito"
 
 #: .\ui\outstanding_items_window.py:22
 msgid "Outstanding Translation Items"
-msgstr "Partidas de conversi\u00f3n pendientes"
+msgstr "Partidas de conversión pendientes"
 
 #: .\ui\outstanding_items_window.py:41
 msgid "Translation in Progress"
-msgstr "Traducci\u00f3n en curso"
+msgstr "Traducción en curso"
 
 #: .\ui\outstanding_items_window.py:42
 msgid "Translation is in progress. Are you sure you want to close?"
-msgstr "La traducci\u00f3n est\u00e1 en progreso. \u00bfEst\u00e1s seguro de que quieres cerrar?"
+msgstr "La traducción está en progreso. ¿Estás seguro de que quieres cerrar?"
 
 #: .\ui\outstanding_items_window.py:71
 msgid "Translate All Missing"
@@ -140,7 +138,7 @@ msgstr "Traducir todo perdido"
 
 #: .\ui\outstanding_items_window.py:74
 msgid "Cancel Translation"
-msgstr "Cancelar Traducci\u00f3n"
+msgstr "Cancelar Traducción"
 
 #: .\ui\outstanding_items_window.py:104 .\ui\outstanding_items_window.py:140
 msgid "Copy Text"
@@ -148,7 +146,7 @@ msgstr "Texto de la copia"
 
 #: .\ui\outstanding_items_window.py:110
 msgid "Copy Default Translation"
-msgstr "Copia la traducci\u00f3n por defecto"
+msgstr "Copia la traducción por defecto"
 
 #: .\ui\outstanding_items_window.py:118
 msgid "Translate with Argos Translate"
@@ -181,19 +179,19 @@ msgstr "Select Project Directory"
 
 #: .\ui\setup_translation_project_window.py:19
 msgid "Setup Translation Project"
-msgstr "Configuraci\u00f3n Traducci\u00f3n Proyecto"
+msgstr "Configuración Traducción Proyecto"
 
 #: .\ui\setup_translation_project_window.py:33
 msgid "Application name"
-msgstr "Nombre de la aplicaci\u00f3n"
+msgstr "Nombre de la aplicación"
 
 #: .\ui\setup_translation_project_window.py:34
 msgid "Application Name:"
-msgstr "Nombre de la aplicaci\u00f3n:"
+msgstr "Nombre de la aplicación:"
 
 #: .\ui\setup_translation_project_window.py:38
 msgid "Version:"
-msgstr "Versi\u00f3n:"
+msgstr "Versión:"
 
 #: .\ui\setup_translation_project_window.py:41
 msgid "Author Name <author@example.com>"
@@ -221,7 +219,7 @@ msgstr "Locales del proyecto"
 
 #: .\ui\setup_translation_project_window.py:71
 msgid "Enter locale code (e.g., fr, de, es)"
-msgstr "Introduzca el c\u00f3digo local (por ejemplo, fr, de, es)"
+msgstr "Introduzca el código local (por ejemplo, fr, de, es)"
 
 #: .\ui\setup_translation_project_window.py:74
 msgid "Add Locale"
@@ -229,15 +227,15 @@ msgstr "Agregar Locale"
 
 #: .\ui\setup_translation_project_window.py:87
 msgid "Remove Selected Locale"
-msgstr "Quitar ubicaci\u00f3n seleccionada"
+msgstr "Quitar ubicación seleccionada"
 
 #: .\ui\setup_translation_project_window.py:96
 msgid "Save Configuration"
-msgstr "Guardar configuraci\u00f3n"
+msgstr "Guardar configuración"
 
 #: .\ui\setup_translation_project_window.py:118
 msgid "Please enter a locale code."
-msgstr "Por favor, introduzca un c\u00f3digo local."
+msgstr "Por favor, introduzca un código local."
 
 #: .\ui\setup_translation_project_window.py:118
 #: .\ui\setup_translation_project_window.py:123
@@ -249,12 +247,15 @@ msgid "Error"
 msgstr "Error"
 
 #: .\ui\setup_translation_project_window.py:124
-msgid "Invalid locale code. Use format 'xx' or 'xx_YY' (e.g., 'fr' or 'fr_FR')."
-msgstr "C\u00f3digo de ubicaci\u00f3n inv\u00e1lido. Usa el formato 'xx' o 'xx_YY' (p. ej, 'fr' o 'fr_FR')"
+msgid ""
+"Invalid locale code. Use format 'xx' or 'xx_YY' (e.g., 'fr' or 'fr_FR')."
+msgstr ""
+"Código de ubicación inválido. Usa el formato 'xx' o 'xx_YY' (p. ej, 'fr' o "
+"'fr_FR')"
 
 #: .\ui\setup_translation_project_window.py:130
 msgid "This locale already exists."
-msgstr "Esta configuraci\u00f3n regional ya existe."
+msgstr "Esta configuración regional ya existe."
 
 #: .\ui\setup_translation_project_window.py:141
 msgid "Please select a locale to remove."
@@ -266,19 +267,23 @@ msgstr "No puede eliminar el local predeterminado."
 
 #: .\ui\setup_translation_project_window.py:149
 msgid "Confirm Removal"
-msgstr "Confirmaci\u00f3n de eliminaci\u00f3n"
+msgstr "Confirmación de eliminación"
 
 #: .\ui\setup_translation_project_window.py:150
-msgid "Are you sure you want to remove locale '{}'? This will delete the locale directory and all its translations."
-msgstr "\u00bfEst\u00e1s seguro de que quieres eliminar el idioma '{}'? Esto borrar\u00e1 el directorio del idioma y todas sus traducciones."
+msgid ""
+"Are you sure you want to remove locale '{}'? This will delete the locale "
+"directory and all its translations."
+msgstr ""
+"¿Estás seguro de que quieres eliminar el idioma '{}'? Esto borrará el "
+"directorio del idioma y todas sus traducciones."
 
 #: .\ui\setup_translation_project_window.py:191
 msgid "Failed to save configuration: {}"
-msgstr "Fallado para guardar la configuraci\u00f3n: {}"
+msgstr "Fallado para guardar la configuración: {}"
 
 #: .\ui\stats_widget.py:36
 msgid "Translation Statistics"
-msgstr "Estad\u00edsticas de traducci\u00f3n"
+msgstr "Estadísticas de traducción"
 
 #: .\ui\stats_widget.py:45
 msgid "Total Translations:"
@@ -294,23 +299,23 @@ msgstr "Traducciones desaparecidas:"
 
 #: .\ui\stats_widget.py:72
 msgid "Invalid Unicode:"
-msgstr "Unicode inv\u00e1lido:"
+msgstr "Unicode inválido:"
 
 #: .\ui\stats_widget.py:81
 msgid "Invalid Indices:"
-msgstr "\u00cdndices inv\u00e1lidos:"
+msgstr "Índices inválidos:"
 
 #: .\ui\stats_widget.py:90
 msgid "Invalid Braces:"
-msgstr "Brazos inv\u00e1lidos:"
+msgstr "Brazos inválidos:"
 
 #: .\ui\stats_widget.py:99
 msgid "Invalid Leading Space:"
-msgstr "Espacio inv\u00e1lido:"
+msgstr "Espacio inválido:"
 
 #: .\ui\stats_widget.py:108
 msgid "Invalid Newline:"
-msgstr "Nueva l\u00ednea inv\u00e1lida:"
+msgstr "Nueva línea inválida:"
 
 #: .\ui\stats_widget.py:117
 msgid "Stale Translations:"
@@ -324,27 +329,27 @@ msgstr "Faltantes"
 #: .\utils\globals.py:42 .\utils\globals.py:65 .\utils\globals.py:98
 #: .\utils\globals.py:123
 msgid "Invalid Unicode"
-msgstr "Unicode inv\u00e1lido"
+msgstr "Unicode inválido"
 
 #: .\utils\globals.py:44 .\utils\globals.py:67 .\utils\globals.py:100
 #: .\utils\globals.py:125
 msgid "Invalid Indices"
-msgstr "\u00cdndices inv\u00e1lidos"
+msgstr "Índices inválidos"
 
 #: .\utils\globals.py:46 .\utils\globals.py:69 .\utils\globals.py:102
 #: .\utils\globals.py:127
 msgid "Invalid Braces"
-msgstr "Brazos inv\u00e1lidos"
+msgstr "Brazos inválidos"
 
 #: .\utils\globals.py:48 .\utils\globals.py:71 .\utils\globals.py:104
 #: .\utils\globals.py:129
 msgid "Invalid Leading Space"
-msgstr "Espacio inv\u00e1lido"
+msgstr "Espacio inválido"
 
 #: .\utils\globals.py:50 .\utils\globals.py:73 .\utils\globals.py:106
 #: .\utils\globals.py:131
 msgid "Invalid Newline"
-msgstr "Nueva l\u00ednea inv\u00e1lida"
+msgstr "Nueva línea inválida"
 
 #: .\utils\globals.py:94 .\utils\globals.py:119
 msgid "All"
@@ -357,4 +362,3 @@ msgstr " (Tareas pendientes: {0})"
 #: .\utils\job_queue.py:38
 msgid " (Pending schedules: {0})"
 msgstr " (Horarios pendientes: {0})"
-

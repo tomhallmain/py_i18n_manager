@@ -1,18 +1,16 @@
-# APPLICATION TRANSLATIONS
-# THOMAS HALL <tomhall.main@gmail.com>, 2025.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2025-03-30 16:23-0400\n"
-"PO-Revision-Date: 2025-03-30 16:23-0400\n"
-"Last-Translator: Thomas Hall <tomhall.main@gmail.com>\n"
-"Language: it\n"
+"POT-Creation-Date: 2025-04-02 13:03-0400\n"
+"PO-Revision-Date: 2025-04-02 13:03-0400\n"
+"Last-Translator: Translator Name <translator@example.com>\n"
 "Language-Team: it Team <<EMAIL>>\n"
+"Language: it\n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=cp1252\n"
+"Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: .\app.py:31
 msgid "i18n Translation Manager"
@@ -72,7 +70,8 @@ msgstr "File MO richiedono aggiornamento"
 
 #: .\app.py:471
 msgid "PO files have been updated for the following locales:"
-msgstr "I file PO sono stati aggiornati per i seguenti ambienti localizzatori:"
+msgstr ""
+"I file PO sono stati aggiornati per i seguenti ambienti localizzatori:"
 
 #: .\app.py:473
 msgid "Remember to run Create MO Files to apply these changes."
@@ -132,11 +131,11 @@ msgstr "Traduzione in progresso"
 
 #: .\ui\outstanding_items_window.py:42
 msgid "Translation is in progress. Are you sure you want to close?"
-msgstr "La traduzione \u00e8 in corso. Sei sicuro di voler chiudere?"
+msgstr "La traduzione è in corso. Sei sicuro di voler chiudere?"
 
 #: .\ui\outstanding_items_window.py:71
 msgid "Translate All Missing"
-msgstr "Traduci tutto ci\u00f2 che manca"
+msgstr "Traduci tutto ciò che manca"
 
 #: .\ui\outstanding_items_window.py:74
 msgid "Cancel Translation"
@@ -249,12 +248,15 @@ msgid "Error"
 msgstr "Errore"
 
 #: .\ui\setup_translation_project_window.py:124
-msgid "Invalid locale code. Use format 'xx' or 'xx_YY' (e.g., 'fr' or 'fr_FR')."
-msgstr "Codice di locale non valido. Utilizza il formato 'xx' o 'xx_YY' (ad esempio, 'fr' o 'fr_FR')."
+msgid ""
+"Invalid locale code. Use format 'xx' or 'xx_YY' (e.g., 'fr' or 'fr_FR')."
+msgstr ""
+"Codice di locale non valido. Utilizza il formato 'xx' o 'xx_YY' (ad esempio,"
+" 'fr' o 'fr_FR')."
 
 #: .\ui\setup_translation_project_window.py:130
 msgid "This locale already exists."
-msgstr "Questa lingua locale esiste gi\u00e0."
+msgstr "Questa lingua locale esiste già."
 
 #: .\ui\setup_translation_project_window.py:141
 msgid "Please select a locale to remove."
@@ -262,15 +264,19 @@ msgstr "Si prega di selezionare un locale da rimuovere."
 
 #: .\ui\setup_translation_project_window.py:146
 msgid "Cannot remove the default locale."
-msgstr "Non \u00e8 possibile rimuovere il locale predefinito."
+msgstr "Non è possibile rimuovere il locale predefinito."
 
 #: .\ui\setup_translation_project_window.py:149
 msgid "Confirm Removal"
 msgstr "Confermare la rimozione"
 
 #: .\ui\setup_translation_project_window.py:150
-msgid "Are you sure you want to remove locale '{}'? This will delete the locale directory and all its translations."
-msgstr "Sei sicuro di voler rimuovere locale '{}? Questo canceller\u00e0 la directory locale e tutte le sue traduzioni."
+msgid ""
+"Are you sure you want to remove locale '{}'? This will delete the locale "
+"directory and all its translations."
+msgstr ""
+"Sei sicuro di voler rimuovere locale '{}? Questo cancellerà la directory "
+"locale e tutte le sue traduzioni."
 
 #: .\ui\setup_translation_project_window.py:191
 msgid "Failed to save configuration: {}"
@@ -357,4 +363,3 @@ msgstr " (Run in sospeso: {0})"
 #: .\utils\job_queue.py:38
 msgid " (Pending schedules: {0})"
 msgstr " (In attesa di appuntamenti: {0})"
-
