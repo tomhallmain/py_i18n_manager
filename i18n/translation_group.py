@@ -1,6 +1,9 @@
 import re
 from dataclasses import dataclass, field
 from typing import List
+
+from polib import POEntry
+
 from utils.config import ConfigManager
 
 # Initialize config manager
@@ -116,15 +119,42 @@ def get_string_format_indices(s):
 
 
 class TranslationGroup():
-    def __init__(self, key, is_in_base, usage_comment):
-        self.key = key
-        self.usage_comment = usage_comment
-        self.is_in_base = is_in_base
+    def __init__(self, msgid, is_in_base=False, usage_comment=None, tcomment=None):
+        self.key = msgid
         self.values = {}
+        self.is_in_base = is_in_base
+        self.usage_comment = usage_comment
+        self.tcomment = tcomment
+        self.occurrences = []  # Add occurrences field to store file references
         self.default_locale = config.get('translation.default_locale', 'en')
     
-    def add_translation(self, locale, translation):
-        self.values[locale] = translation
+    @classmethod
+    def from_polib_entry(cls, entry: POEntry, is_in_base=False):
+        """Create a TranslationGroup from a polib.pofile entry.
+        
+        Args:
+            entry (polib.POEntry): The polib entry to create from
+            is_in_base (bool): Whether this translation is in the base set
+            
+        Returns:
+            TranslationGroup: A new TranslationGroup instance
+        """
+        group = cls(entry.msgid, is_in_base=is_in_base)
+        
+        # Handle comments
+        if entry.comment:
+            group.usage_comment = str(entry.comment)
+        if entry.tcomment:
+            group.tcomment = str(entry.tcomment)
+            
+        # Handle occurrences (file references)
+        if entry.occurrences:
+            group.occurrences = list(entry.occurrences)
+            
+        return group
+
+    def add_translation(self, locale, msgstr):
+        self.values[locale] = msgstr
     
     def get_translation(self, locale, fail_on_key_error=False):
         try:
@@ -147,12 +177,50 @@ class TranslationGroup():
     def get_missing_locales(self, expected_locales):
         return [locale for locale in expected_locales if not locale in self.values or self.values[locale].strip() == '']
 
-    def get_invalid_unicode_locales(self):
-        invalid_unicode_locales = []
+    def get_encoded_unicode_locales(self):
+        """Get locales that have non-ASCII characters encoded in UTF-8.
+        
+        Returns:
+            list: List of locales with non-ASCII characters
+        """
+        encoded_unicode_locales = []
         for locale, translation in self.values.items():
             if re.search("[^\x00-\x7F]+", translation):
+                encoded_unicode_locales.append(locale)
+        return encoded_unicode_locales
+
+    def get_invalid_escaped_unicode_locales(self):
+        """Check for locales that have escaped Unicode sequences (\\uXXXX) which is invalid in UTF-8 context.
+        
+        Returns:
+            list: List of locales with escaped Unicode sequences
+        """
+        invalid_unicode_locales = []
+        for locale, translation in self.values.items():
+            if "\\u" in translation:
                 invalid_unicode_locales.append(locale)
         return invalid_unicode_locales
+
+    def get_invalid_encoded_unicode_locales(self):
+        """Check for locales that have non-ASCII characters that aren't properly encoded in UTF-8.
+        
+        Returns:
+            list: List of locales with invalid Unicode characters
+        """
+        invalid_unicode_locales = []
+        for locale, translation in self.values.items():
+            # Check for non-ASCII characters that aren't properly encoded
+            if any(ord(c) > 127 for c in translation):
+                # Check if the character is a valid UTF-8 character
+                try:
+                    # Try to encode and decode to verify it's valid UTF-8
+                    translation.encode('utf-8').decode('utf-8')
+                except UnicodeError:
+                    invalid_unicode_locales.append(locale)
+        return invalid_unicode_locales
+
+    def get_invalid_unicode_locales(self):
+        return list(set(self.get_invalid_escaped_unicode_locales()) | set(self.get_invalid_encoded_unicode_locales()))
 
     def get_invalid_index_locales(self):
         invalid_index_locales = []
@@ -179,8 +247,9 @@ class TranslationGroup():
         # Define structural brace pairs to check
         # Parentheses are treated more leniently (only check closure)
         # Other braces are checked against default locale
+        # Include Unicode close parenthesis \uff09 as alternative to )
         brace_pairs = [
-            ('(', ')'),  # Parentheses - only check closure
+            ('(', (')', '\uff09')),  # Parentheses - only check closure, unicode close parenthsis is valid
             ('[', ']'),  # Square brackets - check against default
             ('<', '>'),  # Angle brackets - check against default
             ('{', '}')   # Curly braces - check against default
@@ -188,10 +257,19 @@ class TranslationGroup():
         
         # Get default locale brace counts for non-parentheses braces
         default_counts = {}
-        for open_brace, close_brace in brace_pairs[1:]:  # Skip parentheses
-            default_counts[(open_brace, close_brace)] = (
+        for open_brace, close_brace in brace_pairs:
+            # Calculate total count of close braces (handling both single and tuple cases)
+            close_brace_count = 0
+            if isinstance(close_brace, tuple):
+                for close_brace_variant in close_brace:
+                    close_brace_count += default_translation.count(close_brace_variant)
+            else:
+                close_brace_count = default_translation.count(close_brace)
+            
+            # Store the open count and total close count
+            default_counts[open_brace] = (
                 default_translation.count(open_brace),
-                default_translation.count(close_brace)
+                close_brace_count
             )
         
         # Check each locale
@@ -201,14 +279,21 @@ class TranslationGroup():
                 
             for open_brace, close_brace in brace_pairs:
                 open_count = translation.count(open_brace)
-                close_count = translation.count(close_brace)
+                
+                # Calculate total count of close braces (handling both single and tuple cases)
+                close_count = 0
+                if isinstance(close_brace, tuple):
+                    for close_brace_variant in close_brace:
+                        close_count += translation.count(close_brace_variant)
+                else:
+                    close_count = translation.count(close_brace)
                 
                 if open_brace == '(':  # Parentheses - only check closure
                     if open_count != close_count:
                         invalid_brace_locales.append(locale)
                         break
                 else:  # Other braces - check against default
-                    default_open, default_close = default_counts[(open_brace, close_brace)]
+                    default_open, default_close = default_counts[open_brace]
                     if open_count != default_open or close_count != default_close:
                         invalid_brace_locales.append(locale)
                         break
@@ -270,10 +355,10 @@ class TranslationGroup():
                 
         return invalid_newline_locales
 
-    def fix_encoded_unicode_escape_strings(self, invalid_locales):
+    def fix_ensure_encoded_unicode(self, invalid_locales):
         for locale in self.values:
             if locale in invalid_locales:
-                self.values[locale] = escape_unicode(self.values[locale])
+                self.values[locale] = unescape_unicode(self.values[locale])
 
     def fix_leading_and_trailing_spaces(self, invalid_locales):
         """Fix leading and trailing spaces in translations to match the default locale.

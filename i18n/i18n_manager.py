@@ -5,6 +5,7 @@ import sys
 import time
 import logging
 import re
+import polib
 
 from i18n.translation_group import TranslationGroup
 from .translation_manager_results import TranslationManagerResults, TranslationAction, LocaleStatus
@@ -105,87 +106,30 @@ class I18NManager():
         if results.failed_locales:
             results.extend_error_message(f"Failed to create MO files for locales: {results.failed_locales}")
 
-    def _ensure_msgfmt_utf8_encoding(self, msgfmt_path: str) -> bool:
-        """Ensure msgfmt.py is configured to use UTF-8 encoding and handle Unicode escapes correctly.
+    def _create_mo_file(self, locale: str):
+        """Create a MO file from a PO file using polib.
         
         Args:
-            msgfmt_path (str): Path to msgfmt.py
+            locale (str): Locale code
             
         Returns:
             bool: True if successful, False otherwise
         """
         try:
-            with open(msgfmt_path, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-            found_encoding_line = False
+            po_directory = os.path.join(self._directory, "locale", locale, "LC_MESSAGES")
+            po_file = os.path.join(po_directory, "base.po")
+            mo_file = os.path.join(po_directory, "base.mo")
             
-            # Find and replace the encoding line
-            for i, line in enumerate(lines):
-                if line.startswith('    encoding = '):
-                    if line != "    encoding = 'utf-8'\n":
-                        lines[i] = "    encoding = 'utf-8'\n"
-                        found_encoding_line = True
-                        break
-                    else:
-                        logger.debug(f"msgfmt.py already uses UTF-8 encoding")
-                        return True
-
-            if not found_encoding_line:
-                raise Exception("Failed to find encoding line in msgfmt.py")
-
-            # Find the section that handles msgstr and add Unicode escape handling
-            for i, line in enumerate(lines):
-                if 'msgstr = ' in line:
-                    # Add code to handle Unicode escape sequences before writing to MO file
-                    lines.insert(i + 1, "            # Handle Unicode escape sequences\n")
-                    lines.insert(i + 2, "            if '\\u' in msgstr:\n")
-                    lines.insert(i + 3, "                try:\n")
-                    lines.insert(i + 4, "                    msgstr = msgstr.encode('ascii').decode('unicode_escape')\n")
-                    lines.insert(i + 5, "                except Exception as e:\n")
-                    lines.insert(i + 6, "                    print(f'Warning: Failed to decode Unicode escape sequence: {e}')\n")
-                    break
-
-            # Write back the modified file
-            with open(msgfmt_path, 'w', encoding='utf-8') as f:
-                f.writelines(lines)
+            # Load PO file and save as MO
+            po = polib.pofile(po_file, encoding='utf-8')
+            po.save_as_mofile(mo_file)
             
-            logger.debug(f"Updated {msgfmt_path} to handle Unicode escape sequences")
+            print("Created mo for locale " + locale)
             return True
             
         except Exception as e:
-            logger.error(f"Failed to update msgfmt.py: {e}")
-            return False
-
-    def _create_mo_file(self, locale: str):
-        try:
-            po_directory = os.path.join(self._directory, "locale", locale, "LC_MESSAGES")
-            os.chdir(po_directory)
-            
-            # Find msgfmt.py
-            msgfmt_path = self._find_python_i18n_tool("msgfmt.py")
-            if not msgfmt_path:
-                return False
-                
-            # Try to update encoding, but don't fail if it doesn't work
-            self._ensure_msgfmt_utf8_encoding(msgfmt_path)
-                
-            # Run msgfmt.py
-            cmd = f"python {msgfmt_path} -o base.mo base.po"
-            logger.debug(f"Running command: {cmd}")
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-            
-            if result.returncode != 0:
-                logger.error(f"Failed to create .mo file: {result.stderr}")
-                return False
-            else:
-                print("Created mo for locale " + locale)
-                return True
-        except Exception as e:
             print("Error while creating mo file for locale " + locale + ": " + str(e))
             return False
-        finally:
-            # Restore original working directory
-            os.chdir(self._directory)
 
     def manage_translations(self, action: TranslationAction = TranslationAction.CHECK_STATUS, modified_locales: set[str] = None):
         """Manage translations based on the specified action.
@@ -279,21 +223,20 @@ class I18NManager():
         return POT_files[0], PO_files
 
     def _parse_pot(self, POT):
-        with open(POT, "r", encoding="utf8") as f:
-            usage_comment = ""
-            in_usage_comment = False
-            for line in f:
-                if line.startswith(I18NManager.MSGID):
-                    msgid = self.get_msgid(line)
-                    # Skip empty or whitespace-only msgids (including the header entry with empty msgid)
-                    if msgid and msgid.strip():
-                        group = TranslationGroup(msgid, is_in_base=True, usage_comment=usage_comment)
-                        self.translations[msgid] = group
-                    usage_comment = ""
-                    in_usage_comment = False
-                elif line.startswith("#") or in_usage_comment:
-                    in_usage_comment = True
-                    usage_comment += line
+        """Parse a POT file using polib.
+        
+        Args:
+            POT (str): Path to the POT file
+        """
+        logger.debug(f"Parsing POT file: {POT}")
+        # Use include_obsolete=True and include_previous=True to ensure comments are parsed
+        po = polib.pofile(POT, encoding='utf-8', include_obsolete=True, include_previous=True)
+        logger.debug(f"Found {len(po)} entries in POT file")
+        
+        for entry in po:
+            if entry.msgid and entry.msgid.strip():
+                group = TranslationGroup.from_polib_entry(entry, is_in_base=True)
+                self.translations[entry.msgid] = group
 
     def get_msgid(self, line):
         msgid = line[7:-2]
@@ -305,37 +248,73 @@ class I18NManager():
         return os.path.basename(_dirname2)
 
     def _parse_po(self, PO, locale):
-        with open(PO, "r", encoding="utf8") as f:
-            msgid = None
-            usage_comment = ""
-            msgstr = ""
-            is_in_msgstr = False
-            for line in f:
-                if line.startswith("#"):
-                    usage_comment = line
-                    msgstr = ""
-                elif line.startswith(I18NManager.MSGID):
-                    msgid = self.get_msgid(line)
-                    msgstr = ""
-                    is_in_msgstr = True
-                elif line.startswith(I18NManager.MSGSTR):
-                    if not is_in_msgstr or msgid is None:
-                        print("Invalid PO file found in directory: " + PO)
-                        print("Line: " + line)
-                    msgstr += line[8:-2]
-                elif line.strip() == "" and msgstr != "":
-                    if msgid and msgid.strip():
-                        if msgid in self.translations:
-                            self.translations[msgid].add_translation(locale, msgstr)
-                        else:
-                            group = TranslationGroup(msgid, is_in_base=False, usage_comment=usage_comment)
-                            group.add_translation(locale, msgstr)
-                            self.translations[msgid] = group
-                    is_in_msgstr = False
-                    msgstr = ""
-                    usage_comment = ""
-                elif is_in_msgstr: # NOTE multi-line translation value
-                    msgstr += "\n" + line[1:-2]
+        """Parse a PO file using polib.
+        
+        Args:
+            PO (str): Path to the PO file
+            locale (str): Locale code
+        """
+        logger.debug(f"Parsing PO file: {PO} for locale: {locale}")
+        # Use include_obsolete=True and include_previous=True to ensure comments are parsed
+        po = polib.pofile(PO, encoding='utf-8', include_obsolete=True, include_previous=True)
+        logger.debug(f"Found {len(po)} entries in PO file")
+        
+        # Initialize counters
+        total_entries = 0
+        entries_with_newlines = 0
+        entries_with_explicit_newlines = 0
+        entries_with_actual_newlines = 0
+        total_explicit_newlines = 0
+        total_actual_newlines = 0
+        entries_with_comments = 0
+        explicit_newline = '\\n'
+        actual_newline = '\n'
+        
+        for entry in po:
+            if entry.msgid and entry.msgid.strip():
+                total_entries += 1
+                
+                # Debug logging for comment handling
+                if entry.comment or entry.tcomment:
+                    entries_with_comments += 1
+                
+                # Debug logging for newline handling
+                if entry.msgstr and ('\n' in entry.msgstr or '\\n' in entry.msgstr):
+                    entries_with_newlines += 1
+                    has_explicit = explicit_newline in entry.msgstr
+                    has_actual = actual_newline in entry.msgstr
+                    
+                    logger.debug(f"Found newlines in msgstr for msgid '{entry.msgid}':")
+                    logger.debug(f"  Raw msgstr: {repr(entry.msgstr)}")
+                    if has_explicit:
+                        entries_with_explicit_newlines += 1
+                        total_explicit_newlines += entry.msgstr.count(explicit_newline)
+                        logger.debug(f"  Number of '\\n' sequences: {entry.msgstr.count(explicit_newline)}")
+                    else:
+                        logger.debug(f"  Contains '\\n': {has_explicit}")
+                    if has_actual:
+                        entries_with_actual_newlines += 1
+                        total_actual_newlines += entry.msgstr.count(actual_newline)
+                        logger.debug(f"  Number of actual newlines: {entry.msgstr.count(actual_newline)}")
+                    else:
+                        logger.debug(f"  Contains actual newline: {has_actual}")
+                
+                if entry.msgid in self.translations:
+                    self.translations[entry.msgid].add_translation(locale, entry.msgstr)
+                else:
+                    group = TranslationGroup.from_polib_entry(entry, is_in_base=False)
+                    group.add_translation(locale, entry.msgstr)
+                    self.translations[entry.msgid] = group
+        
+        # Log summary statistics
+        logger.info(f"PO file {PO} statistics:")
+        logger.info(f"  Total entries: {total_entries}")
+        logger.info(f"  Entries with comments: {entries_with_comments}")
+        logger.info(f"  Entries with any newlines: {entries_with_newlines}")
+        logger.info(f"  Entries with explicit '\\n': {entries_with_explicit_newlines}")
+        logger.info(f"  Entries with actual newlines: {entries_with_actual_newlines}")
+        logger.info(f"  Total explicit '\\n' sequences: {total_explicit_newlines}")
+        logger.info(f"  Total actual newlines: {total_actual_newlines}")
 
     def _fill_translations(self, PO_files):
         for PO in PO_files:
@@ -401,7 +380,7 @@ class I18NManager():
         
         # Fix invalid unicode
         for msgid, invalid_locales in invalid_groups.invalid_unicode_locale_groups:
-            self.translations[msgid].fix_encoded_unicode_escape_strings(invalid_locales)
+            self.translations[msgid].fix_ensure_encoded_unicode(invalid_locales)
             fixes_applied = True
 
         # Fix invalid leading/trailing spaces
@@ -496,56 +475,87 @@ class I18NManager():
             results.updated_locales = successful_updates
 
     def write_po_file(self, po_file, locale):
-        """Write translations to a PO file for a specific locale.
+        """Write translations to a PO file for a specific locale using polib.
         
         Args:
             po_file (str): Path to the PO file
             locale (str): Locale code
         """
-        logger.debug(f"Writing PO file for locale {locale}: {po_file}")
-        # Get intro details with current locale
-        intro_details = self.get_POT_intro_details(
-            locale=locale,
-            first_author=self.intro_details["first_author"],
-            last_translator=self.intro_details["last_translator"],
-            application_name=self.intro_details["application_name"],
-            version=self.intro_details["version"]
-        )
-        
-        with open(po_file, 'w', encoding='utf-8') as f:
-            # Write header
-            f.write(intro_details)
+        try:
+            logger.debug(f"Starting to write PO file for locale {locale}: {po_file}")
             
-            # Write translations
+            # Create a new PO file
+            po = polib.POFile()
+            logger.debug("Created new POFile object")
+            
+            # Set metadata
+            metadata = {
+                'Project-Id-Version': self.intro_details["version"],
+                'POT-Creation-Date': time.strftime('%Y-%m-%d %H:%M%z'),
+                'PO-Revision-Date': time.strftime('%Y-%m-%d %H:%M%z'),
+                'Last-Translator': self.intro_details["last_translator"],
+                'Language': locale,
+                'Language-Team': f"{locale} Team <<EMAIL>>",
+                'MIME-Version': '1.0',
+                'Content-Type': 'text/plain; charset=UTF-8',
+                'Content-Transfer-Encoding': '8bit',
+                'Plural-Forms': 'nplurals=2; plural=(n != 1);'
+            }
+            po.metadata = metadata
+            logger.debug(f"Set PO file metadata: {metadata}")
+            
+            # Add translations
             translation_count = 0
             for msgid, group in self.translations.items():
                 if not group.is_in_base:
                     continue
                     
-                # Write usage comment if present
+                # Extract comments
+                comment = None
+                tcomment = None
                 if group.usage_comment:
-                    f.write(group.usage_comment)
-                    
-                # Write msgid
-                f.write(f'msgid "{msgid}"\n')
+                    comment = group.usage_comment.strip('#\n')
+                if group.tcomment:
+                    tcomment = group.tcomment.strip('#\n')
                 
-                # Write msgstr
-                translation = group.get_translation_escaped(locale)
-                if translation:
-                    if "\n" in translation:
-                        f.write(f"{I18NManager.MSGSTR} \"\"\n")
-                        for line in translation.split("\n"):
-                            if line != "":
-                                f.write(f"\"{line}\"\n")
-                    else:
-                        f.write(f"{I18NManager.MSGSTR} \"{translation}\"\n")
-                else:
-                    f.write('msgstr ""\n')
-                    
-                f.write('\n')
-                translation_count += 1
+                # Get the translation and ensure it's properly encoded
+                msgstr = group.get_translation_unescaped(locale) or ""
                 
+                try:
+                    entry = polib.POEntry(
+                        msgid=msgid,
+                        msgstr=msgstr,
+                        comment=comment,
+                        tcomment=tcomment,
+                        occurrences=group.occurrences  # Include occurrences
+                    )
+                    po.append(entry)
+                    translation_count += 1
+                    if translation_count % 100 == 0:  # Log progress every 100 entries
+                        logger.debug(f"Added {translation_count} translations so far...")
+                except Exception as e:
+                    logger.error(f"Error creating POEntry for msgid '{msgid}': {e}")
+                    logger.error(f"  msgstr: {repr(msgstr)}")
+                    logger.error(f"  comment: {repr(comment)}")
+                    logger.error(f"  tcomment: {repr(tcomment)}")
+                    logger.error(f"  occurrences: {repr(group.occurrences)}")
+                    raise
+            
+            logger.debug(f"Finished adding {translation_count} translations")
+            
+            # Save the file
+            try:
+                logger.debug(f"Attempting to save PO file to: {po_file}")
+                po.save(po_file)
+                logger.debug("Successfully saved PO file")
+            except Exception as e:
+                logger.error(f"Error saving PO file: {e}")
+                logger.error(f"File path: {po_file}")
+                logger.error(f"Number of entries: {translation_count}")
+                raise
+            
             logger.debug(f"Wrote {translation_count} translations to PO file")
+            
             # Mark this locale as having been written to
             self.written_locales.add(locale)
             
@@ -553,6 +563,10 @@ class I18NManager():
             if self.written_locales.issuperset(self.locales):
                 self._purge_stale_translations()
                 
+        except Exception as e:
+            logger.error(f"Failed to write PO file for locale {locale}: {e}")
+            raise
+
     def _purge_stale_translations(self):
         """Remove translations that are not in base once all locales have been written."""
         stale_msgids = [msgid for msgid, group in self.translations.items() if not group.is_in_base]

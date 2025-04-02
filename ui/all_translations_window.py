@@ -22,7 +22,7 @@ class AllTranslationsWindow(QDialog):
         self.setMinimumSize(int(screen.width() * 0.8), int(screen.height() * 0.8))  # 80% of screen size
         self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))  # 90% of screen size
         
-        self.show_escaped = True  # Set to True by default
+        self.show_escaped = False  # By default it should be encoded, not escaped
         self.setup_ui()
         
     def setup_ui(self):
@@ -71,7 +71,7 @@ class AllTranslationsWindow(QDialog):
         
         # Add Unicode display toggle
         self.unicode_toggle = QCheckBox(_("Show Escaped Unicode"))
-        self.unicode_toggle.setChecked(True)  # Set to checked by default
+        self.unicode_toggle.setChecked(self.show_escaped)
         self.unicode_toggle.stateChanged.connect(self.toggle_unicode_display)
         
         button_layout.addWidget(save_btn)

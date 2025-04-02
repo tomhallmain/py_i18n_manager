@@ -60,7 +60,7 @@ class OutstandingItemsWindow(QDialog):
 
         self.config = ConfigManager()
 
-        self.show_escaped = True  # Set to True by default
+        self.show_escaped = False  # By default it should be encoded, not escaped
         self.setup_properties()
         self.setup_ui()
 
@@ -123,7 +123,7 @@ class OutstandingItemsWindow(QDialog):
         
         # Add Unicode display toggle
         self.unicode_toggle = QCheckBox(_("Show Escaped Unicode"))
-        self.unicode_toggle.setChecked(True)  # Set to checked by default
+        self.unicode_toggle.setChecked(self.show_escaped)
         self.unicode_toggle.stateChanged.connect(self.toggle_unicode_display)
         
         button_layout.addWidget(self.translate_all_btn)
