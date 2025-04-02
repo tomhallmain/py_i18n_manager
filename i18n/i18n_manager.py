@@ -106,7 +106,7 @@ class I18NManager():
             results.extend_error_message(f"Failed to create MO files for locales: {results.failed_locales}")
 
     def _ensure_msgfmt_utf8_encoding(self, msgfmt_path: str) -> bool:
-        """Ensure msgfmt.py is configured to use UTF-8 encoding.
+        """Ensure msgfmt.py is configured to use UTF-8 encoding and handle Unicode escapes correctly.
         
         Args:
             msgfmt_path (str): Path to msgfmt.py
@@ -133,15 +133,27 @@ class I18NManager():
             if not found_encoding_line:
                 raise Exception("Failed to find encoding line in msgfmt.py")
 
+            # Find the section that handles msgstr and add Unicode escape handling
+            for i, line in enumerate(lines):
+                if 'msgstr = ' in line:
+                    # Add code to handle Unicode escape sequences before writing to MO file
+                    lines.insert(i + 1, "            # Handle Unicode escape sequences\n")
+                    lines.insert(i + 2, "            if '\\u' in msgstr:\n")
+                    lines.insert(i + 3, "                try:\n")
+                    lines.insert(i + 4, "                    msgstr = msgstr.encode('ascii').decode('unicode_escape')\n")
+                    lines.insert(i + 5, "                except Exception as e:\n")
+                    lines.insert(i + 6, "                    print(f'Warning: Failed to decode Unicode escape sequence: {e}')\n")
+                    break
+
             # Write back the modified file
             with open(msgfmt_path, 'w', encoding='utf-8') as f:
                 f.writelines(lines)
             
-            logger.debug(f"Updated {msgfmt_path} to use UTF-8 encoding")
+            logger.debug(f"Updated {msgfmt_path} to handle Unicode escape sequences")
             return True
             
         except Exception as e:
-            logger.error(f"Failed to update msgfmt.py encoding: {e}")
+            logger.error(f"Failed to update msgfmt.py: {e}")
             return False
 
     def _create_mo_file(self, locale: str):
@@ -564,7 +576,7 @@ msgstr ""
 "Language: {locale}\\n"
 "Language-Team: {locale} Team <<EMAIL>>\\n"
 "MIME-Version: 1.0\\n"
-"Content-Type: text/plain; charset=cp1252\\n"
+"Content-Type: text/plain; charset=UTF-8\\n"
 "Content-Transfer-Encoding: 8bit\\n"
 
 

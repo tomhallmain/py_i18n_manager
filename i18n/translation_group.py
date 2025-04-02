@@ -55,10 +55,15 @@ def escape_unicode(s):
     Returns:
         str: The string in ASCII-encoded Unicode format
     """
+    # If the string already contains Unicode escape sequences, return as is
+    if '\\u' in s or '\\U' in s:
+        return s
+        
     ret = []
     for c in s:
         n = ord(c)
         if n > 0x7F:
+            # For characters above 0x7F, use Unicode escape sequence
             ret.append("\\u{:04x}".format(n))
         else:
             ret.append(c)
@@ -74,14 +79,27 @@ def unescape_unicode(s):
     Returns:
         str: The string in regular Unicode format
     """
-    # Replace \u00 with \x for short sequences
-    s = s.replace('\\u00', '\\x')
-    # Replace \u with \U for long sequences
-    s = s.replace('\\u', '\\U')
-    
     try:
-        # Decode the escaped string back to Unicode
-        return s.encode('ascii').decode('unicode_escape')
+        # Split the string into parts, handling each escape sequence separately
+        parts = []
+        current = 0
+        while current < len(s):
+            if s[current:current+2] == '\\u': # NOTE: this will only be run on longer unicode sequences
+                # Found a Unicode escape sequence
+                hex_str = s[current+2:current+6]
+                if len(hex_str) == 4:  # Valid hex sequence
+                    try:
+                        # Convert hex to integer and then to character
+                        char = chr(int(hex_str, 16))
+                        parts.append(char)
+                        current += 6
+                        continue
+                    except ValueError:
+                        pass
+            # If we get here, either no escape sequence or invalid one
+            parts.append(s[current])
+            current += 1
+        return ''.join(parts)
     except Exception as e:
         print(f"Error unescaping string: {e}")
         return s
