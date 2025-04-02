@@ -76,6 +76,36 @@ class I18NManager():
             "application_name": "APPLICATION",
             "version": "1.0"
         }
+        # Detect which directory structure is being used
+        self._locale_dir = self._detect_locale_directory()
+
+    def _detect_locale_directory(self):
+        """Detect which directory structure is being used (locale or locales).
+        
+        Returns:
+            str: The name of the locale directory being used ('locale' or 'locales')
+        """
+        locale_dir = os.path.join(self._directory, "locale")
+        locales_dir = os.path.join(self._directory, "locales")
+        
+        # Check if both directories exist
+        if os.path.exists(locale_dir) and os.path.exists(locales_dir):
+            logger.warning("Both 'locale' and 'locales' directories exist. Using 'locale' by default.")
+            return "locale"
+        
+        # Check if locale directory exists
+        if os.path.exists(locale_dir):
+            logger.info("Using 'locale' directory structure")
+            return "locale"
+        
+        # Check if locales directory exists
+        if os.path.exists(locales_dir):
+            logger.info("Using 'locales' directory structure")
+            return "locales"
+        
+        # If neither exists, default to 'locale'
+        logger.info("No locale directory found. Defaulting to 'locale' directory structure")
+        return "locale"
 
     def set_directory(self, directory):
         """Set a new project directory and reset translation state.
@@ -95,6 +125,8 @@ class I18NManager():
             "application_name": "APPLICATION",
             "version": "1.0"
         }
+        # Detect which directory structure is being used
+        self._locale_dir = self._detect_locale_directory()
 
     def create_mo_files(self, results: TranslationManagerResults):
         for locale in results.locale_statuses:
@@ -116,7 +148,7 @@ class I18NManager():
             bool: True if successful, False otherwise
         """
         try:
-            po_directory = os.path.join(self._directory, "locale", locale, "LC_MESSAGES")
+            po_directory = os.path.join(self._directory, self._locale_dir, locale, "LC_MESSAGES")
             po_file = os.path.join(po_directory, "base.po")
             mo_file = os.path.join(po_directory, "base.mo")
             
@@ -200,12 +232,12 @@ class I18NManager():
             return results
 
     def get_po_file_path(self, locale):
-        return os.path.join(self._directory, "locale", locale, "LC_MESSAGES", "base.po")
+        return os.path.join(self._directory, self._locale_dir, locale, "LC_MESSAGES", "base.po")
 
     def gather_files(self):
         POT_files = glob.glob(os.path.join(self._directory, "*.pot"))
         if len(POT_files) != 1:
-            locale_dir = os.path.join(self._directory, "locale")
+            locale_dir = os.path.join(self._directory, self._locale_dir)
             if os.path.exists(locale_dir):
                 POT_files = glob.glob(os.path.join(locale_dir, "*.pot"))
             if len(POT_files) != 1:
@@ -308,8 +340,13 @@ class I18NManager():
         
         # Log summary statistics
         logger.info(f"PO file {PO} statistics:")
-        logger.info(f"  Total entries: {total_entries}  Entries with comments: {entries_with_comments}")
-        logger.info(f"  Entries with any newlines: {entries_with_newlines}  Entries with explicit '\\n': {entries_with_explicit_newlines}  Entries with actual newlines: {entries_with_actual_newlines}  Total explicit '\\n' sequences: {total_explicit_newlines}  Total actual newlines: {total_actual_newlines}")
+        logger.info(f"  Total entries: {total_entries}")
+        logger.info(f"  Entries with comments: {entries_with_comments}")
+        logger.info(f"  Entries with any newlines: {entries_with_newlines}")
+        logger.info(f"  Entries with explicit '\\n': {entries_with_explicit_newlines}")
+        logger.info(f"  Total '\\n' sequences: {total_explicit_newlines}")
+        logger.info(f"  Entries with actual newlines: {entries_with_actual_newlines}")
+        logger.info(f"  Total actual newlines: {total_actual_newlines}")
 
     def _fill_translations(self, PO_files):
         for PO in PO_files:
@@ -621,11 +658,11 @@ msgstr ""
         try:
             # Get the project root directory (one level up from locale dir if needed)
             project_dir = self._directory
-            if project_dir.endswith('locale'):
+            if project_dir.endswith(self._locale_dir):
                 project_dir = os.path.dirname(project_dir)
                 
             # Ensure locale directory exists
-            locale_dir = os.path.join(project_dir, 'locale')
+            locale_dir = os.path.join(project_dir, self._locale_dir)
             os.makedirs(locale_dir, exist_ok=True)
             
             logger.info(f"Generating POT file in directory: {project_dir}")
@@ -636,7 +673,7 @@ msgstr ""
                 return False
                 
             result = subprocess.run(
-                ["python", pygettext_path, "-d", "base", "-o", "locale\\base.pot", "."],
+                ["python", pygettext_path, "-d", "base", "-o", f"{self._locale_dir}\\base.pot", "."],
                 cwd=project_dir,
                 capture_output=True,
                 text=True
@@ -664,7 +701,7 @@ msgstr ""
         """
         # Get the project root directory
         project_dir = self._directory
-        if project_dir.endswith('locale'):
+        if project_dir.endswith(self._locale_dir):
             project_dir = os.path.dirname(project_dir)
             
         # Patterns that suggest UI text
