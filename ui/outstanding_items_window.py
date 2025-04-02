@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                             QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
-                            QMessageBox, QMenu, QCheckBox)
+                            QMessageBox, QMenu, QCheckBox, QTextEdit, QStyledItemDelegate)
 from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer
-from PyQt6.QtGui import QColor, QAction
+from PyQt6.QtGui import QColor, QAction, QKeyEvent
 from PyQt6.QtWidgets import QApplication
 
 from lib.translation_service import TranslationService
@@ -12,6 +12,38 @@ from utils.translations import I18N
 from utils.utils import Utils
 
 _ = I18N._
+
+class MultilineItemDelegate(QStyledItemDelegate):
+    """A delegate that supports multiline editing in table cells."""
+    def createEditor(self, parent, option, index):
+        editor = QTextEdit(parent)
+        editor.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        return editor
+        
+    def setEditorData(self, editor, index):
+        value = index.model().data(index, Qt.ItemDataRole.EditRole)
+        editor.setText(value)
+        
+    def setModelData(self, editor, model, index):
+        value = editor.toPlainText()
+        model.setData(index, value, Qt.ItemDataRole.EditRole)
+        
+    def updateEditorGeometry(self, editor, option, index):
+        editor.setGeometry(option.rect)
+        
+    def eventFilter(self, editor, event):
+        """Filter events to handle Shift+Enter for newlines."""
+        if event.type() == event.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Return:
+                if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                    # Insert newline on Shift+Enter
+                    editor.insertPlainText("\n")
+                    return True
+                else:
+                    # Regular Enter - finish editing
+                    editor.clearFocus()
+                    return True
+        return super().eventFilter(editor, event)
 
 class OutstandingItemsWindow(QDialog):
     # Signal now takes a list of (msgid, new_value) tuples for each locale
@@ -64,6 +96,13 @@ class OutstandingItemsWindow(QDialog):
         # Enable context menu for header
         self.table.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.horizontalHeader().customContextMenuRequested.connect(self.show_header_context_menu)
+        
+        # Set row height to accommodate multiple lines
+        self.table.verticalHeader().setDefaultSectionSize(100)
+        
+        # Set the delegate for multiline editing
+        self.table.setItemDelegate(MultilineItemDelegate())
+        
         layout.addWidget(self.table)
         
         # Buttons
