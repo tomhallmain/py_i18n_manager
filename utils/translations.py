@@ -29,6 +29,3 @@ class I18N:
             return I18N.translate.gettext(s)
         except KeyError:
             return s
-        except Exception as e:
-            # TODO remove this
-            return s

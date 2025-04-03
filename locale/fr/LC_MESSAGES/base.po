@@ -2,9 +2,9 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2025-04-02 13:03-0400\n"
-"PO-Revision-Date: 2025-04-02 13:03-0400\n"
-"Last-Translator: Translator Name <translator@example.com>\n"
+"POT-Creation-Date: 2025-04-03 19:48-0400\n"
+"PO-Revision-Date: 2025-04-03 19:48-0400\n"
+"Last-Translator: Thomas Hall <tomhall.main@gmail.com>\n"
 "Language-Team: fr Team <<EMAIL>>\n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
@@ -12,7 +12,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: .\app.py:31
+#: .\app.py:31 .\app.py:154
 msgid "i18n Translation Manager"
 msgstr "i18n Responsable de traduction"
 
@@ -24,55 +24,59 @@ msgstr "Projet en cours :"
 msgid "No project selected"
 msgstr "Aucun projet sélectionné"
 
-#: .\app.py:75 .\ui\recent_projects_dialog.py:68
+#: .\app.py:82 .\ui\recent_projects_dialog.py:68
 msgid "Select Project"
 msgstr "Sélectionner le projet"
 
-#: .\app.py:101
+#: .\app.py:86
+msgid "Modify Project Settings"
+msgstr "Modifier les paramètres du projet"
+
+#: .\app.py:116
 msgid "Check Status"
 msgstr "Vérifier l'état"
 
-#: .\app.py:102
+#: .\app.py:117
 msgid "Show All Translations"
 msgstr "Afficher toutes les traductions"
 
-#: .\app.py:103
+#: .\app.py:118
 msgid "Show Outstanding Items"
 msgstr "Afficher les éléments en suspens"
 
-#: .\app.py:104
+#: .\app.py:119
 msgid "Find Untranslated"
 msgstr "Trouver non traduit"
 
-#: .\app.py:105
+#: .\app.py:120
 msgid "Write Default Locale"
 msgstr "Écrire la langue par défaut"
 
-#: .\app.py:106
+#: .\app.py:121
 msgid "Generate POT"
 msgstr "Générer le POT"
 
-#: .\app.py:107
+#: .\app.py:122
 msgid "Update PO Files"
 msgstr "Mettre à jour les fichiers PO"
 
-#: .\app.py:108
+#: .\app.py:123
 msgid "Create MO Files"
 msgstr "Créer des fichiers MO"
 
-#: .\app.py:129
+#: .\app.py:144
 msgid "Status"
 msgstr "État"
 
-#: .\app.py:470
+#: .\app.py:509
 msgid "MO Files Need Update"
 msgstr "Les fichiers MO nécessitent une mise à jour."
 
-#: .\app.py:471
+#: .\app.py:510
 msgid "PO files have been updated for the following locales:"
 msgstr "Les fichiers PO ont été mis à jour pour les locaux suivants :"
 
-#: .\app.py:473
+#: .\app.py:512
 msgid "Remember to run Create MO Files to apply these changes."
 msgstr ""
 "N'oubliez pas d'exécuter la création des fichiers MO pour appliquer ces "
@@ -94,15 +98,15 @@ msgstr "Rechercher les clés de traduction..."
 msgid "Filter:"
 msgstr "Filtre:"
 
-#: .\ui\all_translations_window.py:67 .\ui\outstanding_items_window.py:78
+#: .\ui\all_translations_window.py:67 .\ui\outstanding_items_window.py:119
 msgid "Save Changes"
 msgstr "Enregistrer les modifications"
 
-#: .\ui\all_translations_window.py:69 .\ui\outstanding_items_window.py:80
+#: .\ui\all_translations_window.py:69 .\ui\outstanding_items_window.py:121
 msgid "Close"
 msgstr "Fermer"
 
-#: .\ui\all_translations_window.py:73 .\ui\outstanding_items_window.py:84
+#: .\ui\all_translations_window.py:73 .\ui\outstanding_items_window.py:125
 msgid "Show Escaped Unicode"
 msgstr "Afficher l'Unicode échappé"
 
@@ -122,39 +126,39 @@ msgstr "Sauvegarde de {}changements avec succès !"
 msgid "Success"
 msgstr "Succès"
 
-#: .\ui\outstanding_items_window.py:22
+#: .\ui\outstanding_items_window.py:54
 msgid "Outstanding Translation Items"
 msgstr "Éléments de traduction en suspens"
 
-#: .\ui\outstanding_items_window.py:41
+#: .\ui\outstanding_items_window.py:75
 msgid "Translation in Progress"
 msgstr "Traduction en cours"
 
-#: .\ui\outstanding_items_window.py:42
+#: .\ui\outstanding_items_window.py:76
 msgid "Translation is in progress. Are you sure you want to close?"
 msgstr "La traduction est en cours. Êtes-vous sûr de vouloir fermer ?"
 
-#: .\ui\outstanding_items_window.py:71
+#: .\ui\outstanding_items_window.py:112
 msgid "Translate All Missing"
 msgstr "Traduire tout ce qui manque"
 
-#: .\ui\outstanding_items_window.py:74
+#: .\ui\outstanding_items_window.py:115
 msgid "Cancel Translation"
 msgstr "Annuler la traduction"
 
-#: .\ui\outstanding_items_window.py:104 .\ui\outstanding_items_window.py:140
+#: .\ui\outstanding_items_window.py:145 .\ui\outstanding_items_window.py:181
 msgid "Copy Text"
 msgstr "Copier le texte"
 
-#: .\ui\outstanding_items_window.py:110
+#: .\ui\outstanding_items_window.py:151
 msgid "Copy Default Translation"
 msgstr "Copier la traduction par défaut"
 
-#: .\ui\outstanding_items_window.py:118
+#: .\ui\outstanding_items_window.py:159
 msgid "Translate with Argos Translate"
 msgstr "Traduire avec Argos Translate"
 
-#: .\ui\outstanding_items_window.py:123
+#: .\ui\outstanding_items_window.py:164
 msgid "Translate with LLM"
 msgstr "Traduire avec LLM"
 
@@ -244,7 +248,7 @@ msgstr "Veuillez saisir un code local."
 #: .\ui\setup_translation_project_window.py:130
 #: .\ui\setup_translation_project_window.py:141
 #: .\ui\setup_translation_project_window.py:146
-#: .\ui\setup_translation_project_window.py:190
+#: .\ui\setup_translation_project_window.py:227
 msgid "Error"
 msgstr "Erreur"
 
@@ -279,9 +283,35 @@ msgstr ""
 "Voulez-vous vraiment supprimer la locale « {} » ? Cela supprimera le "
 "répertoire local et toutes ses traductions."
 
-#: .\ui\setup_translation_project_window.py:191
+#: .\ui\setup_translation_project_window.py:228
 msgid "Failed to save configuration: {}"
 msgstr "Échec de l'enregistrement de la configuration : {}"
+
+#: .\ui\setup_translation_project_window.py:167
+msgid ""
+"The default locale '{}' is not in the list of locales. Do you want to add "
+"it?"
+msgstr ""
+"La locale par défaut '{}' n'est pas dans la liste des locales. Tu veux "
+"l'ajouter ?"
+
+#: .\ui\setup_translation_project_window.py:190
+msgid "Invalid Locale Codes"
+msgstr "Codes locaux non valides"
+
+#: .\ui\setup_translation_project_window.py:191
+msgid ""
+"The following locale codes are invalid:\n"
+"\n"
+"{}\n"
+"\n"
+"Please correct them before saving."
+msgstr ""
+"Les codes locaux suivants sont invalides:\n"
+"\n"
+"{}\n"
+"\n"
+"Veuillez les corriger avant de les enregistrer."
 
 #: .\ui\stats_widget.py:36
 msgid "Translation Statistics"
@@ -364,3 +394,46 @@ msgstr " (En attente d'exécutions : {0})"
 #: .\utils\job_queue.py:38
 msgid " (Pending schedules: {0})"
 msgstr " (En attente des horaires : {0})"
+
+#: .\ui\setup_translation_project_window.py:166
+msgid "Warning"
+msgstr "Avertissement"
+
+#: .\ui\setup_translation_project_window.py:183
+msgid "The following locale codes are invalid:"
+msgstr "Les codes locaux suivants sont invalides:"
+
+#: .\ui\setup_translation_project_window.py:186
+msgid ""
+"Locale codes must follow ISO 639-1 (language) and optionally ISO 3166-1 "
+"(country) standards."
+msgstr ""
+"Les codes locaux doivent respecter les normes ISO 639-1 (langue) et, en "
+"option, ISO 3166-1 (pays)."
+
+#: .\ui\setup_translation_project_window.py:306
+msgid "Language code must be a two-letter ISO 639-1 code"
+msgstr "Le code linguistique doit être un code ISO 639-1 à deux lettres"
+
+#: .\ui\setup_translation_project_window.py:310
+msgid "Invalid language code. Must be a valid ISO 639-1 code"
+msgstr "Code de langue non valide. Doit être un code ISO 639-1 valide"
+
+#: .\ui\setup_translation_project_window.py:316
+msgid "Country code must be a two-letter uppercase ISO 3166-1 code"
+msgstr ""
+"Le code du pays doit être un code en majuscules de deux lettres ISO 3166-1"
+
+#: .\ui\setup_translation_project_window.py:320
+msgid "Invalid country code. Must be a valid ISO 3166-1 code"
+msgstr "Code pays non valide. Doit être un code ISO 3166-1 valide"
+
+#: .\ui\setup_translation_project_window.py:325
+msgid "Script code must be a four-letter code with first letter uppercase"
+msgstr ""
+"Le code Script doit être un code à quatre lettres avec la première lettre "
+"majuscule"
+
+#: .\ui\setup_translation_project_window.py:329
+msgid "Invalid script code. Must be a valid ISO 15924 code"
+msgstr "Code script non valide. Doit être un code ISO 15924 valide"

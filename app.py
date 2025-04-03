@@ -69,14 +69,29 @@ class MainWindow(QMainWindow):
         self.project_label.setStyleSheet("font-size: 14px;")
         title_layout.addWidget(title_label)
         title_layout.addWidget(self.project_label)
-        title_layout.addStretch()
+        
+        # Add locales label (right-aligned)
+        self.locales_label = QLabel("")
+        self.locales_label.setStyleSheet("font-size: 14px;")
+        self.locales_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        title_layout.addStretch()  # Add stretch before the locales label to push it right
+        title_layout.addWidget(self.locales_label)
 
-        # Project selection button
+        # Project selection buttons in a horizontal layout
+        button_layout = QHBoxLayout()
         select_project_btn = QPushButton(_("Select Project"))
         select_project_btn.clicked.connect(self.show_project_selector)
 
+        # Add modify project settings button
+        self.modify_project_btn = QPushButton(_("Modify Project Settings"))
+        self.modify_project_btn.clicked.connect(self.show_project_setup)
+        self.modify_project_btn.setEnabled(False)  # Disabled by default until a project is selected
+
+        button_layout.addWidget(select_project_btn)
+        button_layout.addWidget(self.modify_project_btn)
+
         project_layout.addLayout(title_layout)
-        project_layout.addWidget(select_project_btn)
+        project_layout.addLayout(button_layout)
         layout.addWidget(project_frame)
 
         # Stats widget
@@ -134,12 +149,22 @@ class MainWindow(QMainWindow):
         # Load last project if available
         self.load_last_project()
 
+    def update_window_title(self, project_name=None):
+        """Update the window title with the project name if provided."""
+        title = _("i18n Translation Manager")
+        if project_name and project_name.strip() != "":
+            self.setWindowTitle(f"{title} - {project_name}")
+        else:
+            self.setWindowTitle(title)
+
     def load_last_project(self):
         """Load the last selected project if it exists."""
         last_project = self.settings_manager.load_last_project()
         if last_project:
             self.current_project = last_project
-            self.project_label.setText(f"Project: {os.path.basename(last_project)}")
+            project_name = os.path.basename(last_project)
+            self.project_label.setText(project_name)
+            self.update_window_title(project_name)
             self.update_button_states()
 
             # Clear previous status
@@ -165,7 +190,9 @@ class MainWindow(QMainWindow):
     def handle_project_selection(self, directory):
         """Handle project selection from either recent projects or directory picker."""
         self.current_project = directory
-        self.project_label.setText(f"Project: {os.path.basename(directory)}")
+        project_name = os.path.basename(directory)
+        self.project_label.setText(project_name)
+        self.update_window_title(project_name)
         self.update_button_states()
 
         # Save the selected project
@@ -204,6 +231,7 @@ class MainWindow(QMainWindow):
         self.write_default_btn.setEnabled(has_project and has_translations)
         self.generate_pot_btn.setEnabled(has_project and has_translations)
         self.find_untranslated_btn.setEnabled(has_project and has_translations)
+        self.modify_project_btn.setEnabled(has_project)
 
     def run_translation_task(self, action: TranslationAction = TranslationAction.CHECK_STATUS):
         """Run a translation task with the specified action.
@@ -275,6 +303,12 @@ class MainWindow(QMainWindow):
         logger.debug(f"Translations ready - count: {len(translations)}, locales: {locales}")
         self.locales = locales
         self.update_button_states()
+        
+        # Update locales label
+        if locales:
+            self.locales_label.setText(", ".join(sorted(locales)))
+        else:
+            self.locales_label.setText("")
 
         # Add a success message if this was an automatic check
         if self.status_text.toPlainText().startswith("Loading project:"):
@@ -361,6 +395,8 @@ class MainWindow(QMainWindow):
         if self.current_project == project_path:
             self.current_project = None
             self.project_label.setText("No project selected")
+            self.locales_label.setText("")  # Clear locales label
+            self.update_window_title()  # Reset window title
             self.update_button_states()
             # Clear stats and translations
             self.locales = None
