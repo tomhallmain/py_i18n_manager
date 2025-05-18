@@ -1,11 +1,14 @@
+from datetime import datetime
 import glob
 import os
-import subprocess
 import sys
 import time
 import logging
 import re
 import polib
+from babel.messages.catalog import Catalog
+from babel.messages.extract import extract_from_dir
+from babel.messages.pofile import write_po
 
 from i18n.translation_group import TranslationGroup
 from .translation_manager_results import TranslationManagerResults, TranslationAction, LocaleStatus
@@ -650,7 +653,8 @@ msgstr ""
             return False
 
     def generate_pot_file(self):
-        """Generate the base.pot file using pygettext.py.
+        """Generate the base.pot file using Babel.
+        TODO double check that polib doesn't actually support this out of the box
         
         Returns:
             bool: True if successful, False otherwise
@@ -667,22 +671,57 @@ msgstr ""
             
             logger.info(f"Generating POT file in directory: {project_dir}")
             
-            # Find pygettext.py
-            pygettext_path = self._find_python_i18n_tool("pygettext.py")
-            if not pygettext_path:
-                return False
-                
-            result = subprocess.run(
-                ["python", pygettext_path, "-d", "base", "-o", f"{self._locale_dir}\\base.pot", "."],
-                cwd=project_dir,
-                capture_output=True,
-                text=True
+            # Create a new catalog
+            now = datetime.now()
+            catalog = Catalog(
+                project=self.intro_details["application_name"],
+                version=self.intro_details["version"],
+                copyright_holder=self.intro_details["first_author"],
+                msgid_bugs_address=self.intro_details["last_translator"],
+                creation_date=now,
+                revision_date=now
             )
-            if result.returncode == 0:
-                logger.info(f"Successfully generated base.pot file using {pygettext_path}")
-                return True
-                
-            return False
+            
+            # Extract messages from Python files
+            for filename, lineno, message, comments, context in extract_from_dir(
+                project_dir,
+                method_map=[('**.py', 'python')],
+                keywords={'_': None, 'gettext': None, 'ngettext': (1, 2)},
+                comment_tags=('TRANSLATORS:',),
+                strip_comment_tags=True,
+                # NOTE the below doesn't actually work, it was an attempt to preserve the location
+                # with line number and remove the format flags, but it doesn't work.
+                # https://babel.pocoo.org/en/latest/messages.html is the relevant documentation,
+                # from how they wrote it it's possible the options_map is purely for custom extractors.
+                # options_map={
+                #     '**.py': {
+                #         'no_location': False,
+                #         'include_lineno': True,
+                #         'include_format_flags': False
+                #     }
+                # }
+            ):
+                catalog.add(message, None, [(filename, lineno)], auto_comments=comments, context=context)
+            
+            # Write the catalog to a POT file
+            pot_file = os.path.join(locale_dir, "base.pot")
+            with open(pot_file, 'wb') as f:
+                write_po(f, catalog, width=120) # TODO make width setting configurable by project
+            
+            # Post-process the file to remove format flag lines
+            # TODO this is a hack to remove the format flag lines, it's not the right
+            # long-term solution, but it's a quick fix.
+            with open(pot_file, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            # Filter out lines that start with "#, " and write back
+            with open(pot_file, 'w', encoding='utf-8') as f:
+                for line in lines:
+                    if not line.startswith('#, '):
+                        f.write(line)
+            
+            logger.info(f"Successfully generated base.pot file with {len(catalog)} entries")
+            return True
                 
         except Exception as e:
             logger.error(f"Error generating POT file: {e}")

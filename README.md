@@ -4,50 +4,20 @@ A PyQt6-based desktop application for managing internationalization (i18n) trans
 
 ## Features
 
-- **Project Management**
-  - Select and manage multiple translation projects
-  - Recent projects tracking
-  - Automatic project state persistence
-
-- **Translation Statistics**
-  - Total translations count
-  - Total locales count
-  - Missing translations tracking
-  - Invalid Unicode detection
-  - Invalid indices detection
-  - Stale translations identification
-
-- **Translation Management**
-  - View and edit translations in a user-friendly interface
-  - Update PO files with new translations
-  - Create MO files for deployment
-  - Track modified locales for efficient updates
-
-- **Quality Control**
-  - Real-time validation of translations
-  - Detection of invalid Unicode characters
-  - Detection of invalid format string indices
-  - Detection of invalid brace formatting
-  - Detection of invalid leading spaces
-  - Detection of invalid newlines
-  - Tracking of stale translations
-
-- **User Interface**
-  - Clean, modern interface with PyQt6
-  - Tabbed interface for different views
-  - Outstanding items window for quick fixes
-  - All translations view for comprehensive editing
+- **Project Management**: Select and manage multiple translation projects with automatic state persistence
+- **Translation Statistics**: Track total translations, locales, missing translations, and various validation metrics
+- **Translation Management**: View/edit translations, update PO files, create MO files
+- **Quality Control**: Real-time validation of translations including Unicode, format strings, braces, spaces, and newlines
+- **User Interface**: Clean, modern PyQt6 interface with tabbed views and dedicated translation windows
 
 ## Installation
 
 1. Clone the repository
-
 2. Create a virtual environment (recommended):
 ```bash
 python -m venv venv
 venv/bin/activate  # On Unix: source venv\Scripts\activate
 ```
-
 3. Install dependencies:
 ```bash
 pip install -r requirements.txt
@@ -59,21 +29,15 @@ pip install -r requirements.txt
 ```bash
 python app.py
 ```
-
 2. Select a project directory containing a locale directory and translation files (PO files)
-
-3. Use the interface to:
-   - Check translation status
-   - Update PO files
-   - Create MO files
-   - View and edit translations
-   - Track translation statistics
+3. Use the interface to check status, update files, and manage translations
 
 ## Requirements
 
 - Python 3.8 or higher
 - PyQt6
-- polib (for PO file handling)
+- polib
+- babel
 
 ## Encoding Support
 
