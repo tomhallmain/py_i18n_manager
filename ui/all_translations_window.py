@@ -11,7 +11,7 @@ from utils.globals import TranslationStatus, TranslationFilter
 _ = I18N._
 
 class AllTranslationsWindow(QDialog):
-    translation_updated = pyqtSignal(str, str, str)  # msgid, locale, new_value
+    translation_updated = pyqtSignal(str, list)  # locale, [(msgid, new_value), ...]
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -222,26 +222,43 @@ class AllTranslationsWindow(QDialog):
         if not self.all_translations or not self.all_locales:
             return
             
-        changes = []
+        # Group changes by locale
+        changes_by_locale = {}
         for row in range(self.table.rowCount()):
             if self.table.isRowHidden(row):
                 continue
                 
             msgid = self.table.item(row, 0).text()
+            group = self.all_translations.get(msgid)
+            if not group:
+                continue
+                
             for col in range(1, self.table.columnCount()):
                 locale = self.table.horizontalHeaderItem(col).text()
-                new_value = self.table.item(row, col).text()
-                changes.append((msgid, locale, new_value))
+                item = self.table.item(row, col)
+                if not item:
+                    continue
+                    
+                new_value = item.text()
+                # Get original value in the same format as displayed
+                original_value = group.get_translation_escaped(locale) if self.show_escaped else group.get_translation_unescaped(locale)
+                
+                # Only include if the value has changed and is non-empty
+                if new_value != original_value and len(new_value) > 0:
+                    if locale not in changes_by_locale:
+                        changes_by_locale[locale] = []
+                    changes_by_locale[locale].append((msgid, new_value))
         
-        if not changes:
+        if not changes_by_locale:
             QMessageBox.information(self, _("Info"), _("No changes to save."))
             return
         
-        # Emit changes
-        for msgid, locale, new_value in changes:
-            self.translation_updated.emit(msgid, locale, new_value)
+        # Emit changes grouped by locale
+        total_changes = sum(len(changes) for changes in changes_by_locale.values())
+        for locale, changes in changes_by_locale.items():
+            self.translation_updated.emit(locale, changes)
         
-        QMessageBox.information(self, _("Success"), _("Saved {} changes successfully!").format(len(changes)))
+        QMessageBox.information(self, _("Success"), _("Saved {} changes successfully!").format(total_changes))
 
     def update_table_display(self):
         """Update the table display based on current Unicode display mode."""
@@ -253,18 +270,18 @@ class AllTranslationsWindow(QDialog):
                 continue
                 
             msgid = self.table.item(row, 0).text()
+            group = self.all_translations.get(msgid)
+            if not group:
+                continue
+                
             for col in range(1, self.table.columnCount()):
                 locale = self.table.horizontalHeaderItem(col).text()
-                group = self.all_translations.get(msgid)
-                if group:
-                    value = group.get_translation(locale)
-                    if value:
-                        item = self.table.item(row, col)
-                        if item:
-                            if self.show_escaped:
-                                item.setText(group.get_translation_escaped(locale))
-                            else:
-                                item.setText(group.get_translation_unescaped(locale))
+                item = self.table.item(row, col)
+                if item:
+                    if self.show_escaped:
+                        item.setText(group.get_translation_escaped(locale))
+                    else:
+                        item.setText(group.get_translation_unescaped(locale))
 
     def toggle_unicode_display(self):
         """Toggle the Unicode display mode."""
