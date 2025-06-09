@@ -10,6 +10,7 @@ from utils.config import ConfigManager
 from utils.globals import TranslationStatus
 from utils.translations import I18N
 from utils.utils import Utils
+from ui.base_translation_window import BaseTranslationWindow
 
 _ = I18N._
 
@@ -45,7 +46,7 @@ class MultilineItemDelegate(QStyledItemDelegate):
                     return True
         return super().eventFilter(editor, event)
 
-class OutstandingItemsWindow(QDialog):
+class OutstandingItemsWindow(BaseTranslationWindow):
     # Signal now takes a list of (msgid, new_value) tuples for each locale
     translation_updated = pyqtSignal(str, list)  # locale, [(msgid, new_value), ...]
 
@@ -86,11 +87,7 @@ class OutstandingItemsWindow(QDialog):
         layout = QVBoxLayout(self)
         
         # Table for translations
-        self.table = QTableWidget()
-        self.table.setColumnCount(0)  # Will be set when data is loaded
-        self.table.setRowCount(0)     # Will be set when data is loaded
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.table = self.setup_table()
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.show_context_menu)
         # Enable context menu for header
@@ -317,6 +314,9 @@ class OutstandingItemsWindow(QDialog):
         self.table.setColumnCount(len(display_locales) + 1)
         headers = ["Translation Key"] + display_locales
         self.table.setHorizontalHeaderLabels(headers)
+
+        # Set dynamic column widths based on number of locales
+        self.set_dynamic_column_widths(len(display_locales))
 
         # Find all translations with missing or invalid entries
         all_invalid_groups = {}

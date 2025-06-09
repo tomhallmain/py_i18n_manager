@@ -7,10 +7,11 @@ from PyQt6.QtWidgets import QApplication
 
 from utils.translations import I18N
 from utils.globals import TranslationStatus, TranslationFilter
+from ui.base_translation_window import BaseTranslationWindow
 
 _ = I18N._
 
-class AllTranslationsWindow(QDialog):
+class AllTranslationsWindow(BaseTranslationWindow):
     translation_updated = pyqtSignal(str, list)  # locale, [(msgid, new_value), ...]
     
     def __init__(self, parent=None):
@@ -54,11 +55,7 @@ class AllTranslationsWindow(QDialog):
         layout.addLayout(controls_layout)
         
         # Table for translations
-        self.table = QTableWidget()
-        self.table.setColumnCount(0)  # Will be set when data is loaded
-        self.table.setRowCount(0)     # Will be set when data is loaded
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.table = self.setup_table()
         layout.addWidget(self.table)
         
         # Buttons
@@ -106,9 +103,12 @@ class AllTranslationsWindow(QDialog):
         headers = ["Translation Key"] + locales
         self.table.setHorizontalHeaderLabels(headers)
         
+        # Set dynamic column widths based on number of locales
+        self.set_dynamic_column_widths(len(locales))
+        
         # Set up rows
-        self.table.setRowCount(len(translations))        
-
+        self.table.setRowCount(len(translations))
+        
         # Fill in data
         for row, (msgid, group) in enumerate(translations.items()):
             # Add msgid
