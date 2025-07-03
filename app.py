@@ -12,6 +12,7 @@ from ui.outstanding_items_window import OutstandingItemsWindow
 from ui.all_translations_window import AllTranslationsWindow
 from ui.recent_projects_dialog import RecentProjectsDialog
 from ui.setup_translation_project_window import SetupTranslationProjectWindow
+from ui.cross_project_analysis_window import CrossProjectAnalysisWindow
 from utils.settings_manager import SettingsManager
 from utils.translations import I18N
 from workers.translation_worker import TranslationWorker
@@ -117,6 +118,7 @@ class MainWindow(QMainWindow):
         self.show_all_btn = QPushButton(_("Show All Translations"))
         self.show_outstanding_btn = QPushButton(_("Show Outstanding Items"))
         self.find_untranslated_btn = QPushButton(_("Find Untranslated"))
+        self.cross_project_btn = QPushButton(_("Cross-Project Analysis"))
         self.write_default_btn = QPushButton(_("Write Default Locale"))
         self.generate_pot_btn = QPushButton(_("Generate POT"))
         self.update_po_btn = QPushButton(_("Update PO Files"))
@@ -126,6 +128,7 @@ class MainWindow(QMainWindow):
         self.show_all_btn.clicked.connect(self.show_all_translations)
         self.show_outstanding_btn.clicked.connect(self.show_outstanding_items)
         self.find_untranslated_btn.clicked.connect(self.find_untranslated_strings)
+        self.cross_project_btn.clicked.connect(self.show_cross_project_analysis)
         self.write_default_btn.clicked.connect(self.write_default_locale)
         self.generate_pot_btn.clicked.connect(self.generate_pot)
         self.update_po_btn.clicked.connect(lambda: self.run_translation_task(TranslationAction.WRITE_PO_FILES))
@@ -135,6 +138,7 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(self.show_all_btn)
         button_layout.addWidget(self.show_outstanding_btn)
         button_layout.addWidget(self.find_untranslated_btn)
+        button_layout.addWidget(self.cross_project_btn)
         button_layout.addWidget(self.write_default_btn)
         button_layout.addWidget(self.generate_pot_btn)
         button_layout.addWidget(self.update_po_btn)
@@ -231,6 +235,7 @@ class MainWindow(QMainWindow):
         self.write_default_btn.setEnabled(has_project and has_translations)
         self.generate_pot_btn.setEnabled(has_project and has_translations)
         self.find_untranslated_btn.setEnabled(has_project and has_translations)
+        self.cross_project_btn.setEnabled(has_project)
         self.modify_project_btn.setEnabled(has_project)
 
     def run_translation_task(self, action: TranslationAction = TranslationAction.CHECK_STATUS):
@@ -251,7 +256,7 @@ class MainWindow(QMainWindow):
         
         # Create I18NManager if needed
         if not self.i18n_manager:
-            self.i18n_manager = I18NManager(self.current_project, intro_details=intro_details)
+            self.i18n_manager = I18NManager(self.current_project, intro_details=intro_details, settings_manager=self.settings_manager)
             
         self.worker = TranslationWorker(
             self.current_project, 
@@ -419,7 +424,8 @@ class MainWindow(QMainWindow):
             return
             
         try:
-            default_locale = self.settings_manager.get_intro_details().get('translation.default_locale', 'en')
+            # Use project-specific default locale if available, otherwise fall back to global
+            default_locale = self.settings_manager.get_project_default_locale(self.current_project)
             if default_locale in self.locales:
                 self.status_text.append(f"\nWriting PO file for default locale ({default_locale})...")
                 if self.i18n_manager.write_locale_po_file(default_locale):
@@ -495,6 +501,26 @@ class MainWindow(QMainWindow):
         """Handle completion of project setup."""
         logger.debug("Project setup completed, running translation task")
         self.run_translation_task()
+
+    def show_cross_project_analysis(self):
+        """Show the cross-project analysis window."""
+        if not self.current_project:
+            QMessageBox.warning(self, "Error", "Please select a project first")
+            return
+            
+        # Check if we have recent projects to analyze against
+        recent_projects = self.settings_manager.load_recent_projects()
+        if len(recent_projects) < 2:
+            QMessageBox.information(
+                self, 
+                _("No Projects to Analyze"), 
+                _("You need at least 2 projects in your recent projects list to perform cross-project analysis.")
+            )
+            return
+            
+        # Show the analysis window
+        analysis_window = CrossProjectAnalysisWindow(self)
+        analysis_window.exec()
 
     def handle_translation_results(self, results):
         """Handle results from translation management operations."""

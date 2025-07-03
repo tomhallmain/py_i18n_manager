@@ -66,11 +66,11 @@ class I18NManager():
     MSGID = "msgid"
     MSGSTR = "msgstr"
 
-    def __init__(self, directory, locales=[], intro_details=None):
+    def __init__(self, directory, locales=[], intro_details=None, settings_manager=None):
         logger.debug(f"Initializing I18NManager with directory: {directory}, locales: {locales}")
         self._directory = directory
         self.locales = locales[:]
-        self.translations = {}
+        self.translations: dict[str, TranslationGroup] = {}
         self.written_locales = set()  # Track which locales have been written to
         # Store intro details if provided, otherwise use defaults
         self.intro_details = intro_details or {
@@ -79,8 +79,22 @@ class I18NManager():
             "application_name": "APPLICATION",
             "version": "1.0"
         }
+        # Store settings manager for project-specific settings
+        self.settings_manager = settings_manager
         # Detect which directory structure is being used
         self._locale_dir = self._detect_locale_directory()
+        
+    @property
+    def default_locale(self) -> str:
+        """Get the default locale for this project.
+        
+        Returns:
+            str: Project-specific default locale if available, otherwise global default
+        """
+        if self.settings_manager:
+            return self.settings_manager.get_project_default_locale(self._directory)
+        else:
+            return self.intro_details.get('translation.default_locale', 'en')
 
     def _detect_locale_directory(self):
         """Detect which directory structure is being used (locale or locales).
@@ -119,7 +133,7 @@ class I18NManager():
         logger.debug(f"Setting new project directory: {directory}")
         self._directory = directory
         # Reset translation state
-        self.translations = {}
+        self.translations: dict[str, TranslationGroup] = {}
         self.written_locales = set()
         self.locales = []
         self.intro_details = {
@@ -128,6 +142,7 @@ class I18NManager():
             "application_name": "APPLICATION",
             "version": "1.0"
         }
+        # Note: settings_manager is preserved when changing directory
         # Detect which directory structure is being used
         self._locale_dir = self._detect_locale_directory()
 
@@ -177,7 +192,7 @@ class I18NManager():
             TranslationManagerResults: Results of the translation management operation.
         """
         results = TranslationManagerResults.create(self._directory, action)
-        results.default_locale = self.intro_details.get('translation.default_locale', 'en')
+        results.default_locale = self.default_locale
         results.failed_locales = []
         results.action_successful = True
         

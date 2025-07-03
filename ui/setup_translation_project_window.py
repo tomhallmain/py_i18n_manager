@@ -2,12 +2,16 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QLabel, QLineEdit, QFormLayout, QListWidget, QListWidgetItem,
                             QMessageBox, QFrame, QComboBox)
 from PyQt6.QtCore import Qt, pyqtSignal
+import logging
 import os
+
 from utils.globals import valid_language_codes, valid_country_codes, valid_script_codes
 from utils.translations import I18N
 from utils.settings_manager import SettingsManager
 
 _ = I18N._
+
+logger = logging.getLogger(__name__)
 
 class SetupTranslationProjectWindow(QDialog):
     project_configured = pyqtSignal()  # Emitted when project setup is complete
@@ -19,7 +23,26 @@ class SetupTranslationProjectWindow(QDialog):
         self.intro_details = self.settings_manager.get_intro_details()
         self.setWindowTitle(_("Setup Translation Project"))
         self.setMinimumSize(600, 500)
+        self.load_project_settings()
         self.setup_ui()
+        
+    def load_project_settings(self):
+        """Load project-specific settings if they exist."""
+        # Load project-specific default locale
+        project_default_locale = self.settings_manager.get_project_default_locale(self.project_dir)
+        if project_default_locale:
+            self.intro_details["translation.default_locale"] = project_default_locale
+            logger.debug(f"Loaded project-specific default locale: {project_default_locale}")
+        else:
+            logger.debug("No project-specific default locale found, using global default")
+            
+        # Load project-specific locales
+        project_locales = self.settings_manager.get_project_locales(self.project_dir)
+        if project_locales:
+            # Store for later use in setup_ui
+            self.project_locales = project_locales
+        else:
+            self.project_locales = []
         
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -105,13 +128,24 @@ class SetupTranslationProjectWindow(QDialog):
         
     def load_existing_locales(self):
         """Load existing locales from the project directory."""
+        temp_locales = set()
         locale_dir = os.path.join(self.project_dir, 'locale')
         if os.path.exists(locale_dir):
             for item in os.listdir(locale_dir):
                 full_path = os.path.join(locale_dir, item)
                 if os.path.isdir(full_path) and not item.startswith('__'):
                     self.locales_list.addItem(item)
-                    
+                    temp_locales.add(item)
+        if temp_locales and self.project_locales:
+            last_seen_set = set(self.project_locales)
+            new_locales = temp_locales - last_seen_set
+            removed_locales = last_seen_set - temp_locales
+            for locale in sorted(new_locales):
+                logger.debug(f"Adding new locale: {locale}")
+            for locale in sorted(removed_locales):
+                logger.debug(f"Removing locale: {locale}")
+        self.project_locales = sorted(list(temp_locales))
+
     def add_locale(self):
         """Add a new locale to the project."""
         locale_code = self.locale_input.text().strip().lower()
@@ -194,7 +228,14 @@ class SetupTranslationProjectWindow(QDialog):
                 )
                 return  # Don't save if there are invalid locales
             
-            # Update intro details
+            # Get the list of locales
+            locales = [self.locales_list.item(i).text().strip() for i in range(self.locales_list.count())]
+            
+            # Save project-specific settings
+            self.settings_manager.save_project_default_locale(self.project_dir, self.default_locale.currentText())
+            self.settings_manager.save_project_locales(self.project_dir, locales)
+            
+            # Also save to global intro details for backward compatibility
             self.intro_details.update({
                 "application_name": self.app_name.text(),
                 "version": self.version.text(),
@@ -203,7 +244,7 @@ class SetupTranslationProjectWindow(QDialog):
                 "translation.default_locale": self.default_locale.currentText()
             })
             
-            # Save to settings
+            # Save to global settings for backward compatibility
             self.settings_manager.save_intro_details(self.intro_details)
             
             # Create locale directories

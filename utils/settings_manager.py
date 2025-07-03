@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 import logging
+from typing import Optional, Any
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ class SettingsManager:
         self.settings_file.parent.mkdir(parents=True, exist_ok=True)
         self.default_config_path = Path(__file__).parent.parent / 'configs' / 'default_config.json'
         
-    def load_config(self):
+    def load_config(self) -> dict:
         """Load configuration from default config file.
         
         Returns:
@@ -30,7 +31,7 @@ class SettingsManager:
             logger.error(f"Error loading config: {e}")
             return {}
             
-    def load_last_project(self):
+    def load_last_project(self) -> Optional[str]:
         """Load the last selected project path from settings.
         
         Returns:
@@ -51,7 +52,7 @@ class SettingsManager:
         except Exception:
             return None
             
-    def load_recent_projects(self):
+    def load_recent_projects(self) -> list[str]:
         """Load the list of recent projects from settings.
         
         Returns:
@@ -136,12 +137,138 @@ class SettingsManager:
             if settings.get('last_project') == project_path:
                 settings['last_project'] = None
                 
+            # Also remove project-specific settings
+            project_settings = settings.get('project_settings', {})
+            if project_path in project_settings:
+                del project_settings[project_path]
+                settings['project_settings'] = project_settings
+                
             with open(self.settings_file, 'w') as f:
                 json.dump(settings, f, indent=4)
         except Exception:
-            pass  # Silently fail if we can't save settings 
+            pass  # Silently fail if we can't save settings
 
-    def get_intro_details(self):
+    def get_project_setting(self, project_path: str, key: str, default: Any = None) -> Any:
+        """Get a project-specific setting.
+        
+        Args:
+            project_path (str): Path to the project
+            key (str): Setting key to retrieve
+            default (Any): Default value if setting doesn't exist
+            
+        Returns:
+            Any: The setting value or default
+        """
+        try:
+            if not self.settings_file.exists():
+                return default
+                
+            with open(self.settings_file, 'r') as f:
+                settings = json.load(f)
+                
+            project_settings = settings.get('project_settings', {})
+            project_config = project_settings.get(project_path, {})
+            
+            return project_config.get(key, default)
+            
+        except Exception as e:
+            logger.error(f"Error getting project setting {key} for {project_path}: {e}")
+            return default
+            
+    def save_project_setting(self, project_path: str, key: str, value: Any) -> bool:
+        """Save a project-specific setting.
+        
+        Args:
+            project_path (str): Path to the project
+            key (str): Setting key to save
+            value (Any): Value to save
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            settings = {}
+            if self.settings_file.exists():
+                with open(self.settings_file, 'r') as f:
+                    settings = json.load(f)
+                    
+            # Initialize project_settings if it doesn't exist
+            if 'project_settings' not in settings:
+                settings['project_settings'] = {}
+                
+            # Initialize project config if it doesn't exist
+            if project_path not in settings['project_settings']:
+                settings['project_settings'][project_path] = {}
+                
+            # Save the setting
+            settings['project_settings'][project_path][key] = value
+            
+            with open(self.settings_file, 'w') as f:
+                json.dump(settings, f, indent=4)
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error saving project setting {key} for {project_path}: {e}")
+            return False
+            
+    def get_project_default_locale(self, project_path: str) -> str:
+        """Get the default locale for a specific project.
+        
+        Args:
+            project_path (str): Path to the project
+            
+        Returns:
+            str: Default locale for the project, or global default if not set
+        """
+        # Try to get project-specific default locale
+        project_default = self.get_project_setting(project_path, 'default_locale')
+        if project_default:
+            return project_default
+            
+        # Fall back to global default
+        try:
+            config = self.load_config()
+            return config.get('translation', {}).get('default_locale', 'en')
+        except Exception:
+            return 'en'
+            
+    def save_project_default_locale(self, project_path: str, default_locale: str) -> bool:
+        """Save the default locale for a specific project.
+        
+        Args:
+            project_path (str): Path to the project
+            default_locale (str): Default locale to save
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        return self.save_project_setting(project_path, 'default_locale', default_locale)
+        
+    def get_project_locales(self, project_path: str) -> list[str]:
+        """Get the list of locales for a specific project.
+        
+        Args:
+            project_path (str): Path to the project
+            
+        Returns:
+            list[str]: List of locales for the project, or empty list if not set
+        """
+        return self.get_project_setting(project_path, 'locales', [])
+        
+    def save_project_locales(self, project_path: str, locales: list[str]) -> bool:
+        """Save the list of locales for a specific project.
+        
+        Args:
+            project_path (str): Path to the project
+            locales (list[str]): List of locales to save
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        return self.save_project_setting(project_path, 'locales', locales)
+
+    def get_intro_details(self) -> dict[str, str]:
         """Get the intro details from the config.
         
         Returns:
@@ -170,7 +297,7 @@ class SettingsManager:
                 "version": "1.0"
             }
 
-    def save_intro_details(self, intro_details):
+    def save_intro_details(self, intro_details: dict[str, str]):
         """Save intro details to settings.
         
         Args:
