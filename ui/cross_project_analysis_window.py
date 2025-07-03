@@ -172,6 +172,8 @@ class CrossProjectAnalysisWindow(QDialog):
     def load_available_projects(self):
         """Load available projects into the combo box."""
         projects = self.analyzer.get_available_projects()
+        logger.debug(f"Available projects: {projects}")
+        logger.debug(f"Available project basenames: {[os.path.basename(p) for p in projects]}")
         
         self.target_project_combo.clear()
         for project in projects:
@@ -222,11 +224,15 @@ class CrossProjectAnalysisWindow(QDialog):
     def start_analysis(self):
         """Start the cross-project analysis."""
         target_project = self.target_project_combo.currentData()
+        logger.debug(f"Starting analysis with target project: {target_project}")
+        logger.debug(f"Target project basename: {os.path.basename(target_project) if target_project else 'None'}")
+        
         if not target_project:
             QMessageBox.warning(self, _("Error"), _("Please select a target project."))
             return
             
         target_locales = self.get_selected_locales()
+        logger.debug(f"Target locales: {target_locales}")
         if target_locales is not None and not target_locales:
             return  # User cancelled due to no locale selection
             
@@ -292,12 +298,19 @@ class CrossProjectAnalysisWindow(QDialog):
         summary_lines.append("")
         
         for analysis in self.analyses:
-            if analysis.matches_found:
+            if analysis.msgid_groups:
                 project_name = os.path.basename(analysis.source_project)
+                total_groups = len(analysis.msgid_groups)
+                total_fillable = sum(g.fillable_locales_count for g in analysis.msgid_groups)
+                total_filled = sum(g.filled_locales_count for g in analysis.msgid_groups)
+                total_unfillable = sum(g.unfillable_locales_count for g in analysis.msgid_groups)
+                
                 summary_lines.append(_("From {}:").format(project_name))
-                summary_lines.append(_("  • {} total matches").format(len(analysis.matches_found)))
-                summary_lines.append(_("  • {} missing translations").format(len(analysis.missing_matches)))
-                summary_lines.append(_("  • {} already filled").format(len(analysis.matches_found) - len(analysis.missing_matches)))
+                summary_lines.append(_("  • {} msgid groups").format(total_groups))
+                summary_lines.append(_("  • {} fillable translations").format(total_fillable))
+                summary_lines.append(_("  • {} already filled").format(total_filled))
+                if total_unfillable > 0:
+                    summary_lines.append(_("  • {} unfillable").format(total_unfillable))
                 summary_lines.append(_("  • Match rate: {:.1f}%").format(analysis.match_rate))
                 summary_lines.append("")
                 
@@ -310,29 +323,45 @@ class CrossProjectAnalysisWindow(QDialog):
         if not self.analyses:
             return
             
-        # Consolidate all matches
-        all_matches = []
+        # Consolidate all msgid groups from all analyses
+        all_groups = []
         for analysis in self.analyses:
-            all_matches.extend(analysis.matches_found)
+            all_groups.extend(analysis.msgid_groups)
             
-        # Sort by target locale and msgid
-        all_matches.sort(key=lambda m: (m.target_locale, m.target_msgid))
+        # Sort by source project and msgid
+        all_groups.sort(key=lambda g: (os.path.basename(g.source_project), g.target_msgid))
         
         # Add to list
-        for match in all_matches:
-            source_project = os.path.basename(match.source_project)
-            item_text = f"[{match.target_locale}] {match.target_msgid[:50]}..."
-            if len(match.target_msgid) > 50:
-                item_text += "..."
+        for group in all_groups:
+            source_project = os.path.basename(group.source_project)
+            
+            # Create display text
+            msgid_display = group.target_msgid[:60]
+            if len(group.target_msgid) > 60:
+                msgid_display += "..."
+                
+            item_text = f"[{source_project}] {msgid_display}"
+            
+            # Add counts to the display
+            counts_text = f" (filled: {group.filled_locales_count}, fillable: {group.fillable_locales_count}"
+            if group.unfillable_locales_count > 0:
+                counts_text += f", unfillable: {group.unfillable_locales_count}"
+            counts_text += f", total: {group.total_target_locales})"
+            
+            item_text += counts_text
                 
             item = QListWidgetItem(item_text)
-            item.setData(Qt.ItemDataRole.UserRole, match)
+            item.setData(Qt.ItemDataRole.UserRole, group)
             
             # Add tooltip with full details
-            tooltip = f"Source: {source_project}\n"
-            tooltip += f"Target: {match.target_msgid}\n"
-            tooltip += f"Locale: {match.target_locale}\n"
-            tooltip += f"Translation: {match.source_translation}"
+            tooltip = f"Source Project: {source_project}\n"
+            tooltip += f"Target MsgID: {group.target_msgid}\n"
+            tooltip += f"Filled Locales: {group.filled_locales_count}\n"
+            tooltip += f"Fillable Locales: {group.fillable_locales_count}\n"
+            if group.unfillable_locales_count > 0:
+                tooltip += f"Unfillable Locales: {group.unfillable_locales_count}\n"
+            tooltip += f"Total Target Locales: {group.total_target_locales}\n"
+            tooltip += f"Match Rate: {group.match_rate:.1f}%"
             item.setToolTip(tooltip)
             
             self.matches_list.addItem(item)
@@ -344,8 +373,17 @@ class CrossProjectAnalysisWindow(QDialog):
             QMessageBox.warning(self, _("Warning"), _("Please select matches to apply."))
             return
             
-        matches = [item.data(Qt.ItemDataRole.UserRole) for item in selected_items]
-        self.apply_matches(matches)
+        # Extract matches from selected groups
+        all_matches = []
+        for item in selected_items:
+            group = item.data(Qt.ItemDataRole.UserRole)
+            all_matches.extend(group.matches)
+            
+        if not all_matches:
+            QMessageBox.warning(self, _("Warning"), _("No matches to apply from selected items."))
+            return
+            
+        self.apply_matches(all_matches)
         
     def apply_all_matches(self):
         """Apply all translation matches."""

@@ -26,12 +26,36 @@ class TranslationMatch:
         return f"Match: '{self.source_msgid}' -> '{self.target_msgid}' ({self.target_locale}) from {self.source_project}"
 
 @dataclass
+class MsgIdMatchGroup:
+    """Represents a group of translation matches for a single msgid."""
+    source_project: str
+    target_msgid: str
+    filled_locales_count: int = 0
+    fillable_locales_count: int = 0
+    unfillable_locales_count: int = 0
+    total_target_locales: int = 0
+    matches: List[TranslationMatch] = field(default_factory=list)
+    
+    @property
+    def total_matches(self) -> int:
+        """Total number of matches for this msgid."""
+        return len(self.matches)
+    
+    @property
+    def match_rate(self) -> float:
+        """Calculate match rate as percentage of target locales that can be filled."""
+        if self.total_target_locales == 0:
+            return 0.0
+        return ((self.filled_locales_count + self.fillable_locales_count) / self.total_target_locales) * 100
+
+@dataclass
 class CrossProjectAnalysis:
     """Results of cross-project translation analysis."""
     source_project: str
     target_project: str
     matches_found: List[TranslationMatch] = field(default_factory=list)
     missing_matches: List[TranslationMatch] = field(default_factory=list)  # Matches for actually missing translations
+    msgid_groups: List[MsgIdMatchGroup] = field(default_factory=list)  # Grouped by msgid for display
     total_analyzed: int = 0
     total_matched: int = 0
     analysis_timestamp: Optional[str] = None
@@ -171,16 +195,37 @@ class CrossProjectAnalyzer:
         
         analysis = CrossProjectAnalysis(source_project, target_project)
         analysis.total_analyzed = len(target_manager.translations)
+        logger.debug(f"Target project has {len(target_manager.translations)} translations to analyze")
         
         # Find matches for ALL translation groups (not just missing ones) for user confidence
         all_matches = []
         missing_matches = []
+        msgid_groups = {}  # Group matches by msgid
         
         for msgid, target_group in target_manager.translations.items():
             if not target_group.is_in_base:
                 continue  # Skip stale translations
                 
-            # Check each target locale for matches (both filled and missing)
+            # Initialize group for this msgid
+            if msgid not in msgid_groups:
+                msgid_groups[msgid] = MsgIdMatchGroup(
+                    source_project=source_project,
+                    target_msgid=msgid,
+                    total_target_locales=len(target_locales)
+                )
+            
+            group = msgid_groups[msgid]
+            filled_count = 0
+            fillable_count = 0
+            unfillable_count = 0
+            
+            # First, count all filled translations in target (regardless of source matches)
+            for locale in target_locales:
+                target_translation = target_group.get_translation(locale)
+                if target_translation and target_translation.strip():
+                    filled_count += 1
+            
+            # Now check each target locale for matches
             for locale in target_locales:
                 logger.debug(f"Looking for match for msgid '{msgid}' in locale '{locale}'")
                 
@@ -190,20 +235,44 @@ class CrossProjectAnalyzer:
                     msgid, locale, source_default
                 )
                 
+                # Check current target translation status
+                target_translation = target_group.get_translation(locale)
+                is_filled = target_translation and target_translation.strip()
+                
                 if match:
                     logger.debug(f"Found match: {match}")
                     all_matches.append(match)
+                    group.matches.append(match)
                     
-                    # Check if this is a missing translation (for applying)
-                    if not target_group.get_translation(locale) or not target_group.get_translation(locale).strip():
+                    # If target is not filled, this is fillable
+                    if not is_filled:
+                        fillable_count += 1
+                        logger.debug(f"Translation is missing - adding to missing_matches")
                         missing_matches.append(match)
                         analysis.total_matched += 1
+                    else:
+                        logger.debug(f"Translation already exists - not adding to missing_matches")
+                else:
+                    # No match found for this locale
+                    if not is_filled:
+                        unfillable_count += 1
+                        logger.debug(f"No match found for unfilled locale '{locale}'")
+            
+            # Update group counts
+            group.filled_locales_count = filled_count
+            group.fillable_locales_count = fillable_count
+            group.unfillable_locales_count = unfillable_count
         
         # Store all matches for display, but track which ones are actually missing
         analysis.matches_found = all_matches
         analysis.missing_matches = missing_matches  # New field for actual missing translations
         
+        # Filter out groups with no fillable translations
+        filtered_groups = [group for group in msgid_groups.values() if group.fillable_locales_count > 0]
+        analysis.msgid_groups = filtered_groups
+        
         logger.info(f"Found {len(all_matches)} total matches, {len(missing_matches)} missing translations out of {analysis.total_analyzed} analyzed")
+        logger.info(f"Created {len(filtered_groups)} msgid groups with fillable translations (filtered from {len(msgid_groups)} total groups)")
         return analysis
     
     def _find_exact_match(self, source_manager: I18NManager, target_manager: I18NManager,
@@ -388,6 +457,7 @@ class CrossProjectAnalyzer:
         """
         logger.debug(f"=== Starting analyze_all_projects ===")
         logger.debug(f"Target project: {target_project}")
+        logger.debug(f"Target project basename: {os.path.basename(target_project)}")
         logger.debug(f"Target locales: {target_locales}")
         
         # Ensure target project has a POT file by generating it if needed
@@ -410,13 +480,14 @@ class CrossProjectAnalyzer:
         
         for source_project in available_projects:
             logger.debug(f"Checking source project: {source_project}")
+            logger.debug(f"Source project basename: {os.path.basename(source_project)}")
             if source_project == target_project:
                 logger.debug(f"Skipping self-analysis for {source_project}")
                 continue  # Skip self-analysis
                 
             logger.debug(f"Analyzing source project: {source_project}")
             analysis = self.analyze_project_pair(source_project, target_project, target_locales)
-            logger.debug(f"Analysis result: {len(analysis.matches_found)} matches found")
+            logger.debug(f"Analysis result: {len(analysis.matches_found)} matches found, {len(analysis.missing_matches)} missing")
             if analysis.matches_found:
                 analyses.append(analysis)
             else:
