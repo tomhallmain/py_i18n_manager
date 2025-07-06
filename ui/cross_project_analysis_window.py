@@ -25,24 +25,33 @@ class AnalysisWorker(QThread):
     error = pyqtSignal(str)
     
     def __init__(self, analyzer: CrossProjectAnalyzer, target_project: str, 
-                 target_locales: Optional[List[str]] = None):
+                 target_locales: Optional[List[str]] = None, source_project: Optional[str] = None):
         super().__init__()
         self.analyzer = analyzer
         self.target_project = target_project
         self.target_locales = target_locales
+        self.source_project = source_project
         
     def run(self):
         try:
             logger.debug(f"AnalysisWorker.run() started")
             logger.debug(f"Target project: {self.target_project}")
             logger.debug(f"Target locales: {self.target_locales}")
+            logger.debug(f"Source project: {self.source_project}")
             
-            self.progress.emit(_("Starting cross-project analysis..."))
-            
-            # Analyze all projects
-            logger.debug(f"Calling analyzer.analyze_all_projects()")
-            analyses = self.analyzer.analyze_all_projects(self.target_project, self.target_locales)
-            logger.debug(f"analyze_all_projects returned {len(analyses)} analyses")
+            if self.source_project:
+                self.progress.emit(_("Analyzing from specific source project..."))
+                logger.debug(f"Calling analyzer.analyze_project_pair()")
+                analysis = self.analyzer.analyze_project_pair(
+                    self.source_project, self.target_project, self.target_locales
+                )
+                analyses = [analysis] if analysis.matches_found else []
+                logger.debug(f"analyze_project_pair returned analysis with {len(analysis.matches_found)} matches")
+            else:
+                self.progress.emit(_("Starting cross-project analysis..."))
+                logger.debug(f"Calling analyzer.analyze_all_projects()")
+                analyses = self.analyzer.analyze_all_projects(self.target_project, self.target_locales)
+                logger.debug(f"analyze_all_projects returned {len(analyses)} analyses")
             
             self.progress.emit(_("Analysis complete!"))
             self.analysis_complete.emit(analyses)
@@ -103,6 +112,16 @@ class CrossProjectAnalysisWindow(QDialog):
         
         top_layout.addLayout(project_layout)
         
+        # Source project selection (compact)
+        source_layout = QHBoxLayout()
+        source_layout.addWidget(QLabel(_("Source Project:")))
+        self.source_project_combo = QComboBox()
+        self.source_project_combo.setMinimumWidth(250)
+        self.source_project_combo.addItem(_("All Projects"), None)  # Default option
+        source_layout.addWidget(self.source_project_combo)
+        
+        top_layout.addLayout(source_layout)
+        
         # Analysis controls (compact)
         controls_layout = QHBoxLayout()
         controls_layout.setSpacing(5)
@@ -125,6 +144,11 @@ class CrossProjectAnalysisWindow(QDialog):
         self.apply_all_btn.clicked.connect(self.apply_all_matches)
         self.apply_all_btn.setEnabled(False)
         controls_layout.addWidget(self.apply_all_btn)
+        
+        self.apply_from_project_btn = QPushButton(_("Apply from Project"))
+        self.apply_from_project_btn.clicked.connect(self.apply_from_project)
+        self.apply_from_project_btn.setEnabled(False)
+        controls_layout.addWidget(self.apply_from_project_btn)
         
         self.close_btn = QPushButton(_("Close"))
         self.close_btn.clicked.connect(self.close)
@@ -170,11 +194,12 @@ class CrossProjectAnalysisWindow(QDialog):
         layout.addWidget(results_splitter)
         
     def load_available_projects(self):
-        """Load available projects into the combo box."""
+        """Load available projects into the combo boxes."""
         projects = self.analyzer.get_available_projects()
         logger.debug(f"Available projects: {projects}")
         logger.debug(f"Available project basenames: {[os.path.basename(p) for p in projects]}")
         
+        # Populate target project combo
         self.target_project_combo.clear()
         for project in projects:
             project_name = os.path.basename(project)
@@ -183,6 +208,13 @@ class CrossProjectAnalysisWindow(QDialog):
         if projects:
             self.target_project_combo.setCurrentIndex(0)
             self.on_target_project_changed()
+            
+        # Populate source project combo (excluding "All Projects" option)
+        self.source_project_combo.clear()
+        self.source_project_combo.addItem(_("All Projects"), None)  # Default option
+        for project in projects:
+            project_name = os.path.basename(project)
+            self.source_project_combo.addItem(project_name, project)
             
     def on_target_project_changed(self):
         """Handle target project selection change."""
@@ -246,8 +278,11 @@ class CrossProjectAnalysisWindow(QDialog):
         self.summary_text.clear()
         self.matches_list.clear()
         
+        # Get selected source project
+        source_project = self.source_project_combo.currentData()
+        
         # Start worker thread
-        self.worker = AnalysisWorker(self.analyzer, target_project, target_locales)
+        self.worker = AnalysisWorker(self.analyzer, target_project, target_locales, source_project)
         self.worker.progress.connect(self.update_progress)
         self.worker.analysis_complete.connect(self.on_analysis_complete)
         self.worker.error.connect(self.on_analysis_error)
@@ -274,6 +309,7 @@ class CrossProjectAnalysisWindow(QDialog):
         has_missing = any(analysis.missing_matches for analysis in analyses)
         self.apply_btn.setEnabled(has_matches)
         self.apply_all_btn.setEnabled(has_missing)  # Only enable if there are missing translations
+        self.apply_from_project_btn.setEnabled(has_matches)
         
     def on_analysis_error(self, error_message: str):
         """Handle analysis error."""
@@ -365,83 +401,121 @@ class CrossProjectAnalysisWindow(QDialog):
             count = 0
             for match in group.matches:
                 count += 1
+                if count > 5:
+                    tooltip += "\n" + _("... etc.")
+                    break
                 tooltip += f"\n  Match {count}: {match.source_msgid}"
                 tooltip += f"\n    Source Translation: {match.source_translation}"
-                if count > 9: break
             item.setToolTip(tooltip)
             
             self.matches_list.addItem(item)
 
-    def _collect_matches(self):
-        """Collect all and selected matches"""
-        all_matches = []
-        selected_matches = []
+    def _collect_matches(self, source_project_filter: Optional[str] = None):
+        """Collect all and selected matches, optionally filtered by source project"""
+        target_project = self.target_project_combo.currentData()
+        
+        # Create a temporary analysis object for application
+        temp_analysis = CrossProjectAnalysis(
+            source_project="",  # Not used for application
+            target_project=target_project,
+        )
 
         # Get the apply mode from checkbox
         apply_all_matches = self.apply_all_matches_checkbox.isChecked()
         
-        if apply_all_matches:
-            # Get all matches
-            for analysis in self.analyses:
-                all_matches.extend(analysis.matches_found)
-        else:
-            # Get only missing matches
-            for analysis in self.analyses:
-                all_matches.extend(analysis.missing_matches)
+        # Filter analyses by source project if specified
+        filtered_analyses = self.analyses
+        if source_project_filter:
+            filtered_analyses = [analysis for analysis in self.analyses 
+                               if analysis.source_project == source_project_filter]
+        
+        # Get all matches
+        for analysis in filtered_analyses:
+            temp_analysis.matches_found.extend(analysis.matches_found)
+            temp_analysis.missing_matches.extend(analysis.missing_matches)
 
         selected_items = self.matches_list.selectedItems()
-        if not selected_items:
-            QMessageBox.warning(self, _("Warning"), _("Please select matches to apply."))
-            return
             
         # Extract matches from selected groups
         selected_matches = []
         for item in selected_items:
             group = item.data(Qt.ItemDataRole.UserRole)
-            selected_matches.extend(group.matches)
+            temp_analysis.selected_matches.extend(group.matches)
 
-        return all_matches, selected_matches, apply_all_matches
+        return temp_analysis, apply_all_matches
 
     def apply_selected_matches(self):
         """Apply selected translation matches."""
-        all_matches, selected_matches, apply_all_matches = self._collect_matches()
+        temp_analysis, apply_all_matches = self._collect_matches()
             
-        if not selected_matches:
-            QMessageBox.warning(self, _("Warning"), _("No matches to apply from selected items."))
+        if not temp_analysis.selected_matches:
+            QMessageBox.warning(self, _("Warning"), _("Please select matches to apply."))
             return
             
-        self.apply_matches(all_matches, selected_matches, apply_all_matches)
+        self.apply_matches(temp_analysis, apply_all_matches, None)
         
     def apply_all_matches(self):
         """Apply all translation matches."""
         if not self.analyses:
             return
 
-        all_matches, _, apply_all_matches = self._collect_matches()
+        temp_analysis, apply_all_matches = self._collect_matches()
             
-        if not all_matches:
-            if apply_all_matches:
-                QMessageBox.information(self, _("Info"), _("No matches to apply."))
-            else:
-                QMessageBox.information(self, _("Info"), _("No missing translations to apply."))
+        if apply_all_matches and not temp_analysis.matches_found:
+            QMessageBox.information(self, _("Info"), _("No matches to apply."))
+            return
+        if not apply_all_matches and not temp_analysis.missing_matches:
+            QMessageBox.information(self, _("Info"), _("No missing translations to apply."))
             return
             
-        self.apply_matches(all_matches, [], apply_all_matches)
+        self.apply_matches(temp_analysis, apply_all_matches, None)
         
-    def apply_matches(self, all_matches: List[TranslationMatch],
-                      selected_matches: List[TranslationMatch],
-                      apply_all_matches: bool):
+    def apply_from_project(self):
+        """Apply matches from the currently selected source project."""
+        if not self.analyses:
+            return
+            
+        # Get the currently selected source project
+        selected_source_project = self.source_project_combo.currentData()
+        
+        if not selected_source_project:
+            QMessageBox.warning(self, _("Warning"), _("Please select a specific source project from the dropdown."))
+            return
+            
+        # Use _collect_matches with source project filter
+        temp_analysis, apply_all_matches = self._collect_matches(selected_source_project)
+        
+        if not temp_analysis.matches_found:
+            QMessageBox.information(self, _("Info"), _("No matches found for the selected project."))
+            return
+            
+        # Apply matches from the selected project
+        self.apply_matches(temp_analysis, apply_all_matches, 
+                          source_project_filter=os.path.basename(selected_source_project))
+        
+    def apply_matches(self, 
+                      temp_analysis: CrossProjectAnalysis,
+                      apply_all_matches: bool,
+                      source_project_filter: Optional[str] = None):
         """Apply the specified translation matches."""
-        if not all_matches:
+        if not temp_analysis.matches_found:
             return
             
         # Create appropriate confirmation message
-        is_selected = len(selected_matches) > 0
-        matches = selected_matches if is_selected else all_matches
-        if apply_all_matches:
-            msg = _("Apply {} translation matches (including already filled translations) to the target project?").format(len(matches))
+        is_selected = len(temp_analysis.selected_matches) > 0
+        matches = temp_analysis.selected_matches if is_selected else temp_analysis.matches_found
+        
+        # Build the message with project filtering info
+        if source_project_filter:
+            if apply_all_matches:
+                msg = _("Apply {0} translation matches (including already filled translations) from project '{1}' to the target project?").format(len(matches), source_project_filter)
+            else:
+                msg = _("Apply {0} missing translation matches from project '{1}' to the target project?").format(len(matches), source_project_filter)
         else:
-            msg = _("Apply {} missing translation matches to the target project?").format(len(matches))
+            if apply_all_matches:
+                msg = _("Apply {0} translation matches (including already filled translations) to the target project?").format(len(matches))
+            else:
+                msg = _("Apply {0} missing translation matches to the target project?").format(len(matches))
             
         reply = QMessageBox.question(self, _("Confirm Application"), msg,
                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
@@ -450,21 +524,12 @@ class CrossProjectAnalysisWindow(QDialog):
             return
             
         try:
-            target_project = matches[0].target_project
-            
-            # Create a temporary analysis object for application
-            temp_analysis = CrossProjectAnalysis(
-                source_project="",  # Not used for application
-                target_project=target_project,
-                matches_found=all_matches,
-                missing_matches=selected_matches
-            )
-            
             # Apply matches with the selected mode
             applied_changes = self.analyzer.apply_matches_to_target(
                 temp_analysis, 
+                apply_all_matches=apply_all_matches,
+                apply_selected_matches=is_selected,
                 dry_run=False, 
-                apply_all_matches=apply_all_matches
             )
             
             if applied_changes:

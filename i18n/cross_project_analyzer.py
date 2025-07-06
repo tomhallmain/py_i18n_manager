@@ -55,6 +55,7 @@ class CrossProjectAnalysis:
     target_project: str
     matches_found: List[TranslationMatch] = field(default_factory=list)
     missing_matches: List[TranslationMatch] = field(default_factory=list)  # Matches for actually missing translations
+    selected_matches: List[TranslationMatch] = field(default_factory=list)  # Matches for selected translations
     msgid_groups: List[MsgIdMatchGroup] = field(default_factory=list)  # Grouped by msgid for display
     total_analyzed: int = 0
     total_matched: int = 0
@@ -301,7 +302,7 @@ class CrossProjectAnalyzer:
                 source_translation = source_group.values[target_locale]
                 # logger.debug(f"Source has target locale '{target_locale}': '{source_translation}' (strip: '{source_translation.strip()}')")
                 if source_translation.strip():
-                    logger.debug(f"Found translation for target locale '{target_locale}': '{source_translation}'")
+                    # logger.debug(f"Found translation for target locale '{target_locale}': '{source_translation}'")
                     return TranslationMatch(
                         source_project=source_manager._directory,
                         source_msgid=target_msgid,
@@ -339,7 +340,7 @@ class CrossProjectAnalyzer:
                         source_translation = source_group.values[target_locale]
                         # logger.debug(f"Source has target locale '{target_locale}': '{source_translation}' (strip: '{target_translation.strip()}')")
                         if source_translation.strip():
-                            logger.debug(f"Found translation for target locale '{target_locale}': '{source_translation}'")
+                            # logger.debug(f"Found translation for target locale '{target_locale}': '{source_translation}'")
                             return TranslationMatch(
                                 source_project=source_manager._directory,
                                 source_msgid=source_msgid,
@@ -363,21 +364,28 @@ class CrossProjectAnalyzer:
         # logger.debug(f"No match found for msgid '{target_msgid}' in locale '{target_locale}'")
         return None
     
-    def apply_matches_to_target(self, analysis: CrossProjectAnalysis, 
-                              dry_run: bool = True, apply_all_matches: bool = False) -> Dict[str, int]:
+    def apply_matches_to_target(self,
+                                analysis: CrossProjectAnalysis,
+                                apply_all_matches: bool = False, 
+                                apply_selected_matches: bool = False,
+                                dry_run: bool = True) -> Dict[str, int]:
         """Apply found translation matches to the target project.
         
         Args:
             analysis (CrossProjectAnalysis): Analysis results with matches to apply
-            dry_run (bool): If True, only show what would be applied without making changes
             apply_all_matches (bool): If True, apply all matches (including filled translations), 
                                     if False, only apply missing translations
+            apply_selected_matches (bool): If True, apply selected matches, if False, apply all matches
+            dry_run (bool): If True, only show what would be applied without making changes
             
         Returns:
             Dict[str, int]: Summary of applied changes by locale
         """
         # Choose which matches to apply
-        matches_to_apply = analysis.matches_found if apply_all_matches else analysis.missing_matches
+        if apply_selected_matches:
+            matches_to_apply = analysis.selected_matches
+        else:
+            matches_to_apply = analysis.matches_found if apply_all_matches else analysis.missing_matches
         logger.debug(f"Applying {len(matches_to_apply)} matches to target project {analysis.target_project}")
         
         if not matches_to_apply:
