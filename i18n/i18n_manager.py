@@ -334,20 +334,20 @@ class I18NManager():
                     has_explicit = explicit_newline in entry.msgstr
                     has_actual = actual_newline in entry.msgstr
                     
-                    logger.debug(f"Found newlines in msgstr for msgid '{entry.msgid}':")
-                    logger.debug(f"  Raw msgstr: {repr(entry.msgstr)}")
+                    # logger.debug(f"Found newlines in msgstr for msgid '{entry.msgid}':")
+                    # logger.debug(f"  Raw msgstr: {repr(entry.msgstr)}")
                     if has_explicit:
                         entries_with_explicit_newlines += 1
                         total_explicit_newlines += entry.msgstr.count(explicit_newline)
-                        logger.debug(f"  Number of '\\n' sequences: {entry.msgstr.count(explicit_newline)}")
-                    else:
-                        logger.debug(f"  Contains '\\n': {has_explicit}")
+                        # logger.debug(f"  Number of '\\n' sequences: {entry.msgstr.count(explicit_newline)}")
+                    # else:
+                        # logger.debug(f"  Contains '\\n': {has_explicit}")
                     if has_actual:
                         entries_with_actual_newlines += 1
                         total_actual_newlines += entry.msgstr.count(actual_newline)
-                        logger.debug(f"  Number of actual newlines: {entry.msgstr.count(actual_newline)}")
-                    else:
-                        logger.debug(f"  Contains actual newline: {has_actual}")
+                        # logger.debug(f"  Number of actual newlines: {entry.msgstr.count(actual_newline)}")
+                    # else:
+                        # logger.debug(f"  Contains actual newline: {has_actual}")
                 
                 if entry.msgid in self.translations:
                     self.translations[entry.msgid].add_translation(locale, entry.msgstr)

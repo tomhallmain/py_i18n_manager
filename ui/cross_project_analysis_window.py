@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 
-from i18n.cross_project_analyzer import CrossProjectAnalyzer, CrossProjectAnalysis, TranslationMatch
+from i18n.cross_project_analyzer import CrossProjectAnalyzer, CrossProjectAnalysis, MsgIdMatchGroup, TranslationMatch
 from utils.settings_manager import SettingsManager
 from utils.translations import I18N
 
@@ -362,47 +362,62 @@ class CrossProjectAnalysisWindow(QDialog):
                 tooltip += f"Unfillable Locales: {group.unfillable_locales_count}\n"
             tooltip += f"Total Target Locales: {group.total_target_locales}\n"
             tooltip += f"Match Rate: {group.match_rate:.1f}%"
+            count = 0
+            for match in group.matches:
+                count += 1
+                tooltip += f"\n  Match {count}: {match.source_msgid}"
+                tooltip += f"\n    Source Translation: {match.source_translation}"
+                if count > 9: break
             item.setToolTip(tooltip)
             
             self.matches_list.addItem(item)
-            
-    def apply_selected_matches(self):
-        """Apply selected translation matches."""
+
+    def _collect_matches(self):
+        """Collect all and selected matches"""
+        all_matches = []
+        selected_matches = []
+
+        # Get the apply mode from checkbox
+        apply_all_matches = self.apply_all_matches_checkbox.isChecked()
+        
+        if apply_all_matches:
+            # Get all matches
+            for analysis in self.analyses:
+                all_matches.extend(analysis.matches_found)
+        else:
+            # Get only missing matches
+            for analysis in self.analyses:
+                all_matches.extend(analysis.missing_matches)
+
         selected_items = self.matches_list.selectedItems()
         if not selected_items:
             QMessageBox.warning(self, _("Warning"), _("Please select matches to apply."))
             return
             
         # Extract matches from selected groups
-        all_matches = []
+        selected_matches = []
         for item in selected_items:
             group = item.data(Qt.ItemDataRole.UserRole)
-            all_matches.extend(group.matches)
+            selected_matches.extend(group.matches)
+
+        return all_matches, selected_matches, apply_all_matches
+
+    def apply_selected_matches(self):
+        """Apply selected translation matches."""
+        all_matches, selected_matches, apply_all_matches = self._collect_matches()
             
-        if not all_matches:
+        if not selected_matches:
             QMessageBox.warning(self, _("Warning"), _("No matches to apply from selected items."))
             return
             
-        self.apply_matches(all_matches)
+        self.apply_matches(all_matches, selected_matches, apply_all_matches)
         
     def apply_all_matches(self):
         """Apply all translation matches."""
         if not self.analyses:
             return
-            
-        # Get the apply mode from checkbox
-        apply_all_matches = self.apply_all_matches_checkbox.isChecked()
-        
-        if apply_all_matches:
-            # Get all matches
-            all_matches = []
-            for analysis in self.analyses:
-                all_matches.extend(analysis.matches_found)
-        else:
-            # Get only missing matches
-            all_matches = []
-            for analysis in self.analyses:
-                all_matches.extend(analysis.missing_matches)
+
+        all_matches, _, apply_all_matches = self._collect_matches()
             
         if not all_matches:
             if apply_all_matches:
@@ -411,17 +426,18 @@ class CrossProjectAnalysisWindow(QDialog):
                 QMessageBox.information(self, _("Info"), _("No missing translations to apply."))
             return
             
-        self.apply_matches(all_matches)
+        self.apply_matches(all_matches, [], apply_all_matches)
         
-    def apply_matches(self, matches: List[TranslationMatch]):
+    def apply_matches(self, all_matches: List[TranslationMatch],
+                      selected_matches: List[TranslationMatch],
+                      apply_all_matches: bool):
         """Apply the specified translation matches."""
-        if not matches:
+        if not all_matches:
             return
             
-        # Get the apply mode from checkbox
-        apply_all_matches = self.apply_all_matches_checkbox.isChecked()
-        
         # Create appropriate confirmation message
+        is_selected = len(selected_matches) > 0
+        matches = selected_matches if is_selected else all_matches
         if apply_all_matches:
             msg = _("Apply {} translation matches (including already filled translations) to the target project?").format(len(matches))
         else:
@@ -434,14 +450,14 @@ class CrossProjectAnalysisWindow(QDialog):
             return
             
         try:
-            # Group matches by target project
             target_project = matches[0].target_project
             
             # Create a temporary analysis object for application
             temp_analysis = CrossProjectAnalysis(
                 source_project="",  # Not used for application
                 target_project=target_project,
-                matches_found=matches
+                matches_found=all_matches,
+                missing_matches=selected_matches
             )
             
             # Apply matches with the selected mode

@@ -23,7 +23,7 @@ class TranslationMatch:
     confidence: float = 1.0  # 1.0 for exact matches, lower for fuzzy matches
     
     def __str__(self):
-        return f"Match: '{self.source_msgid}' -> '{self.target_msgid}' ({self.target_locale}) from {self.source_project}"
+        return f"Match: '{self.source_msgid}' ({self.source_translation}) -> '{self.target_msgid}' ({self.target_locale}) from {self.source_project}"
 
 @dataclass
 class MsgIdMatchGroup:
@@ -227,7 +227,7 @@ class CrossProjectAnalyzer:
             
             # Now check each target locale for matches
             for locale in target_locales:
-                logger.debug(f"Looking for match for msgid '{msgid}' in locale '{locale}'")
+                # logger.debug(f"Looking for match for msgid '{msgid}' in locale '{locale}'")
                 
                 # Look for exact match in source project
                 match = self._find_exact_match(
@@ -240,23 +240,23 @@ class CrossProjectAnalyzer:
                 is_filled = target_translation and target_translation.strip()
                 
                 if match:
-                    logger.debug(f"Found match: {match}")
+                    # logger.debug(f"Found match: {match}")
                     all_matches.append(match)
                     group.matches.append(match)
                     
                     # If target is not filled, this is fillable
                     if not is_filled:
                         fillable_count += 1
-                        logger.debug(f"Translation is missing - adding to missing_matches")
+                        # logger.debug(f"Translation is missing - adding to missing_matches")
                         missing_matches.append(match)
                         analysis.total_matched += 1
-                    else:
-                        logger.debug(f"Translation already exists - not adding to missing_matches")
+                    # else:
+                        # logger.debug(f"Translation already exists - not adding to missing_matches")
                 else:
                     # No match found for this locale
                     if not is_filled:
                         unfillable_count += 1
-                        logger.debug(f"No match found for unfilled locale '{locale}'")
+                        # logger.debug(f"No match found for unfilled locale '{locale}'")
             
             # Update group counts
             group.filled_locales_count = filled_count
@@ -289,58 +289,43 @@ class CrossProjectAnalyzer:
         Returns:
             Optional[TranslationMatch]: Match if found, None otherwise
         """
-        logger.debug(f"Finding match for msgid '{target_msgid}' in locale '{target_locale}'")
+        # logger.debug(f"Finding match for msgid '{target_msgid}' in locale '{target_locale}'")
         
         # Strategy 1: Look for exact msgid match in source project
         if target_msgid in source_manager.translations:
-            logger.debug(f"Found exact msgid match in source project")
+            # logger.debug(f"Found exact msgid match in source project")
             source_group = source_manager.translations[target_msgid]
             
             # Check if source has translation for target locale
             if target_locale in source_group.values:
-                target_translation = source_group.values[target_locale]
-                logger.debug(f"Source has target locale '{target_locale}': '{target_translation}' (strip: '{target_translation.strip()}')")
-                if target_translation.strip():
-                    logger.debug(f"Found translation for target locale '{target_locale}': '{target_translation}'")
+                source_translation = source_group.values[target_locale]
+                # logger.debug(f"Source has target locale '{target_locale}': '{source_translation}' (strip: '{source_translation.strip()}')")
+                if source_translation.strip():
+                    logger.debug(f"Found translation for target locale '{target_locale}': '{source_translation}'")
                     return TranslationMatch(
                         source_project=source_manager._directory,
                         source_msgid=target_msgid,
-                        source_translation=target_translation,
+                        source_translation=source_translation,
                         target_project=target_manager._directory,
                         target_msgid=target_msgid,
                         target_locale=target_locale
                     )
-                else:
-                    logger.debug(f"Target locale translation is empty or whitespace")
-            else:
-                logger.debug(f"Source does not have target locale '{target_locale}'")
-            
-            # Check if source has translation for default locale (fallback)
-            if default_locale in source_group.values:
-                default_translation = source_group.values[default_locale]
-                logger.debug(f"Source has default locale '{default_locale}': '{default_translation}' (strip: '{default_translation.strip()}')")
-                if default_translation.strip():
-                    logger.debug(f"Using default locale '{default_locale}' as fallback: '{default_translation}'")
-                    return TranslationMatch(
-                        source_project=source_manager._directory,
-                        source_msgid=target_msgid,
-                        source_translation=default_translation,
-                        target_project=target_manager._directory,
-                        target_msgid=target_msgid,
-                        target_locale=target_locale
-                    )
-                else:
-                    logger.debug(f"Default locale translation is empty or whitespace")
-            else:
-                logger.debug(f"Source does not have default locale '{default_locale}'")
-        else:
-            logger.debug(f"No exact msgid match found in source project")
+            #     else:
+            #         logger.debug(f"Target locale translation is empty or whitespace")
+            # else:
+            #     logger.debug(f"Source does not have target locale '{target_locale}'")
+        #         else:
+        #             logger.debug(f"Default locale translation is empty or whitespace")
+        #     else:
+        #         logger.debug(f"Source does not have default locale '{default_locale}'")
+        # else:
+        #     logger.debug(f"No exact msgid match found in source project")
         
         # Strategy 2: Look for exact default locale translation match
         # This handles cases where the msgid is different but the English text is the same
         target_default_translation = target_manager.translations[target_msgid].get_translation(default_locale)
         if target_default_translation and target_default_translation.strip():
-            logger.debug(f"Looking for default locale match: '{target_default_translation}'")
+            # logger.debug(f"Looking for default locale match: '{target_default_translation}'")
             match_count = 0
             for source_msgid, source_group in source_manager.translations.items():
                 source_default = source_group.get_translation(default_locale)
@@ -348,34 +333,34 @@ class CrossProjectAnalyzer:
                     source_default == target_default_translation):
                     
                     match_count += 1
-                    logger.debug(f"Found matching default translation in source msgid '{source_msgid}' (match #{match_count})")
+                    # logger.debug(f"Found matching default translation in source msgid '{source_msgid}' (match #{match_count})")
                     # Check if source has translation for target locale
                     if target_locale in source_group.values:
-                        target_translation = source_group.values[target_locale]
-                        logger.debug(f"Source has target locale '{target_locale}': '{target_translation}' (strip: '{target_translation.strip()}')")
-                        if target_translation.strip():
-                            logger.debug(f"Found translation for target locale '{target_locale}': '{target_translation}'")
+                        source_translation = source_group.values[target_locale]
+                        # logger.debug(f"Source has target locale '{target_locale}': '{source_translation}' (strip: '{target_translation.strip()}')")
+                        if source_translation.strip():
+                            logger.debug(f"Found translation for target locale '{target_locale}': '{source_translation}'")
                             return TranslationMatch(
                                 source_project=source_manager._directory,
                                 source_msgid=source_msgid,
-                                source_translation=target_translation,
+                                source_translation=source_translation,
                                 target_project=target_manager._directory,
                                 target_msgid=target_msgid,
                                 target_locale=target_locale
                             )
-                        else:
-                            logger.debug(f"Target locale translation is empty or whitespace")
-                    else:
-                        logger.debug(f"Source does not have target locale '{target_locale}'")
+                    #     else:
+                    #         logger.debug(f"Target locale translation is empty or whitespace")
+                    # else:
+                    #     logger.debug(f"Source does not have target locale '{target_locale}'")
             
-            if match_count == 0:
-                logger.debug(f"No matching default translations found")
-            else:
-                logger.debug(f"Found {match_count} matching default translations but none had target locale '{target_locale}'")
-        else:
-            logger.debug(f"No default locale translation available for target msgid")
+            # if match_count == 0:
+            #     logger.debug(f"No matching default translations found")
+            # else:
+            #     logger.debug(f"Found {match_count} matching default translations but none had target locale '{target_locale}'")
+        # else:
+        #     logger.debug(f"No default locale translation available for target msgid")
         
-        logger.debug(f"No match found for msgid '{target_msgid}' in locale '{target_locale}'")
+        # logger.debug(f"No match found for msgid '{target_msgid}' in locale '{target_locale}'")
         return None
     
     def apply_matches_to_target(self, analysis: CrossProjectAnalysis, 
@@ -393,6 +378,7 @@ class CrossProjectAnalyzer:
         """
         # Choose which matches to apply
         matches_to_apply = analysis.matches_found if apply_all_matches else analysis.missing_matches
+        logger.debug(f"Applying {len(matches_to_apply)} matches to target project {analysis.target_project}")
         
         if not matches_to_apply:
             if apply_all_matches:
@@ -430,6 +416,8 @@ class CrossProjectAnalyzer:
                 if match.target_locale not in applied_changes:
                     applied_changes[match.target_locale] = 0
                 applied_changes[match.target_locale] += 1
+            else:
+                logger.error(f"Could not find target msgid {match.target_msgid} in target project {target_manager._directory}")
         
         if not dry_run and applied_changes:
             # Write PO files for affected locales
