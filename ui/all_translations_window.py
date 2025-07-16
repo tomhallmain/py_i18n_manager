@@ -36,10 +36,21 @@ class AllTranslationsWindow(BaseTranslationWindow):
         search_layout = QHBoxLayout()
         search_label = QLabel(_("Search:"))
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText(_("Search translation keys..."))
-        self.search_box.textChanged.connect(self.filter_table)
+        self.search_box.setPlaceholderText(_("Search translation keys... (Press Enter to search)"))
+        self.search_box.returnPressed.connect(self.filter_table)
         search_layout.addWidget(search_label)
         search_layout.addWidget(self.search_box)
+        
+        # Search button
+        self.search_button = QPushButton(_("Search"))
+        self.search_button.clicked.connect(self.filter_table)
+        search_layout.addWidget(self.search_button)
+        
+        # Clear search button
+        self.clear_search_button = QPushButton(_("Clear"))
+        self.clear_search_button.clicked.connect(self.clear_search)
+        search_layout.addWidget(self.clear_search_button)
+        
         controls_layout.addLayout(search_layout)
         
         # Status filter
@@ -282,6 +293,11 @@ class AllTranslationsWindow(BaseTranslationWindow):
                         item.setText(group.get_translation_escaped(locale))
                     else:
                         item.setText(group.get_translation_unescaped(locale))
+
+    def clear_search(self):
+        """Clear the search box and reset the filter to show all items."""
+        self.search_box.clear()
+        self.filter_table()
 
     def toggle_unicode_display(self):
         """Toggle the Unicode display mode."""

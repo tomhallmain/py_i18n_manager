@@ -1,14 +1,14 @@
 # Translations template for APPLICATION.
-# Copyright (C) 2025 AUTHOR NAME <author@example.com>
+# Copyright (C) 2025 THOMAS HALL <tomhall.main@gmail.com>
 # This file is distributed under the same license as the APPLICATION project.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: APPLICATION 1.0\n"
-"Report-Msgid-Bugs-To: Translator Name <translator@example.com>\n"
-"POT-Creation-Date: 2025-07-06 15:33-0400\n"
-"PO-Revision-Date: 2025-07-06 15:33-0400\n"
+"Report-Msgid-Bugs-To: Thomas Hall <tomhall.main@gmail.com>\n"
+"POT-Creation-Date: 2025-07-16 01:37-0400\n"
+"PO-Revision-Date: 2025-07-16 01:37-0400\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -105,39 +105,47 @@ msgid "Search:"
 msgstr ""
 
 #: ui/all_translations_window.py:39
-msgid "Search translation keys..."
+msgid "Search translation keys... (Press Enter to search)"
 msgstr ""
 
-#: ui/all_translations_window.py:47
+#: ui/all_translations_window.py:45
+msgid "Search"
+msgstr ""
+
+#: ui/all_translations_window.py:50
+msgid "Clear"
+msgstr ""
+
+#: ui/all_translations_window.py:58
 msgid "Filter:"
 msgstr ""
 
-#: ui/all_translations_window.py:64 ui/outstanding_items_window.py:116
+#: ui/all_translations_window.py:75 ui/outstanding_items_window.py:116
 msgid "Save Changes"
 msgstr ""
 
-#: ui/all_translations_window.py:66 ui/cross_project_analysis_window.py:153 ui/outstanding_items_window.py:118
+#: ui/all_translations_window.py:77 ui/cross_project_analysis_window.py:153 ui/outstanding_items_window.py:118
 msgid "Close"
 msgstr ""
 
-#: ui/all_translations_window.py:70 ui/outstanding_items_window.py:122
+#: ui/all_translations_window.py:81 ui/outstanding_items_window.py:122
 msgid "Show Escaped Unicode"
 msgstr ""
 
-#: ui/all_translations_window.py:253 ui/cross_project_analysis_window.py:465 ui/cross_project_analysis_window.py:468
+#: ui/all_translations_window.py:264 ui/cross_project_analysis_window.py:465 ui/cross_project_analysis_window.py:468
 #: ui/cross_project_analysis_window.py:489
 msgid "Info"
 msgstr ""
 
-#: ui/all_translations_window.py:253
+#: ui/all_translations_window.py:264
 msgid "No changes to save."
 msgstr ""
 
-#: ui/all_translations_window.py:261 ui/cross_project_analysis_window.py:542
+#: ui/all_translations_window.py:272 ui/cross_project_analysis_window.py:542
 msgid "Success"
 msgstr ""
 
-#: ui/all_translations_window.py:261
+#: ui/all_translations_window.py:272
 msgid "Saved {} changes successfully!"
 msgstr ""
 
