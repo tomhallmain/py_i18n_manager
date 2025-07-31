@@ -3,7 +3,6 @@ import glob
 import os
 import sys
 import time
-import logging
 import re
 import polib
 from babel.messages.catalog import Catalog
@@ -14,7 +13,9 @@ from i18n.translation_group import TranslationGroup
 from .translation_manager_results import TranslationManagerResults, TranslationAction, LocaleStatus
 from .invalid_translation_groups import InvalidTranslationGroups
 
-logger = logging.getLogger(__name__)
+from utils.logging_setup import get_logger
+
+logger = get_logger("i18n_manager")
 
 class I18NManager():
     """Manages the Python internationalization (i18n) workflow for translation files.

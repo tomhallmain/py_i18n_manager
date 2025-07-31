@@ -1,13 +1,16 @@
+import os
+from pathlib import Path
+
 import argostranslate.package
 import argostranslate.translate
-from pathlib import Path
-from utils.config import ConfigManager
-import logging
-import os
-from PyQt6.QtCore import QObject, pyqtSignal
-from ui.download_dialog import DownloadDialog
 
-logger = logging.getLogger(__name__)
+from PyQt6.QtCore import QObject, pyqtSignal
+
+from ui.download_dialog import DownloadDialog
+from utils.config import ConfigManager
+from utils.logging_setup import get_logger
+
+logger = get_logger("argos_translate")
 
 class ArgosTranslate(QObject):
     """Handles translation using Argos Translate models."""

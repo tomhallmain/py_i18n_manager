@@ -1,4 +1,4 @@
-import logging
+
 import os
 from typing import List, Optional
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
@@ -9,13 +9,14 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 
 from i18n.cross_project_analyzer import CrossProjectAnalyzer, CrossProjectAnalysis, MsgIdMatchGroup, TranslationMatch
+from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
 from utils.translations import I18N
 
 # Set up translation
 _ = I18N._
 
-logger = logging.getLogger(__name__)
+logger = get_logger("cross_project_analysis_window")
 
 class AnalysisWorker(QThread):
     """Worker thread for performing cross-project analysis."""

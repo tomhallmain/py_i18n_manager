@@ -1,5 +1,4 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QHeaderView
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QDialog, QTableWidget, QHeaderView
 
 class BaseTranslationWindow(QDialog):
     """Base class for translation windows with shared table setup logic."""

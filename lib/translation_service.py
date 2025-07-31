@@ -1,10 +1,10 @@
 from lib.llm import LLM
 from lib.argos_translate import ArgosTranslate
-import asyncio
 from concurrent.futures import ThreadPoolExecutor
-import logging
 
-logger = logging.getLogger(__name__)
+from utils.logging_setup import get_logger
+
+logger = get_logger("translation_service")
 
 class TranslationService:
     def __init__(self, default_locale='en'):
@@ -44,12 +44,12 @@ class TranslationService:
         
         # Get translation from LLM
         try:
-            response = self.llm.generate_json_get_value(
-                prompt=prompt,
-                attr_name="translation",
+            result = self.llm.generate_json_get_value(
+                query=prompt,
+                json_key="translation",
                 timeout=60  # Shorter timeout for translations
             )
-            return response if response else ""
+            return result.response if result else ""
         except Exception as e:
             logger.error(f"LLM translation failed: {e}")
             return ""

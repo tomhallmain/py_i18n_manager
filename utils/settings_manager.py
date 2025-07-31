@@ -1,10 +1,11 @@
 import json
 import os
 from pathlib import Path
-import logging
 from typing import Optional, Any
 
-logger = logging.getLogger(__name__)
+from utils.logging_setup import get_logger
+
+logger = get_logger("settings_manager")
 
 class SettingsManager:
     MAX_RECENT_PROJECTS = 10

@@ -2,16 +2,16 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QLabel, QLineEdit, QFormLayout, QListWidget, QListWidgetItem,
                             QMessageBox, QFrame, QComboBox)
 from PyQt6.QtCore import Qt, pyqtSignal
-import logging
 import os
 
 from utils.globals import valid_language_codes, valid_country_codes, valid_script_codes
-from utils.translations import I18N
+from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
+from utils.translations import I18N
 
 _ = I18N._
 
-logger = logging.getLogger(__name__)
+logger = get_logger("setup_translation_project_window")
 
 class SetupTranslationProjectWindow(QDialog):
     project_configured = pyqtSignal()  # Emitted when project setup is complete

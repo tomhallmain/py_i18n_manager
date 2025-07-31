@@ -5,9 +5,9 @@ from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QApplication
 
-from utils.translations import I18N
-from utils.globals import TranslationStatus, TranslationFilter
 from ui.base_translation_window import BaseTranslationWindow
+from utils.globals import TranslationStatus, TranslationFilter
+from utils.translations import I18N
 
 _ = I18N._
 

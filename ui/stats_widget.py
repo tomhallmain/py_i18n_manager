@@ -1,13 +1,13 @@
-import logging
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
 from i18n.translation_manager_results import TranslationManagerResults
+from utils.logging_setup import get_logger
 from utils.translations import I18N
 
-logger = logging.getLogger(__name__)
+logger = get_logger("stats_widget")
 
 _ = I18N._
 

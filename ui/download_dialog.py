@@ -1,7 +1,5 @@
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QApplication
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QMovie
-import os
 
 class DownloadDialog(QDialog):
     """Dialog showing download progress for translation models."""

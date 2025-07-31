@@ -1,26 +1,26 @@
-import logging
+from datetime import datetime
 import os
 import sys
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                             QTextEdit, QTabWidget, QMessageBox, QFrame)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, QTimer
+
 from i18n.i18n_manager import I18NManager
-from ui.stats_widget import StatsWidget
-from ui.outstanding_items_window import OutstandingItemsWindow
+from i18n.translation_manager_results import TranslationManagerResults, TranslationAction
 from ui.all_translations_window import AllTranslationsWindow
+from ui.cross_project_analysis_window import CrossProjectAnalysisWindow
+from ui.outstanding_items_window import OutstandingItemsWindow
 from ui.recent_projects_dialog import RecentProjectsDialog
 from ui.setup_translation_project_window import SetupTranslationProjectWindow
-from ui.cross_project_analysis_window import CrossProjectAnalysisWindow
+from ui.stats_widget import StatsWidget
+from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
 from utils.translations import I18N
 from workers.translation_worker import TranslationWorker
-from i18n.translation_manager_results import TranslationManagerResults, TranslationAction
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+logger = get_logger("main_window")
 
 # Set up translation
 _ = I18N._
@@ -541,6 +541,7 @@ class MainWindow(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     window = MainWindow()
+    logger.info(f"Application started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     window.show()
     sys.exit(app.exec())
 

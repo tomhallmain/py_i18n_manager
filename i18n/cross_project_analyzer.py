@@ -1,4 +1,4 @@
-import logging
+
 import os
 from typing import Dict, List, Set, Tuple, Optional
 from dataclasses import dataclass, field
@@ -7,9 +7,10 @@ from pathlib import Path
 from .i18n_manager import I18NManager
 from .translation_group import TranslationGroup
 from .translation_manager_results import TranslationAction
+from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
 
-logger = logging.getLogger(__name__)
+logger = get_logger("cross_project_analyzer")
 
 @dataclass
 class TranslationMatch:
