@@ -1,4 +1,4 @@
-"""LLM interface for the Muse application."""
+"""General LLM interface using Ollama."""
 
 from dataclasses import dataclass
 import json

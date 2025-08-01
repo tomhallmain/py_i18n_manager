@@ -2,9 +2,9 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2025-07-16 01:40-0400\n"
-"PO-Revision-Date: 2025-07-16 01:40-0400\n"
-"Last-Translator: Translator Name <translator@example.com>\n"
+"POT-Creation-Date: 2025-08-01 01:47-0400\n"
+"PO-Revision-Date: 2025-08-01 01:47-0400\n"
+"Last-Translator: Thomas Hall <tomhall.main@gmail.com>\n"
 "Language-Team: fr Team <<EMAIL>>\n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
@@ -12,71 +12,75 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: app.py:32 app.py:158
+#: app.py:33 app.py:162
 msgid "i18n Translation Manager"
 msgstr "i18n Responsable de traduction"
 
-#: app.py:67
+#: app.py:68
 msgid "Current Project:"
 msgstr "Projet en cours :"
 
-#: app.py:69
+#: app.py:70
 msgid "No project selected"
 msgstr "Aucun projet sélectionné"
 
-#: app.py:83 ui/recent_projects_dialog.py:68
+#: app.py:84 ui/recent_projects_dialog.py:68
 msgid "Select Project"
 msgstr "Sélectionner le projet"
 
-#: app.py:87
+#: app.py:88
 msgid "Modify Project Settings"
 msgstr "Modifier les paramètres du projet"
 
-#: app.py:117
+#: app.py:118
 msgid "Check Status"
 msgstr "Vérifier l'état"
 
-#: app.py:118
+#: app.py:119
 msgid "Show All Translations"
 msgstr "Afficher toutes les traductions"
 
-#: app.py:119
+#: app.py:120
 msgid "Show Outstanding Items"
 msgstr "Afficher les éléments en suspens"
 
-#: app.py:120
+#: app.py:121
 msgid "Find Untranslated"
 msgstr "Trouver non traduit"
 
-#: app.py:121
+#: app.py:122
 msgid "Cross-Project Analysis"
 msgstr "Analyse inter-projets"
 
-#: app.py:122
+#: app.py:123 ui/bulk_pot_analysis_window.py:66
+msgid "Bulk POT Analysis"
+msgstr "Analyse POT en vrac"
+
+#: app.py:124
 msgid "Write Default Locale"
 msgstr "Écrire la langue par défaut"
 
-#: app.py:123
+#: app.py:125
 msgid "Generate POT"
 msgstr "Générer le POT"
 
-#: app.py:124
+#: app.py:126
 msgid "Update PO Files"
 msgstr "Mettre à jour les fichiers PO"
 
-#: app.py:125
+#: app.py:127
 msgid "Create MO Files"
 msgstr "Créer des fichiers MO"
 
-#: app.py:148
+#: app.py:152 ui/bulk_pot_analysis_window.py:120
 msgid "Status"
 msgstr "État"
 
-#: app.py:516
+#: app.py:521 app.py:537
 msgid "No Projects to Analyze"
 msgstr "Aucun projet à analyser"
 
-#: app.py:517
+#: app.py:522
 msgid ""
 "You need at least 2 projects in your recent projects list to perform cross-"
 "project analysis."
@@ -84,15 +88,23 @@ msgstr ""
 "Vous avez besoin d'au moins deux projets dans votre liste de projets récents"
 " pour effectuer une analyse inter-projets."
 
-#: app.py:535
+#: app.py:538
+msgid ""
+"You need at least 1 project in your recent projects list to perform bulk POT"
+" analysis."
+msgstr ""
+"Vous devez avoir au moins un projet dans votre liste de projets récents pour"
+" effectuer une analyse POT groupée."
+
+#: app.py:556
 msgid "MO Files Need Update"
 msgstr "Les fichiers MO nécessitent une mise à jour."
 
-#: app.py:536
+#: app.py:557
 msgid "PO files have been updated for the following locales:"
 msgstr "Les fichiers PO ont été mis à jour pour les locaux suivants :"
 
-#: app.py:538
+#: app.py:559
 msgid "Remember to run Create MO Files to apply these changes."
 msgstr ""
 "N'oubliez pas d'exécuter la création des fichiers MO pour appliquer ces "
@@ -107,8 +119,17 @@ msgid "Search:"
 msgstr "Rechercher :"
 
 #: ui/all_translations_window.py:39
-msgid "Search translation keys..."
-msgstr "Rechercher les clés de traduction..."
+msgid "Search translation keys... (Press Enter to search)"
+msgstr ""
+"Rechercher les clés de traduction... (Appuyer sur Entrée pour effectuer)"
+
+#: ui/all_translations_window.py:45
+msgid "Search"
+msgstr "Recherche"
+
+#: ui/all_translations_window.py:50
+msgid "Clear"
+msgstr "Effacer"
 
 #: ui/all_translations_window.py:58
 msgid "Filter:"
@@ -118,8 +139,8 @@ msgstr "Filtre:"
 msgid "Save Changes"
 msgstr "Enregistrer les modifications"
 
-#: ui/all_translations_window.py:77 ui/cross_project_analysis_window.py:153
-#: ui/outstanding_items_window.py:118
+#: ui/all_translations_window.py:77 ui/bulk_pot_analysis_window.py:96
+#: ui/cross_project_analysis_window.py:154 ui/outstanding_items_window.py:118
 msgid "Close"
 msgstr "Fermer"
 
@@ -127,9 +148,9 @@ msgstr "Fermer"
 msgid "Show Escaped Unicode"
 msgstr "Afficher l'Unicode échappé"
 
-#: ui/all_translations_window.py:264 ui/cross_project_analysis_window.py:465
-#: ui/cross_project_analysis_window.py:468
-#: ui/cross_project_analysis_window.py:489
+#: ui/all_translations_window.py:264 ui/cross_project_analysis_window.py:466
+#: ui/cross_project_analysis_window.py:469
+#: ui/cross_project_analysis_window.py:490
 msgid "Info"
 msgstr "Informations"
 
@@ -137,7 +158,7 @@ msgstr "Informations"
 msgid "No changes to save."
 msgstr "Aucun changement à enregistrer."
 
-#: ui/all_translations_window.py:272 ui/cross_project_analysis_window.py:542
+#: ui/all_translations_window.py:272 ui/cross_project_analysis_window.py:543
 msgid "Success"
 msgstr "Succès"
 
@@ -145,96 +166,74 @@ msgstr "Succès"
 msgid "Saved {} changes successfully!"
 msgstr "Sauvegarde de {}changements avec succès !"
 
-#: ui/cross_project_analysis_window.py:43
-msgid "Analyzing from specific source project..."
-msgstr "Analyse d'un projet source spécifique..."
+#: ui/bulk_pot_analysis_window.py:38
+msgid "No projects available for analysis."
+msgstr "Aucun projet disponible pour analyse"
 
-#: ui/cross_project_analysis_window.py:51
-msgid "Starting cross-project analysis..."
-msgstr "Démarrer l'analyse inter-projets..."
+#: ui/bulk_pot_analysis_window.py:41
+msgid "Starting bulk POT analysis for {} projects..."
+msgstr "Lancement de l'analyse POT en masse pour {} projets..."
 
-#: ui/cross_project_analysis_window.py:56
-msgid "Analysis complete!"
-msgstr "Analyse terminée !"
+#: ui/bulk_pot_analysis_window.py:46
+msgid "Analyzing project {} of {}: {}"
+msgstr "Analyse du projet {} de {}: {}"
 
-#: ui/cross_project_analysis_window.py:70
-msgid "Cross-Project Translation Analysis"
-msgstr "Analyse des traductions inter-projets"
+#: ui/bulk_pot_analysis_window.py:52
+msgid "Bulk analysis complete!"
+msgstr "Analyse en masse terminée !"
 
-#: ui/cross_project_analysis_window.py:94
-msgid "Target Project:"
-msgstr "Projet cible :"
+#: ui/bulk_pot_analysis_window.py:87
+msgid "Analyze All Projects"
+msgstr "Analyser tous les projets"
 
-#: ui/cross_project_analysis_window.py:101
-msgid "Locales:"
-msgstr "Langues locales :"
+#: ui/bulk_pot_analysis_window.py:91
+msgid "Refresh"
+msgstr "Actualiser"
 
-#: ui/cross_project_analysis_window.py:102 utils/globals.py:94
-#: utils/globals.py:119
-msgid "All"
-msgstr "Tous"
+#: ui/bulk_pot_analysis_window.py:114
+msgid "Project Analysis Results"
+msgstr "Résultats de l'analyse du projet"
 
-#: ui/cross_project_analysis_window.py:117
-msgid "Source Project:"
-msgstr "Projet source :"
+#: ui/bulk_pot_analysis_window.py:120
+msgid "Project"
+msgstr "Projet"
 
-#: ui/cross_project_analysis_window.py:120
-#: ui/cross_project_analysis_window.py:214
-msgid "All Projects"
-msgstr "Tous les projets"
+#: ui/bulk_pot_analysis_window.py:120 utils/globals.py:40 utils/globals.py:63
+#: utils/globals.py:96 utils/globals.py:121
+msgid "Missing"
+msgstr "Manquants"
 
-#: ui/cross_project_analysis_window.py:129
-msgid "Analyze"
-msgstr "Analyser"
+#: ui/bulk_pot_analysis_window.py:120
+msgid "Total"
+msgstr "Total"
 
-#: ui/cross_project_analysis_window.py:134
-msgid "Apply All Matches"
-msgstr "Appliquer tous les résultats"
+#: ui/bulk_pot_analysis_window.py:121
+msgid "Locales"
+msgstr "Paramètres régionaux"
 
-#: ui/cross_project_analysis_window.py:135
-msgid ""
-"If checked, apply all matches including already filled translations. If "
-"unchecked, only apply missing translations."
-msgstr ""
-"Si la case est cochée, toutes les correspondances sont appliquées, y compris"
-" les traductions déjà remplies. Si la case n'est pas cochée, seules les "
-"traductions manquantes sont appliquées."
+#: ui/bulk_pot_analysis_window.py:121
+msgid "Git Status"
+msgstr "État Git"
 
-#: ui/cross_project_analysis_window.py:138
-msgid "Apply Selected"
-msgstr "Appliquer Sélectionné"
+#: ui/bulk_pot_analysis_window.py:121
+msgid "POT Modified"
+msgstr "POT modifié"
 
-#: ui/cross_project_analysis_window.py:143
-msgid "Apply All"
-msgstr "Appliquer tout"
+#: ui/bulk_pot_analysis_window.py:141
+msgid "Project Details"
+msgstr "Détails du projet"
 
-#: ui/cross_project_analysis_window.py:148
-msgid "Apply from Project"
-msgstr "Postuler à partir du projet"
+#: ui/bulk_pot_analysis_window.py:160
+msgid "No analysis performed yet"
+msgstr "Aucune analyse n'a encore été effectuée"
 
-#: ui/cross_project_analysis_window.py:171
-msgid "Analysis Summary"
-msgstr "Résumé de l'analyse"
+#: ui/bulk_pot_analysis_window.py:178
+msgid "Analysis in progress..."
+msgstr "Analyse en cours..."
 
-#: ui/cross_project_analysis_window.py:182
-msgid "Translation Matches"
-msgstr "Correspondance des traductions"
-
-#: ui/cross_project_analysis_window.py:251
-#: ui/cross_project_analysis_window.py:452
-#: ui/cross_project_analysis_window.py:482
-#: ui/cross_project_analysis_window.py:548
-#: ui/cross_project_analysis_window.py:550
-#: ui/setup_translation_project_window.py:201
-msgid "Warning"
-msgstr "Avertissement"
-
-#: ui/cross_project_analysis_window.py:251
-msgid "Please select at least one locale to analyze."
-msgstr "Veuillez sélectionner au moins un lieu à analyser."
-
-#: ui/cross_project_analysis_window.py:263
-#: ui/cross_project_analysis_window.py:554
+#: ui/bulk_pot_analysis_window.py:212 ui/bulk_pot_analysis_window.py:240
+#: ui/cross_project_analysis_window.py:264
+#: ui/cross_project_analysis_window.py:555
 #: ui/setup_translation_project_window.py:153
 #: ui/setup_translation_project_window.py:158
 #: ui/setup_translation_project_window.py:165
@@ -244,84 +243,220 @@ msgstr "Veuillez sélectionner au moins un lieu à analyser."
 msgid "Error"
 msgstr "Erreur"
 
-#: ui/cross_project_analysis_window.py:263
-msgid "Please select a target project."
-msgstr "Veuillez sélectionner un projet cible."
+#: ui/bulk_pot_analysis_window.py:215
+msgid "Missing Translations"
+msgstr "Traductions manquantes"
 
-#: ui/cross_project_analysis_window.py:318
+#: ui/bulk_pot_analysis_window.py:218
+msgid "Complete"
+msgstr "Complète"
+
+#: ui/bulk_pot_analysis_window.py:231
+msgid "None"
+msgstr "Aucun"
+
+#: ui/bulk_pot_analysis_window.py:237
+msgid "Clean"
+msgstr "Propre"
+
+#: ui/bulk_pot_analysis_window.py:238
+msgid "Modified"
+msgstr "Modifié"
+
+#: ui/bulk_pot_analysis_window.py:239
+msgid "Untracked"
+msgstr "Non suivi"
+
+#: ui/bulk_pot_analysis_window.py:241
+msgid "Unknown"
+msgstr "Inconnu"
+
+#: ui/bulk_pot_analysis_window.py:247
+msgid "Yes"
+msgstr "Oui"
+
+#: ui/bulk_pot_analysis_window.py:247
+msgid "No"
+msgstr "Non"
+
+#: ui/bulk_pot_analysis_window.py:265
+msgid "Analysis complete: {} projects analyzed"
+msgstr "Analyse terminée : {} projets analysés"
+
+#: ui/bulk_pot_analysis_window.py:267
+msgid ", {} projects have missing translations ({} total missing)"
+msgstr ", {} projets ont des traductions manquantes ({} au total)"
+
+#: ui/bulk_pot_analysis_window.py:270
+msgid ", {} projects had errors"
+msgstr ", {} projets présentaient des erreurs"
+
+#: ui/bulk_pot_analysis_window.py:279 ui/cross_project_analysis_window.py:319
 msgid "Analysis Error"
 msgstr "Erreur d'analyse"
 
-#: ui/cross_project_analysis_window.py:323
+#: ui/cross_project_analysis_window.py:44
+msgid "Analyzing from specific source project..."
+msgstr "Analyse d'un projet source spécifique..."
+
+#: ui/cross_project_analysis_window.py:52
+msgid "Starting cross-project analysis..."
+msgstr "Démarrer l'analyse inter-projets..."
+
+#: ui/cross_project_analysis_window.py:57
+msgid "Analysis complete!"
+msgstr "Analyse terminée !"
+
+#: ui/cross_project_analysis_window.py:71
+msgid "Cross-Project Translation Analysis"
+msgstr "Analyse des traductions inter-projets"
+
+#: ui/cross_project_analysis_window.py:95
+msgid "Target Project:"
+msgstr "Projet cible :"
+
+#: ui/cross_project_analysis_window.py:102
+msgid "Locales:"
+msgstr "Langues locales :"
+
+#: ui/cross_project_analysis_window.py:103 utils/globals.py:94
+#: utils/globals.py:119
+msgid "All"
+msgstr "Tous"
+
+#: ui/cross_project_analysis_window.py:118
+msgid "Source Project:"
+msgstr "Projet source :"
+
+#: ui/cross_project_analysis_window.py:121
+#: ui/cross_project_analysis_window.py:215
+msgid "All Projects"
+msgstr "Tous les projets"
+
+#: ui/cross_project_analysis_window.py:130
+msgid "Analyze"
+msgstr "Analyser"
+
+#: ui/cross_project_analysis_window.py:135
+msgid "Apply All Matches"
+msgstr "Appliquer tous les résultats"
+
+#: ui/cross_project_analysis_window.py:136
+msgid ""
+"If checked, apply all matches including already filled translations. If "
+"unchecked, only apply missing translations."
+msgstr ""
+"Si la case est cochée, toutes les correspondances sont appliquées, y compris"
+" les traductions déjà remplies. Si la case n'est pas cochée, seules les "
+"traductions manquantes sont appliquées."
+
+#: ui/cross_project_analysis_window.py:139
+msgid "Apply Selected"
+msgstr "Appliquer Sélectionné"
+
+#: ui/cross_project_analysis_window.py:144
+msgid "Apply All"
+msgstr "Appliquer tout"
+
+#: ui/cross_project_analysis_window.py:149
+msgid "Apply from Project"
+msgstr "Postuler à partir du projet"
+
+#: ui/cross_project_analysis_window.py:172
+msgid "Analysis Summary"
+msgstr "Résumé de l'analyse"
+
+#: ui/cross_project_analysis_window.py:183
+msgid "Translation Matches"
+msgstr "Correspondance des traductions"
+
+#: ui/cross_project_analysis_window.py:252
+#: ui/cross_project_analysis_window.py:453
+#: ui/cross_project_analysis_window.py:483
+#: ui/cross_project_analysis_window.py:549
+#: ui/cross_project_analysis_window.py:551
+#: ui/setup_translation_project_window.py:201
+msgid "Warning"
+msgstr "Avertissement"
+
+#: ui/cross_project_analysis_window.py:252
+msgid "Please select at least one locale to analyze."
+msgstr "Veuillez sélectionner au moins un lieu à analyser."
+
+#: ui/cross_project_analysis_window.py:264
+msgid "Please select a target project."
+msgstr "Veuillez sélectionner un projet cible."
+
+#: ui/cross_project_analysis_window.py:324
 msgid "No analysis results available."
 msgstr "Aucun résultat d'analyse disponible."
 
-#: ui/cross_project_analysis_window.py:326
+#: ui/cross_project_analysis_window.py:327
 msgid "Analysis Summary:"
 msgstr "Résumé de l'analyse :"
 
-#: ui/cross_project_analysis_window.py:331
+#: ui/cross_project_analysis_window.py:332
 msgid "Total matches found: {}"
 msgstr "Total des correspondances trouvées : {}"
 
-#: ui/cross_project_analysis_window.py:332
+#: ui/cross_project_analysis_window.py:333
 msgid "Missing translations: {}"
 msgstr "Traductions manquantes : {}"
 
-#: ui/cross_project_analysis_window.py:333
+#: ui/cross_project_analysis_window.py:334
 msgid "Already filled translations: {}"
 msgstr "Traductions déjà remplies : {}"
 
-#: ui/cross_project_analysis_window.py:344
+#: ui/cross_project_analysis_window.py:345
 msgid "From {}:"
 msgstr "De {} :"
 
-#: ui/cross_project_analysis_window.py:345
+#: ui/cross_project_analysis_window.py:346
 msgid "  • {} msgid groups"
 msgstr "  • {} msgid groupes"
 
-#: ui/cross_project_analysis_window.py:346
+#: ui/cross_project_analysis_window.py:347
 msgid "  • {} fillable translations"
 msgstr "  • {} traductions à remplir"
 
-#: ui/cross_project_analysis_window.py:347
+#: ui/cross_project_analysis_window.py:348
 msgid "  • {} already filled"
 msgstr "  • {} déjà rempli"
 
-#: ui/cross_project_analysis_window.py:349
+#: ui/cross_project_analysis_window.py:350
 msgid "  • {} unfillable"
 msgstr "  • {} non remplissable"
 
-#: ui/cross_project_analysis_window.py:350
+#: ui/cross_project_analysis_window.py:351
 msgid "  • Match rate: {:.1f}%"
 msgstr "  • Taux de correspondance : { :.1f}%"
 
-#: ui/cross_project_analysis_window.py:405
+#: ui/cross_project_analysis_window.py:406
 msgid "... etc."
 msgstr "... etc."
 
-#: ui/cross_project_analysis_window.py:452
+#: ui/cross_project_analysis_window.py:453
 msgid "Please select matches to apply."
 msgstr "Veuillez sélectionner les correspondances pour postuler."
 
-#: ui/cross_project_analysis_window.py:465
+#: ui/cross_project_analysis_window.py:466
 msgid "No matches to apply."
 msgstr "Il n'y a pas de correspondance à demander."
 
-#: ui/cross_project_analysis_window.py:468
+#: ui/cross_project_analysis_window.py:469
 msgid "No missing translations to apply."
 msgstr "Aucune traduction manquante à appliquer."
 
-#: ui/cross_project_analysis_window.py:482
+#: ui/cross_project_analysis_window.py:483
 msgid "Please select a specific source project from the dropdown."
 msgstr ""
 "Veuillez sélectionner un projet source spécifique dans la liste déroulante."
 
-#: ui/cross_project_analysis_window.py:489
+#: ui/cross_project_analysis_window.py:490
 msgid "No matches found for the selected project."
 msgstr "Aucune correspondance n'a été trouvée pour le projet sélectionné."
 
-#: ui/cross_project_analysis_window.py:511
+#: ui/cross_project_analysis_window.py:512
 msgid ""
 "Apply {0} translation matches (including already filled translations) from "
 "project '{1}' to the target project?"
@@ -329,7 +464,7 @@ msgstr ""
 "Appliquer {0} correspondances de traduction (y compris les traductions déjà "
 "remplies) du projet “{1}” au projet cible ?"
 
-#: ui/cross_project_analysis_window.py:513
+#: ui/cross_project_analysis_window.py:514
 msgid ""
 "Apply {0} missing translation matches from project '{1}' to the target "
 "project?"
@@ -337,7 +472,7 @@ msgstr ""
 "Appliquer {0} correspondances de traduction manquantes du projet “{1}” au "
 "projet cible ?"
 
-#: ui/cross_project_analysis_window.py:516
+#: ui/cross_project_analysis_window.py:517
 msgid ""
 "Apply {0} translation matches (including already filled translations) to the"
 " target project?"
@@ -345,20 +480,20 @@ msgstr ""
 "Appliquer {0} correspondances de traduction (y compris les traductions déjà "
 "remplies) au projet cible ?"
 
-#: ui/cross_project_analysis_window.py:518
+#: ui/cross_project_analysis_window.py:519
 msgid "Apply {0} missing translation matches to the target project?"
 msgstr ""
 "Appliquer {0} correspondances de traduction manquantes au projet cible ?"
 
-#: ui/cross_project_analysis_window.py:520
+#: ui/cross_project_analysis_window.py:521
 msgid "Confirm Application"
 msgstr "Confirmer la demande"
 
-#: ui/cross_project_analysis_window.py:539
+#: ui/cross_project_analysis_window.py:540
 msgid "{}: {} translations"
 msgstr "{} : {} traductions"
 
-#: ui/cross_project_analysis_window.py:541
+#: ui/cross_project_analysis_window.py:542
 msgid ""
 "Successfully applied translations:\n"
 "\n"
@@ -368,15 +503,15 @@ msgstr ""
 "\n"
 "{}"
 
-#: ui/cross_project_analysis_window.py:548
+#: ui/cross_project_analysis_window.py:549
 msgid "No translations were applied (all were already filled)."
 msgstr "Aucune traduction n'a été appliquée (toutes étaient déjà remplies)."
 
-#: ui/cross_project_analysis_window.py:550
+#: ui/cross_project_analysis_window.py:551
 msgid "No missing translations were applied."
 msgstr "Aucune traduction manquante n'a été appliquée."
 
-#: ui/cross_project_analysis_window.py:554
+#: ui/cross_project_analysis_window.py:555
 msgid "Failed to apply translations: {}"
 msgstr "Échec de l'application des traductions : {}"
 
@@ -622,11 +757,6 @@ msgstr "Nouvelle ligne invalide :"
 msgid "Stale Translations:"
 msgstr "Traductions sur place :"
 
-#: utils/globals.py:40 utils/globals.py:63 utils/globals.py:96
-#: utils/globals.py:121
-msgid "Missing"
-msgstr "Manquants"
-
 #: utils/globals.py:42 utils/globals.py:65 utils/globals.py:98
 #: utils/globals.py:123
 msgid "Invalid Unicode"
@@ -651,24 +781,3 @@ msgstr "Espaces non valides"
 #: utils/globals.py:131
 msgid "Invalid Newline"
 msgstr "Nouvelle ligne invalide"
-
-#: utils/job_queue.py:36
-msgid " (Pending runs: {0})"
-msgstr " (En attente d'exécutions : {0})"
-
-#: utils/job_queue.py:38
-msgid " (Pending schedules: {0})"
-msgstr " (En attente des horaires : {0})"
-
-#: ui/all_translations_window.py:39
-msgid "Search translation keys... (Press Enter to search)"
-msgstr ""
-"Rechercher les clés de traduction... (Appuyer sur Entrée pour effectuer)"
-
-#: ui/all_translations_window.py:45
-msgid "Search"
-msgstr "Recherche"
-
-#: ui/all_translations_window.py:50
-msgid "Clear"
-msgstr "Effacer"

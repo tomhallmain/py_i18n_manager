@@ -10,6 +10,7 @@ from PyQt6.QtCore import Qt, QTimer
 from i18n.i18n_manager import I18NManager
 from i18n.translation_manager_results import TranslationManagerResults, TranslationAction
 from ui.all_translations_window import AllTranslationsWindow
+from ui.bulk_pot_analysis_window import BulkPotAnalysisWindow
 from ui.cross_project_analysis_window import CrossProjectAnalysisWindow
 from ui.outstanding_items_window import OutstandingItemsWindow
 from ui.recent_projects_dialog import RecentProjectsDialog
@@ -112,37 +113,52 @@ class MainWindow(QMainWindow):
         self.status_text.setReadOnly(True)
         status_layout.addWidget(self.status_text)
 
-        # Action buttons
-        button_layout = QHBoxLayout()
+        # Action buttons - split into two rows
+        button_layout = QVBoxLayout()
+        
+        # First row of buttons
+        first_row_layout = QHBoxLayout()
         self.check_status_btn = QPushButton(_("Check Status"))
+        self.write_default_btn = QPushButton(_("Write Default Locale"))
         self.show_all_btn = QPushButton(_("Show All Translations"))
         self.show_outstanding_btn = QPushButton(_("Show Outstanding Items"))
         self.find_untranslated_btn = QPushButton(_("Find Untranslated"))
+
+        self.check_status_btn.clicked.connect(lambda: self.run_translation_task())
+        self.write_default_btn.clicked.connect(self.write_default_locale)
+        self.show_all_btn.clicked.connect(self.show_all_translations)
+        self.show_outstanding_btn.clicked.connect(self.show_outstanding_items)
+        self.find_untranslated_btn.clicked.connect(self.find_untranslated_strings)
+
+        first_row_layout.addWidget(self.check_status_btn)
+        first_row_layout.addWidget(self.write_default_btn)
+        first_row_layout.addWidget(self.show_all_btn)
+        first_row_layout.addWidget(self.show_outstanding_btn)
+        first_row_layout.addWidget(self.find_untranslated_btn)
+
+        # Second row of buttons
+        second_row_layout = QHBoxLayout()
+        self.bulk_pot_btn = QPushButton(_("Bulk POT Analysis"))
         self.cross_project_btn = QPushButton(_("Cross-Project Analysis"))
-        self.write_default_btn = QPushButton(_("Write Default Locale"))
         self.generate_pot_btn = QPushButton(_("Generate POT"))
         self.update_po_btn = QPushButton(_("Update PO Files"))
         self.create_mo_btn = QPushButton(_("Create MO Files"))
 
-        self.check_status_btn.clicked.connect(lambda: self.run_translation_task())
-        self.show_all_btn.clicked.connect(self.show_all_translations)
-        self.show_outstanding_btn.clicked.connect(self.show_outstanding_items)
-        self.find_untranslated_btn.clicked.connect(self.find_untranslated_strings)
+        self.bulk_pot_btn.clicked.connect(self.show_bulk_pot_analysis)
         self.cross_project_btn.clicked.connect(self.show_cross_project_analysis)
-        self.write_default_btn.clicked.connect(self.write_default_locale)
         self.generate_pot_btn.clicked.connect(self.generate_pot)
         self.update_po_btn.clicked.connect(lambda: self.run_translation_task(TranslationAction.WRITE_PO_FILES))
         self.create_mo_btn.clicked.connect(lambda: self.run_translation_task(TranslationAction.WRITE_MO_FILES))
 
-        button_layout.addWidget(self.check_status_btn)
-        button_layout.addWidget(self.show_all_btn)
-        button_layout.addWidget(self.show_outstanding_btn)
-        button_layout.addWidget(self.find_untranslated_btn)
-        button_layout.addWidget(self.cross_project_btn)
-        button_layout.addWidget(self.write_default_btn)
-        button_layout.addWidget(self.generate_pot_btn)
-        button_layout.addWidget(self.update_po_btn)
-        button_layout.addWidget(self.create_mo_btn)
+        second_row_layout.addWidget(self.bulk_pot_btn)
+        second_row_layout.addWidget(self.cross_project_btn)
+        second_row_layout.addWidget(self.generate_pot_btn)
+        second_row_layout.addWidget(self.update_po_btn)
+        second_row_layout.addWidget(self.create_mo_btn)
+
+        # Add both rows to the main button layout
+        button_layout.addLayout(first_row_layout)
+        button_layout.addLayout(second_row_layout)
         status_layout.addLayout(button_layout)
 
         self.tab_widget.addTab(status_tab, _("Status"))
@@ -236,6 +252,7 @@ class MainWindow(QMainWindow):
         self.generate_pot_btn.setEnabled(has_project and has_translations)
         self.find_untranslated_btn.setEnabled(has_project and has_translations)
         self.cross_project_btn.setEnabled(has_project)
+        self.bulk_pot_btn.setEnabled(True)  # Always enabled as it works across all projects
         self.modify_project_btn.setEnabled(has_project)
 
     def run_translation_task(self, action: TranslationAction = TranslationAction.CHECK_STATUS):
@@ -520,6 +537,22 @@ class MainWindow(QMainWindow):
             
         # Show the analysis window
         analysis_window = CrossProjectAnalysisWindow(self)
+        analysis_window.exec()
+
+    def show_bulk_pot_analysis(self):
+        """Show the bulk POT analysis window."""
+        # Check if we have recent projects to analyze
+        recent_projects = self.settings_manager.load_recent_projects()
+        if not recent_projects:
+            QMessageBox.information(
+                self, 
+                _("No Projects to Analyze"), 
+                _("You need at least 1 project in your recent projects list to perform bulk POT analysis.")
+            )
+            return
+            
+        # Show the analysis window
+        analysis_window = BulkPotAnalysisWindow(self)
         analysis_window.exec()
 
     def handle_translation_results(self, results):

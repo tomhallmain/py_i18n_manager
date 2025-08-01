@@ -86,6 +86,37 @@ class CrossProjectAnalyzer:
         logger.debug(f"Settings manager returned projects: {projects}")
         return projects
     
+    def _detect_locale_directory(self, project_path: str) -> str:
+        """Detect which directory structure is being used (locale or locales).
+        
+        Args:
+            project_path (str): Path to the project
+            
+        Returns:
+            str: The name of the locale directory being used ('locale' or 'locales')
+        """
+        locale_dir = os.path.join(project_path, "locale")
+        locales_dir = os.path.join(project_path, "locales")
+        
+        # Check if both directories exist
+        if os.path.exists(locale_dir) and os.path.exists(locales_dir):
+            logger.warning("Both 'locale' and 'locales' directories exist. Using 'locale' by default.")
+            return "locale"
+        
+        # Check if locale directory exists
+        if os.path.exists(locale_dir):
+            logger.debug("Using 'locale' directory structure")
+            return "locale"
+        
+        # Check if locales directory exists
+        if os.path.exists(locales_dir):
+            logger.debug("Using 'locales' directory structure")
+            return "locales"
+        
+        # If neither exists, default to 'locale'
+        logger.debug("No locale directory found. Defaulting to 'locale' directory structure")
+        return "locale"
+
     def _get_project_default_locale(self, project_path: str) -> Optional[str]:
         """Get the default locale for a project without creating a full manager.
         
@@ -97,7 +128,8 @@ class CrossProjectAnalyzer:
         """
         try:
             # Check if project has required structure
-            locale_dir = os.path.join(project_path, "locale")
+            locale_dir_name = self._detect_locale_directory(project_path)
+            locale_dir = os.path.join(project_path, locale_dir_name)
             if not os.path.exists(locale_dir):
                 return None
                 

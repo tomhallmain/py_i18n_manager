@@ -8,6 +8,8 @@ A PyQt6-based desktop application for managing internationalization (i18n) trans
 - **Translation Statistics**: Track total translations, locales, missing translations, and various validation metrics
 - **Translation Management**: View/edit translations, update PO files, create MO files
 - **Quality Control**: Real-time validation of translations including Unicode, format strings, braces, spaces, and newlines
+- **Bulk Project Analysis**: Quickly determine which projects need translation updates
+- **Cross Project Analysis**: Allows quick sharing of translations between projects
 - **User Interface**: Clean, modern PyQt6 interface with tabbed views and dedicated translation windows
 
 ## Installation

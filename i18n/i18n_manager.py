@@ -1,6 +1,7 @@
 from datetime import datetime
 import glob
 import os
+import shutil
 import sys
 import time
 import re
@@ -252,6 +253,14 @@ class I18NManager():
 
     def get_po_file_path(self, locale):
         return os.path.join(self._directory, self._locale_dir, locale, "LC_MESSAGES", "base.po")
+    
+    def get_pot_file_path(self):
+        """Get the path to the POT file for this project.
+        
+        Returns:
+            str: Path to the POT file
+        """
+        return os.path.join(self._directory, self._locale_dir, "base.pot")
 
     def gather_files(self):
         POT_files = glob.glob(os.path.join(self._directory, "*.pot"))
@@ -720,7 +729,7 @@ msgstr ""
                 catalog.add(message, None, [(filename, lineno)], auto_comments=comments, context=context)
             
             # Write the catalog to a POT file
-            pot_file = os.path.join(locale_dir, "base.pot")
+            pot_file = self.get_pot_file_path()
             with open(pot_file, 'wb') as f:
                 write_po(f, catalog, width=120) # TODO make width setting configurable by project
             
@@ -810,6 +819,92 @@ msgstr ""
                     logger.error(f"Error processing file {file_path}: {e}")
                     
         return results
+
+    def check_translations_changed(self, include_stale_translations: bool = False) -> bool:
+        """Check if translations actually changed by comparing current state with a backup.
+        
+        This method creates a backup of the current POT file, generates a new one,
+        and compares the translation content to determine if there are actual changes
+        (ignoring timestamps and line number changes).
+        
+        Args:
+            include_stale_translations (bool): If True, consider stale translations
+                (translations that exist in current but not in new) as changes.
+                If False (default), only consider new or modified translations as changes.
+                
+        Returns:
+            bool: True if translations changed, False otherwise
+        """
+        try:
+            # Get current POT file path
+            pot_file_path = self.get_pot_file_path()
+            
+            # Check if POT file exists
+            if not os.path.exists(pot_file_path):
+                # No existing POT file, so any generation would be a change
+                return True
+                
+            # Create backup of current POT file
+            backup_pot_path = pot_file_path + ".backup"
+            shutil.copy2(pot_file_path, backup_pot_path)
+            
+            # Store current translations for comparison
+            current_translations = self.translations.copy()
+            
+            # Generate new POT file
+            if not self.generate_pot_file():
+                logger.error("Failed to generate POT file for comparison")
+                return True
+            
+            # Parse the new POT file
+            new_results = self.manage_translations()
+            if not new_results.action_successful:
+                logger.error(f"Failed to parse newly generated POT file: {new_results.error_message}")
+                return True
+            
+            new_translations = self.translations
+            
+            # Compare the translation sets
+            new_msgids = set(new_translations.keys())
+            current_msgids = set(current_translations.keys())
+            
+            # Check for new translations (in new but not in current)
+            new_translations_only = new_msgids - current_msgids
+            if new_translations_only:
+                logger.debug(f"Found {len(new_translations_only)} new translations")
+                return True
+            
+            # Check for stale translations (in current but not in new) if requested
+            if include_stale_translations:
+                stale_translations = current_msgids - new_msgids
+                if stale_translations:
+                    logger.debug(f"Found {len(stale_translations)} stale translations")
+                    return True
+            
+            # Check if any existing translations have changed their content
+            for msgid in current_msgids:
+                if msgid in new_msgids:
+                    new_group = new_translations[msgid]
+                    current_group = current_translations[msgid]
+                    
+                    # Compare actual translation values (not metadata)
+                    if current_group.has_translation_changes(new_group):
+                        logger.debug(f"Translation values changed for msgid '{msgid}'")
+                        return True
+            
+            logger.debug("No actual translation content changes detected")
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error checking translation changes: {e}")
+            return True  # Assume changed if comparison fails
+        finally:
+            # Clean up backup file
+            if 'backup_pot_path' in locals() and os.path.exists(backup_pot_path):
+                try:
+                    os.remove(backup_pot_path)
+                except Exception as e:
+                    logger.warning(f"Failed to clean up backup file {backup_pot_path}: {e}")
 
     def _find_python_i18n_tool(self, tool_name: str) -> str:
         """Find a valid Python i18n tool script.

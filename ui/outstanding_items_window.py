@@ -8,11 +8,13 @@ from PyQt6.QtWidgets import QApplication
 from lib.translation_service import TranslationService
 from utils.config import ConfigManager
 from utils.globals import TranslationStatus
+from utils.logging_setup import get_logger
 from utils.translations import I18N
-from utils.utils import Utils
 from ui.base_translation_window import BaseTranslationWindow
 
 _ = I18N._
+
+logger = get_logger(__name__)
 
 class MultilineItemDelegate(QStyledItemDelegate):
     """A delegate that supports multiline editing in table cells."""
@@ -256,7 +258,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             except Exception as e:
                 if attempt == 0:  # First attempt failed, will retry
                     continue
-                print(f"Translation failed for {msgid} to {locale}: {e}")
+                logger.error(f"Translation failed for {msgid} to {locale}: {e}")
 
     def translate_all_missing(self):
         """Translate all missing items."""
@@ -382,33 +384,33 @@ class OutstandingItemsWindow(BaseTranslationWindow):
     def save_changes(self):
         """Save changes to the translations."""
         try:
-            Utils.log("Starting save changes process...")
+            logger.debug("Starting save changes process...")
             
             # Store current column widths
             column_widths = [self.table.columnWidth(i) for i in range(self.table.columnCount())]
             
             # First, ensure translation service is cleaned up
             if hasattr(self, 'translation_service'):
-                Utils.log("Cleaning up translation service...")
+                logger.debug("Cleaning up translation service...")
                 try:
                     if hasattr(self.translation_service, '_executor'):
-                        Utils.log("Shutting down translation service executor...")
+                        logger.debug("Shutting down translation service executor...")
                         self.translation_service._executor.shutdown(wait=True)
                     if hasattr(self.translation_service, 'llm'):
-                        Utils.log("Cleaning up LLM instance...")
+                        logger.debug("Cleaning up LLM instance...")
                         if hasattr(self.translation_service.llm, '_loop'):
                             self.translation_service.llm._loop.close()
-                    Utils.log("Deleting translation service...")
+                    logger.debug("Deleting translation service...")
                     del self.translation_service
                     
                     # Reinitialize translation service
-                    Utils.log("Reinitializing translation service...")
+                    logger.debug("Reinitializing translation service...")
                     default_locale = self.config.get('translation.default_locale', 'en')
                     self.translation_service = TranslationService(default_locale=default_locale)
                 except Exception as e:
-                    Utils.log_red(f"Error during translation service cleanup/reinitialization: {e}")
+                    logger.error(f"Error during translation service cleanup/reinitialization: {e}")
             
-            Utils.log("Processing table changes...")
+            logger.debug("Processing table changes...")
             # Collect all changes first, grouped by locale
             changes_by_locale = {}
             has_remaining_empty = False
@@ -425,7 +427,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                         new_value = item.text()
                         # Only include if the value is non-empty
                         if len(new_value) > 0:
-                            Utils.log(f"Collecting translation update for {msgid} in {locale}")
+                            logger.debug(f"Collecting translation update for {msgid} in {locale}")
                             if locale not in changes_by_locale:
                                 changes_by_locale[locale] = []
                             changes_by_locale[locale].append((msgid, new_value))
@@ -433,16 +435,16 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                             row_complete = False
                             has_remaining_empty = True
                             if len(item.text()) > 0:
-                                Utils.log_yellow(f"Empty translation with spaces for {msgid} in {locale}")
+                                logger.warn(f"Empty translation with spaces for {msgid} in {locale}")
                 
                 # If all cells in this row have translations, mark it for removal
                 if row_complete:
                     rows_to_remove.append(row)
             
             # Emit one batch per locale
-            Utils.log(f"Emitting batches for {len(changes_by_locale)} locales...")
+            logger.debug(f"Emitting batches for {len(changes_by_locale)} locales...")
             for i, (locale, changes) in enumerate(changes_by_locale.items()):
-                Utils.log(f"Emitting batch of {len(changes)} updates for locale {locale}")
+                logger.debug(f"Emitting batch of {len(changes)} updates for locale {locale}")
                 self.translation_updated.emit(locale, changes)
                 if i < len(changes_by_locale) - 1:  # Don't sleep after the last one
                     QThread.msleep(100)  # 100ms delay between locales
@@ -457,13 +459,13 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             
             # Only close the dialog if there are no remaining empty translations
             if has_remaining_empty:
-                Utils.log("There are still empty translations remaining...")
+                logger.warn("There are still empty translations remaining...")
             else:
-                Utils.log("No remaining empty translations, accepting dialog...")
+                logger.debug("No remaining empty translations, accepting dialog...")
                 self.accept()
                 
         except Exception as e:
-            Utils.log_red(f"Error during save changes: {e}")
+            logger.error(f"Error during save changes: {e}")
             QMessageBox.critical(self, "Error", f"Failed to save changes: {e}")
 
     def update_table_display(self):

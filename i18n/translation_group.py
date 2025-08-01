@@ -355,6 +355,36 @@ class TranslationGroup():
                 
         return invalid_newline_locales
 
+    def has_translation_changes(self, other: 'TranslationGroup') -> bool:
+        """Compare this translation group with another to check if translations have changed.
+        
+        This method compares the actual translation values, ignoring metadata like
+        occurrences, comments, etc. Only changes to the actual translation strings
+        are considered meaningful changes.
+        
+        Args:
+            other (TranslationGroup): The other translation group to compare with
+            
+        Returns:
+            bool: True if any translation values have changed, False otherwise
+        """
+        # Check if the msgid is the same
+        if self.key != other.key:
+            return True
+        
+        # Get all unique locales from both groups
+        all_locales = set(self.values.keys()) | set(other.values.keys())
+        
+        # Compare translation values for each locale
+        for locale in all_locales:
+            self_translation = self.get_translation(locale)
+            other_translation = other.get_translation(locale)
+            
+            if self_translation != other_translation:
+                return True
+        
+        return False
+
     def fix_ensure_encoded_unicode(self, invalid_locales):
         for locale in self.values:
             if locale in invalid_locales:
