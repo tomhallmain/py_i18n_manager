@@ -1,0 +1,83 @@
+# Example babel.cfg file for i18n Translation Manager
+# This file configures Babel to extract translatable strings from multiple file formats
+#
+# Two formats are supported:
+# 1. Standard format: [extractors] section with pattern = extractor
+# 2. Alternative format: [extractor: pattern] sections
+
+# =============================================================================
+# FORMAT 1: Standard [extractors] format
+# =============================================================================
+
+[extractors]
+# Python files - extract from gettext functions
+*.py = python
+
+# JavaScript files - extract from various i18n functions
+*.js = javascript
+
+# HTML files - extract from text content and attributes
+*.html = html
+
+# XML files - extract from text content
+*.xml = xml
+
+# JSON files - extract from string values
+*.json = json
+
+# Jinja2 templates - extract from template content
+*.jinja = jinja2
+*.j2 = jinja2
+
+# =============================================================================
+# FORMAT 2: Alternative [extractor: pattern] format
+# =============================================================================
+# Uncomment the lines below to use the alternative format instead
+
+# [python: **.py]
+# [javascript: **.js]
+# [html: **.html]
+# [xml: **.xml]
+# [json: **.json]
+# [jinja2: **/templates/**.html]
+# [jinja2: **.jinja]
+# [jinja2: **.j2]
+
+# =============================================================================
+# EXTRACTION CONFIGURATION (optional)
+# =============================================================================
+# These sections configure what functions/keywords to extract from each file type
+
+# JavaScript extraction configuration
+[javascript:extract_from_file]
+# Extract from common JavaScript i18n functions
+*.js = i18n.tr
+*.js = gettext
+*.js = _tr
+*.js = t
+*.js = translate
+
+# HTML extraction configuration
+[html:extract_from_file]
+# Extract from HTML attributes and text content
+*.html = i18n.tr
+*.html = gettext
+*.html = _tr
+*.html = t
+*.html = translate
+
+# Jinja2 extraction configuration
+[jinja2:extract_from_file]
+# Extract from Jinja2 template functions
+*.jinja = gettext
+*.jinja = ngettext
+*.j2 = gettext
+*.j2 = ngettext
+
+# Python extraction configuration (default keywords)
+[python:extract_from_file]
+*.py = gettext
+*.py = ngettext
+*.py = _
+*.py = _l
+*.py = lazy_gettext 

@@ -685,10 +685,175 @@ msgstr ""
             bool: True if successful, False otherwise
         """
         try:
-            # Get the project root directory (one level up from locale dir if needed)
-            project_dir = self._directory
-            if project_dir.endswith(self._locale_dir):
-                project_dir = os.path.dirname(project_dir)
+            # Check if we should use Babel configuration
+            if self._get_babel_cfg_path() != "":
+                return self._generate_pot_file_with_babel()
+            else:
+                return self._generate_pot_file_with_default()
+        except Exception as e:
+            logger.error(f"Error generating POT file: {e}")
+            return False
+
+    def _get_project_root(self) -> str:
+        """Get the project root directory (one level up from locale dir if needed)
+        
+        Returns:
+            str: Project root directory path
+        """
+        project_dir = self._directory
+        if project_dir.endswith(self._locale_dir):
+            project_dir = os.path.dirname(project_dir)
+        return project_dir
+
+    def _get_babel_cfg_path(self) -> str:
+        """Get the path to a valid babel.cfg file, or empty string if none found.
+        
+        Returns:
+            str: Path to babel.cfg file or empty string if not found
+        """
+        project_dir = self._get_project_root()
+        
+        # Check for auto-detected babel.cfg in project root
+        auto_detected_path = os.path.join(project_dir, "babel.cfg")
+        if os.path.exists(auto_detected_path):
+            logger.info(f"Found babel.cfg file: {auto_detected_path}")
+            return auto_detected_path
+            
+        # Check for configured path in settings
+        if self.settings_manager:
+            configured_path = self.settings_manager.get_project_setting(
+                self._directory, 'babel_cfg_path', ''
+            )
+            if configured_path and os.path.exists(configured_path):
+                logger.info(f"Using configured babel.cfg file: {configured_path}")
+                return configured_path
+                
+        return ""
+
+    def _create_catalog(self) -> Catalog:
+        """Create a new Babel catalog with current project metadata.
+        
+        Returns:
+            Catalog: New Babel catalog instance
+        """
+        now = datetime.now()
+        return Catalog(
+            project=self.intro_details["application_name"],
+            version=self.intro_details["version"],
+            copyright_holder=self.intro_details["first_author"],
+            msgid_bugs_address=self.intro_details["last_translator"],
+            creation_date=now,
+            revision_date=now
+        )
+
+    def _write_pot_file(self, catalog: Catalog, method_name: str) -> bool:
+        """Write a catalog to a POT file with post-processing.
+        
+        Args:
+            catalog (Catalog): Babel catalog to write
+            method_name (str): Name of the method for logging
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Write the catalog to a POT file
+            pot_file = self.get_pot_file_path()
+            with open(pot_file, 'wb') as f:
+                write_po(f, catalog, width=120)
+            
+            # Post-process the file to remove format flag lines
+            # TODO this is a hack to remove the format flag lines, it's not the right
+            # long-term solution, but it's a quick fix.
+            with open(pot_file, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            # Filter out lines that start with "#, " and write back to the file
+            with open(pot_file, 'w', encoding='utf-8') as f:
+                for line in lines:
+                    if not line.startswith('#, '):
+                        f.write(line)
+            
+            logger.info(f"Successfully generated base.pot file with {method_name}: {len(catalog)} entries")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error writing POT file: {e}")
+            return False
+
+    def _generate_pot_file_with_babel(self) -> bool:
+        """Generate POT file using Babel configuration file.
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            import configparser
+            
+            babel_cfg_path = self._get_babel_cfg_path()
+            if not babel_cfg_path:
+                logger.error("No babel.cfg file found")
+                return False
+                
+            project_dir = self._get_project_root()
+            
+            # Ensure locale directory exists
+            locale_dir = os.path.join(project_dir, self._locale_dir)
+            os.makedirs(locale_dir, exist_ok=True)
+            
+            logger.info(f"Generating POT file using Babel config: {babel_cfg_path}")
+            
+            # Parse babel.cfg file to get method_map
+            config = configparser.ConfigParser()
+            config.read(babel_cfg_path)
+            
+            # Build method_map from babel.cfg
+            method_map = []
+            
+            # Check for [extractors] section (standard format)
+            if 'extractors' in config:
+                for pattern, extractor in config['extractors'].items():
+                    method_map.append((pattern, extractor))
+            
+            # Check for [extractor: pattern] format (alternative format)
+            for section_name in config.sections():
+                if ':' in section_name:
+                    # Format: [python: **.py] -> extractor=python, pattern=**.py
+                    extractor, pattern = section_name.split(':', 1)
+                    method_map.append((pattern.strip(), extractor.strip()))
+            
+            # If no extractors found, fall back to Python-only
+            if not method_map:
+                logger.warning("No extractors found in babel.cfg, falling back to Python-only")
+                method_map = [('**.py', 'python')]
+            
+            # Create catalog and extract messages
+            catalog = self._create_catalog()
+            
+            # Extract messages using Babel configuration
+            for filename, lineno, message, comments, context in extract_from_dir(
+                project_dir,
+                method_map=method_map,
+                keywords={'_': None, 'gettext': None, 'ngettext': (1, 2)},
+                comment_tags=('TRANSLATORS:',),
+                strip_comment_tags=True
+            ):
+                catalog.add(message, None, [(filename, lineno)], auto_comments=comments, context=context)
+            
+            return self._write_pot_file(catalog, "Babel config")
+            
+        except Exception as e:
+            logger.error(f"Error generating POT file with Babel: {e}")
+            return False
+
+    def _generate_pot_file_with_default(self) -> bool:
+        """Generate POT file using the default method (current implementation).
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            project_dir = self._get_project_root()
                 
             # Ensure locale directory exists
             locale_dir = os.path.join(project_dir, self._locale_dir)
@@ -696,16 +861,8 @@ msgstr ""
             
             logger.info(f"Generating POT file in directory: {project_dir}")
             
-            # Create a new catalog
-            now = datetime.now()
-            catalog = Catalog(
-                project=self.intro_details["application_name"],
-                version=self.intro_details["version"],
-                copyright_holder=self.intro_details["first_author"],
-                msgid_bugs_address=self.intro_details["last_translator"],
-                creation_date=now,
-                revision_date=now
-            )
+            # Create catalog and extract messages
+            catalog = self._create_catalog()
             
             # Extract messages from Python files
             for filename, lineno, message, comments, context in extract_from_dir(
@@ -728,29 +885,26 @@ msgstr ""
             ):
                 catalog.add(message, None, [(filename, lineno)], auto_comments=comments, context=context)
             
-            # Write the catalog to a POT file
-            pot_file = self.get_pot_file_path()
-            with open(pot_file, 'wb') as f:
-                write_po(f, catalog, width=120) # TODO make width setting configurable by project
-            
-            # Post-process the file to remove format flag lines
-            # TODO this is a hack to remove the format flag lines, it's not the right
-            # long-term solution, but it's a quick fix.
-            with open(pot_file, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-            
-            # Filter out lines that start with "#, " and write back
-            with open(pot_file, 'w', encoding='utf-8') as f:
-                for line in lines:
-                    if not line.startswith('#, '):
-                        f.write(line)
-            
-            logger.info(f"Successfully generated base.pot file with {len(catalog)} entries")
-            return True
+            return self._write_pot_file(catalog, "default method")
                 
         except Exception as e:
             logger.error(f"Error generating POT file: {e}")
             return False
+
+    def set_babel_cfg_path(self, babel_cfg_path: str) -> bool:
+        """Set the path to the babel.cfg file for this project.
+        
+        Args:
+            babel_cfg_path (str): Path to the babel.cfg file
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if self.settings_manager:
+            return self.settings_manager.save_project_setting(
+                self._directory, 'babel_cfg_path', babel_cfg_path
+            )
+        return False
 
     def find_translatable_strings(self):
         """Find potential hardcoded strings in Python files that might need translation.
@@ -764,9 +918,7 @@ msgstr ""
             dict: A dictionary mapping filenames to lists of potential translatable strings
         """
         # Get the project root directory
-        project_dir = self._directory
-        if project_dir.endswith(self._locale_dir):
-            project_dir = os.path.dirname(project_dir)
+        project_dir = self._get_project_root()
             
         # Patterns that suggest UI text
         ui_patterns = [

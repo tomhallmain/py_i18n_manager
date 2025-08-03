@@ -8,6 +8,7 @@ A PyQt6-based desktop application for managing internationalization (i18n) trans
 - **Translation Statistics**: Track total translations, locales, missing translations, and various validation metrics
 - **Translation Management**: View/edit translations, update PO files, create MO files
 - **Quality Control**: Real-time validation of translations including Unicode, format strings, braces, spaces, and newlines
+- **Babel Support**: Automatic detection and use of `babel.cfg` files for enhanced POT generation across multiple file formats
 - **Bulk Project Analysis**: Quickly determine which projects need translation updates
 - **Cross Project Analysis**: Allows quick sharing of translations between projects
 - **User Interface**: Clean, modern PyQt6 interface with tabbed views and dedicated translation windows
@@ -54,6 +55,43 @@ The application supports both common directory structures for i18n projects:
 - `locales/` - An alternative structure used by some projects
 
 The application will automatically detect which directory structure is being used in your project and adapt accordingly. If both directories exist, it will default to using the `locale/` directory.
+
+## Babel Configuration Support
+
+The application automatically detects and uses `babel.cfg` files for enhanced POT generation. When a `babel.cfg` file is found in your project root, the application will use Babel's configuration to extract translatable strings from multiple file formats beyond just Python files.
+
+### How it works:
+1. **Automatic Detection**: The application automatically looks for a `babel.cfg` file in your project root directory
+2. **Enhanced Extraction**: When found, Babel's configuration is used to extract strings from all file types specified in the config
+3. **Fallback**: If no `babel.cfg` file is found, the application falls back to the default Python-only extraction method
+4. **Configuration**: You can also manually specify a custom path to a `babel.cfg` file through project settings
+
+### Example babel.cfg file:
+```ini
+[extractors]
+*.py = python
+*.js = javascript
+*.html = html
+*.xml = xml
+*.json = json
+
+[javascript:extract_from_file]
+*.js = i18n.tr
+*.js = gettext
+
+[html:extract_from_file]
+*.html = i18n.tr
+*.html = gettext
+```
+
+This allows you to extract translatable strings from JavaScript, HTML, XML, JSON, and other file formats in addition to Python files.
+
+A complete example `babel.cfg` file is provided as `babel.cfg.example` in the project root.
+
+You can test the Babel integration by running:
+```bash
+python test_babel_integration.py
+```
 
 # Limitations
 
