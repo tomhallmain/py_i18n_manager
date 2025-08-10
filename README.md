@@ -5,6 +5,7 @@ A PyQt6-based desktop application for managing internationalization (i18n) trans
 ## Features
 
 - **Project Management**: Select and manage multiple translation projects with automatic state persistence
+- **Multi-Language Support**: Support for Python and Ruby projects with automatic project type detection
 - **Translation Statistics**: Track total translations, locales, missing translations, and various validation metrics
 - **Translation Management**: View/edit translations, update PO files, create MO files
 - **Quality Control**: Real-time validation of translations including Unicode, format strings, braces, spaces, and newlines

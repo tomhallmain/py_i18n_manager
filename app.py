@@ -17,6 +17,7 @@ from ui.recent_projects_dialog import RecentProjectsDialog
 from ui.setup_translation_project_window import SetupTranslationProjectWindow
 from ui.stats_widget import StatsWidget
 from utils.logging_setup import get_logger
+from utils.project_detector import ProjectDetector
 from utils.settings_manager import SettingsManager
 from utils.translations import I18N
 from workers.translation_worker import TranslationWorker
@@ -214,6 +215,18 @@ class MainWindow(QMainWindow):
         self.project_label.setText(project_name)
         self.update_window_title(project_name)
         self.update_button_states()
+
+        # Detect and save project type if not already saved
+        saved_project_type = self.settings_manager.get_project_type(directory)
+        if not saved_project_type:
+            detected_type = ProjectDetector.detect_project_type(directory)
+            if detected_type:
+                self.settings_manager.save_project_type(directory, detected_type.value)
+                logger.info(f"Detected and saved project type: {detected_type.value} for {directory}")
+            else:
+                # Default to Python if detection fails
+                self.settings_manager.save_project_type(directory, "python")
+                logger.warning(f"Could not detect project type for {directory}, defaulting to Python")
 
         # Save the selected project
         self.settings_manager.save_last_project(directory)

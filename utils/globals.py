@@ -21,6 +21,39 @@ class WorkflowType(Enum):
 class Language(Enum):
     PYTHON = "Python"
 
+class ProjectType(Enum):
+    """Enum for different project types that support internationalization."""
+    PYTHON = "python"
+    RUBY = "ruby"
+    
+    def get_display_name(self) -> str:
+        """Get the display name for this project type.
+        
+        Returns:
+            str: The display name
+        """
+        if self == ProjectType.PYTHON:
+            return _("Python")
+        elif self == ProjectType.RUBY:
+            return _("Ruby")
+        return self.value
+    
+    @classmethod
+    def from_display_name(cls, display_name: str) -> 'ProjectType':
+        """Get the enum value from a display name.
+        
+        Args:
+            display_name: The display name to match
+            
+        Returns:
+            ProjectType: The matching enum value
+        """
+        if display_name == _("Python"):
+            return cls.PYTHON
+        elif display_name == _("Ruby"):
+            return cls.RUBY
+        raise ValueError(f"Unknown project type: {display_name}")
+
 class TranslationStatus(Enum):
     """Enum for different translation status types."""
     MISSING = "Missing"

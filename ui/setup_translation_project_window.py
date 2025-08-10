@@ -4,9 +4,10 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
 from PyQt6.QtCore import Qt, pyqtSignal
 import os
 
-from utils.globals import valid_language_codes, valid_country_codes, valid_script_codes
+from utils.globals import valid_language_codes, valid_country_codes, valid_script_codes, ProjectType
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
+from utils.project_detector import ProjectDetector
 from utils.translations import I18N
 
 _ = I18N._
@@ -43,6 +44,18 @@ class SetupTranslationProjectWindow(QDialog):
             self.project_locales = project_locales
         else:
             self.project_locales = []
+            
+        # Load or detect project type
+        self.project_type = self.settings_manager.get_project_type(self.project_dir)
+        if not self.project_type:
+            # Detect project type if not saved
+            detected_type = ProjectDetector.detect_project_type(self.project_dir)
+            if detected_type:
+                self.project_type = detected_type.value
+                logger.debug(f"Detected project type: {self.project_type}")
+            else:
+                self.project_type = ProjectType.PYTHON.value  # Default to Python
+                logger.debug("Could not detect project type, defaulting to Python")
         
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -51,6 +64,18 @@ class SetupTranslationProjectWindow(QDialog):
         info_frame = QFrame()
         info_frame.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
         info_layout = QFormLayout(info_frame)
+        
+        # Project type selection
+        self.project_type_combo = QComboBox()
+        for project_type in ProjectType:
+            self.project_type_combo.addItem(project_type.get_display_name(), project_type.value)
+        
+        # Set current project type
+        current_index = self.project_type_combo.findData(self.project_type)
+        if current_index >= 0:
+            self.project_type_combo.setCurrentIndex(current_index)
+        
+        info_layout.addRow(_("Project Type:"), self.project_type_combo)
         
         # Project details
         self.app_name = QLineEdit(self.intro_details.get("application_name", ""))
@@ -234,6 +259,7 @@ class SetupTranslationProjectWindow(QDialog):
             # Save project-specific settings
             self.settings_manager.save_project_default_locale(self.project_dir, self.default_locale.currentText())
             self.settings_manager.save_project_locales(self.project_dir, locales)
+            self.settings_manager.save_project_type(self.project_dir, self.project_type_combo.currentData())
             
             # Also save to global intro details for backward compatibility
             self.intro_details.update({

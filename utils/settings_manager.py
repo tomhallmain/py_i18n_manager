@@ -269,6 +269,29 @@ class SettingsManager:
         """
         return self.save_project_setting(project_path, 'locales', locales)
 
+    def get_project_type(self, project_path: str) -> Optional[str]:
+        """Get the project type for a specific project.
+        
+        Args:
+            project_path (str): Path to the project
+            
+        Returns:
+            Optional[str]: Project type if set, None otherwise
+        """
+        return self.get_project_setting(project_path, 'project_type')
+        
+    def save_project_type(self, project_path: str, project_type: str) -> bool:
+        """Save the project type for a specific project.
+        
+        Args:
+            project_path (str): Path to the project
+            project_type (str): Project type to save
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        return self.save_project_setting(project_path, 'project_type', project_type)
+
     def get_intro_details(self) -> dict[str, str]:
         """Get the intro details from the config.
         
