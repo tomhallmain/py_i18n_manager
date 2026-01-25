@@ -60,6 +60,10 @@ class RubyI18NManager(I18NManagerBase):
     def __init__(self, directory, locales=[], intro_details=None, settings_manager=None):
         logger.info(f"Initializing RubyI18NManager with directory: {directory}, locales: {locales}")
         super().__init__(directory, locales, intro_details, settings_manager)
+        # Track source files for each translation key: {key: {locale: source_file_path}}
+        self._source_files: dict[str, dict[str, str]] = {}
+        # Setup custom YAML representer to preserve quotes
+        self._setup_yaml_representer()
         
     @property
     def default_locale(self) -> str:
@@ -116,6 +120,7 @@ class RubyI18NManager(I18NManagerBase):
         self.translations: dict[str, TranslationGroup] = {}
         self.written_locales = set()
         self.locales = []
+        self._source_files = {}  # Reset source file tracking
         self.intro_details = {
             "first_author": "AUTHOR NAME <author@example.com>",
             "last_translator": "Translator Name <translator@example.com>",
@@ -125,6 +130,18 @@ class RubyI18NManager(I18NManagerBase):
         # Note: settings_manager is preserved when changing directory
         # Detect which directory structure is being used
         self._locale_dir = self._detect_locale_directory()
+    
+    def _setup_yaml_representer(self):
+        """Setup custom YAML representer to always quote string values."""
+        def str_presenter(dumper, data):
+            """Custom representer that always uses double quotes for strings."""
+            if '\n' in data:
+                # Multi-line strings use literal block style
+                return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+            # Single-line strings use double quotes
+            return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='"')
+        
+        yaml.add_representer(str, str_presenter)
 
     def create_mo_files(self, results: TranslationManagerResults):
         """Create compiled translation files.
@@ -289,8 +306,9 @@ class RubyI18NManager(I18NManagerBase):
     def gather_yaml_files(self) -> dict[str, list[str]]:
         """Gather all YAML translation files organized by locale.
         
-        In Rails, locales are subdirectories under config/locales/.
-        YAML files directly in config/locales/ (like devise.en.yml) are not locale directories.
+        Rails supports two structures:
+        1. Directory structure: config/locales/en/application.yml
+        2. Flat files: config/locales/en.yml, config/locales/devise.en.yml
         
         Returns:
             dict: Dictionary mapping locale codes to lists of YAML file paths
@@ -301,26 +319,50 @@ class RubyI18NManager(I18NManagerBase):
         if not os.path.exists(locale_dir):
             return yaml_files_by_locale
         
-        # Look for locale subdirectories (e.g., config/locales/en/, config/locales/es/)
-        # Ignore YAML files directly in config/locales/ (like devise.en.yml, en.yml)
+        # First, look for locale subdirectories (e.g., config/locales/en/, config/locales/es/)
         for item in os.listdir(locale_dir):
             item_path = os.path.join(locale_dir, item)
             
-            # Only process subdirectories (locales), not files
             if os.path.isdir(item_path) and not item.startswith('__'):
                 locale = item
                 # Find all YAML files in this locale directory
                 locale_yaml_files = list(Path(item_path).rglob("*.yml"))
                 
                 if locale_yaml_files:
-                    yaml_files_by_locale[locale] = [str(f) for f in locale_yaml_files]
-                    logger.debug(f"Found {len(locale_yaml_files)} YAML files for locale {locale}")
+                    if locale not in yaml_files_by_locale:
+                        yaml_files_by_locale[locale] = []
+                    yaml_files_by_locale[locale].extend([str(f) for f in locale_yaml_files])
+                    logger.debug(f"Found {len(locale_yaml_files)} YAML files in locale directory {locale}")
+        
+        # Second, look for flat YAML files directly in config/locales/
+        # Files like en.yml, devise.en.yml contain locale-specific translations
+        for item in os.listdir(locale_dir):
+            item_path = os.path.join(locale_dir, item)
+            
+            if os.path.isfile(item_path) and item.endswith('.yml'):
+                # Try to extract locale from filename
+                # Patterns: en.yml, devise.en.yml, en-GB.yml
+                base_name = os.path.splitext(item)[0]
+                
+                # Check for patterns like "devise.en" or just "en"
+                if '.' in base_name:
+                    # Pattern: devise.en -> locale is "en"
+                    parts = base_name.split('.')
+                    # Last part before .yml should be locale
+                    potential_locale = parts[-1]
                 else:
-                    logger.debug(f"Locale directory {locale} exists but has no YAML files")
-            else:
-                # Skip files directly in config/locales/ (they're not locale directories)
-                if os.path.isfile(item_path) and item.endswith('.yml'):
-                    logger.debug(f"Skipping YAML file directly in locales directory: {item} (not a locale)")
+                    # Pattern: en.yml -> locale is "en"
+                    potential_locale = base_name
+                
+                # Validate it looks like a locale code (2-5 chars, alphanumeric with possible dash/underscore)
+                if re.match(r'^[a-z]{2}([-_][A-Z]{2})?$', potential_locale, re.IGNORECASE):
+                    locale = potential_locale
+                    if locale not in yaml_files_by_locale:
+                        yaml_files_by_locale[locale] = []
+                    yaml_files_by_locale[locale].append(item_path)
+                    logger.debug(f"Found flat YAML file {item} for locale {locale}")
+                else:
+                    logger.debug(f"Skipping YAML file {item} - couldn't determine locale from filename")
         
         logger.info(f"Gathered YAML files for {len(yaml_files_by_locale)} locales: {list(yaml_files_by_locale.keys())}")
         return yaml_files_by_locale
@@ -341,6 +383,9 @@ class RubyI18NManager(I18NManagerBase):
         
         We flatten these to translation keys like "tasks.form.title" and use
         the locale as the key (e.g., "en").
+        
+        Also tracks source file paths for each translation key so we can update
+        the original files when writing.
         
         Args:
             yaml_files_by_locale: Dictionary mapping locale codes to lists of YAML file paths
@@ -365,6 +410,12 @@ class RubyI18NManager(I18NManagerBase):
                                 if key not in self.translations:
                                     group = TranslationGroup(key, is_in_base=True)
                                     self.translations[key] = group
+                                
+                                # Track source file for this key/locale
+                                if key not in self._source_files:
+                                    self._source_files[key] = {}
+                                self._source_files[key][default_locale] = yaml_file
+                                
                                 # Add the default locale translation
                                 value = self._get_nested_value(data[default_locale], key)
                                 if value:
@@ -390,6 +441,11 @@ class RubyI18NManager(I18NManagerBase):
                                         # Key exists in this locale but not in base
                                         group = TranslationGroup(key, is_in_base=False)
                                         self.translations[key] = group
+                                    
+                                    # Track source file for this key/locale
+                                    if key not in self._source_files:
+                                        self._source_files[key] = {}
+                                    self._source_files[key][locale] = yaml_file
                                     
                                     value = self._get_nested_value(data[locale], key)
                                     if value:
@@ -540,19 +596,35 @@ class RubyI18NManager(I18NManagerBase):
         (models, views, etc.) as per Rails i18n conventions.
         
         Args:
-            modified_locales (set[str]): Set of locales to update. If None, updates all locales.
+            modified_locales (set[str]): Set of locales to update. If None or empty, updates all locales.
             results (TranslationManagerResults): Results object to track failures
         """
-        locales_to_update = modified_locales or results.locale_statuses.keys()
+        # Determine which locales to update
+        if modified_locales:
+            # Use specified locales
+            locales_to_update = modified_locales
+        else:
+            # If no specific locales, update all locales that have translations in memory
+            # This includes locales from self.locales (parsed from files) and any locales
+            # that have translations in memory (e.g., newly added locales)
+            locales_to_update = set(self.locales)
+            # Also check for any locales that have translations in memory but aren't in self.locales
+            for key, group in self.translations.items():
+                if group.is_in_base:
+                    locales_to_update.update(group.values.keys())
+        
         successful_updates = []
         
         for locale in locales_to_update:
-            if locale in results.locale_statuses:
-                if self.write_locale_yaml_files(locale):
-                    successful_updates.append(locale)
-                    self.written_locales.add(locale)
-                else:
-                    results.failed_locales.append(locale)
+            # Write the locale even if it's not in results.locale_statuses
+            # (e.g., newly added locales that don't have files yet)
+            if self.write_locale_yaml_files(locale):
+                successful_updates.append(locale)
+                self.written_locales.add(locale)
+                logger.info(f"Successfully wrote YAML files for locale {locale}")
+            else:
+                results.failed_locales.append(locale)
+                logger.error(f"Failed to write YAML files for locale {locale}")
                     
         if results.failed_locales:
             results.extend_error_message(f"Failed to write YAML files for locales: {results.failed_locales}")
@@ -561,6 +633,7 @@ class RubyI18NManager(I18NManagerBase):
         if successful_updates:
             results.po_files_updated = True
             results.updated_locales = successful_updates
+            logger.info(f"Successfully updated YAML files for {len(successful_updates)} locales: {successful_updates}")
 
     def write_po_file(self, po_file, locale):
         """Write translations to a PO file for a specific locale using polib.
@@ -690,8 +763,8 @@ msgstr ""
     def write_locale_yaml_files(self, locale: str) -> bool:
         """Write YAML translation files for a specific locale.
         
-        Organizes translations into YAML files based on their namespace prefix
-        (e.g., "tasks.form.title" goes into tasks/_form.yml or tasks/form.yml).
+        Updates existing source files when available, otherwise creates new files
+        based on namespace heuristics. Preserves existing file structure.
         
         Args:
             locale (str): The locale code to write YAML files for
@@ -700,43 +773,108 @@ msgstr ""
             bool: True if successful, False otherwise
         """
         try:
-            locale_dir = os.path.join(self._directory, self._locale_dir, locale)
-            os.makedirs(locale_dir, exist_ok=True)
+            base_locale_dir = os.path.join(self._directory, self._locale_dir)
+            locale_dir = os.path.join(base_locale_dir, locale)
             
-            # Organize translations by file/namespace
-            translations_by_file = {}
+            # Check if we have flat files for this locale (en.yml directly in config/locales/)
+            flat_file = os.path.join(base_locale_dir, f"{locale}.yml")
+            has_flat_file = os.path.exists(flat_file)
+            
+            # For directory structure, create locale_dir if needed
+            if not has_flat_file and not os.path.exists(locale_dir):
+                os.makedirs(locale_dir, exist_ok=True)
+            
+            logger.debug(f"Writing YAML files for locale {locale}")
+            
+            # Organize translations by source file (or determined file)
+            translations_by_file = {}  # {file_path: {nested_dict}}
+            file_metadata = {}  # {file_path: {'is_flat': bool, 'original_data': dict}}
+            skipped_no_value = 0
+            skipped_not_in_base = 0
             
             for key, group in self.translations.items():
                 if not group.is_in_base:
+                    skipped_not_in_base += 1
                     continue
                 
                 # Get translation value for this locale
                 value = group.get_translation_unescaped(locale)
                 if not value:
+                    skipped_no_value += 1
                     continue
                 
-                # Determine which YAML file this key belongs to
-                file_path = self._determine_yaml_file_path(key, locale_dir)
+                # Determine target file - prefer source file if available
+                source_file = self._source_files.get(key, {}).get(locale)
+                if source_file and os.path.exists(source_file):
+                    # Use existing source file
+                    file_path = source_file
+                    # Check if it's a flat file (directly in config/locales/, not in locale subdirectory)
+                    file_dir = os.path.dirname(source_file)
+                    # Flat file is directly in config/locales/ (e.g., config/locales/en.yml)
+                    # Not flat if it's in a locale subdirectory (e.g., config/locales/en/application.yml)
+                    is_flat = (os.path.normpath(file_dir) == os.path.normpath(base_locale_dir))
+                else:
+                    # Determine new file path using heuristics
+                    # If we have a flat file for this locale, use it; otherwise use directory structure
+                    if has_flat_file:
+                        file_path = flat_file
+                        is_flat = True
+                    else:
+                        file_path = self._determine_yaml_file_path(key, locale_dir)
+                        is_flat = False
                 
+                # Load existing file content if it exists (to preserve structure)
                 if file_path not in translations_by_file:
                     translations_by_file[file_path] = {}
+                    file_metadata[file_path] = {'is_flat': is_flat, 'original_data': None}
+                    
+                    if os.path.exists(file_path):
+                        try:
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                existing_data = yaml.safe_load(f) or {}
+                                file_metadata[file_path]['original_data'] = existing_data
+                                # Extract existing translations for this locale
+                                if locale in existing_data and isinstance(existing_data[locale], dict):
+                                    translations_by_file[file_path] = existing_data[locale].copy()
+                                logger.debug(f"Loaded existing content from {file_path}")
+                        except Exception as e:
+                            logger.warning(f"Could not load existing content from {file_path}: {e}")
                 
-                # Add to nested structure
+                # Add/update translation in nested structure
                 self._add_to_nested_dict(translations_by_file[file_path], key, value)
+            
+            if not translations_by_file:
+                logger.warning(f"No translations to write for locale {locale} (skipped {skipped_no_value} with no value, {skipped_not_in_base} not in base)")
+                return True
             
             # Write each YAML file
             for file_path, data in translations_by_file.items():
-                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                # Ensure parent directory exists (but don't create locale/ for flat files)
+                file_dir = os.path.dirname(file_path)
+                if file_dir and file_dir != base_locale_dir:
+                    os.makedirs(file_dir, exist_ok=True)
                 
-                # Wrap in locale key for Rails i18n format
-                yaml_data = {locale: data}
+                metadata = file_metadata[file_path]
+                
+                # For flat files, preserve the entire structure (may have multiple locales)
+                if metadata['is_flat']:
+                    if metadata['original_data']:
+                        # Preserve existing structure and update just this locale
+                        yaml_data = metadata['original_data'].copy()
+                        yaml_data[locale] = data
+                    else:
+                        # New flat file, just create with this locale
+                        yaml_data = {locale: data}
+                else:
+                    # For directory structure, wrap in locale key
+                    yaml_data = {locale: data}
                 
                 with open(file_path, 'w', encoding='utf-8') as f:
                     yaml.dump(yaml_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
                 
-                logger.debug(f"Wrote YAML file: {file_path}")
+                logger.debug(f"Wrote YAML file: {file_path} ({len(data)} top-level keys, flat={metadata['is_flat']})")
             
-            logger.info(f"Successfully wrote {len(translations_by_file)} YAML files for locale {locale}")
+            logger.info(f"Successfully wrote {len(translations_by_file)} YAML files for locale {locale} (skipped {skipped_no_value} keys with no value)")
             return True
             
         except Exception as e:
