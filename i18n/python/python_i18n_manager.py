@@ -65,7 +65,7 @@ class PythonI18NManager(I18NManagerBase):
     MSGSTR = "msgstr"
 
     def __init__(self, directory, locales=[], intro_details=None, settings_manager=None):
-        logger.debug(f"Initializing PythonI18NManager with directory: {directory}, locales: {locales}")
+        logger.info(f"Initializing PythonI18NManager with directory: {directory}, locales: {locales}")
         super().__init__(directory, locales, intro_details, settings_manager)
         
     @property

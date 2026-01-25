@@ -5,10 +5,8 @@ import shutil
 import sys
 import time
 import re
-import polib
-from babel.messages.catalog import Catalog
-from babel.messages.extract import extract_from_dir
-from babel.messages.pofile import write_po
+import yaml
+from pathlib import Path
 
 from i18n.translation_group import TranslationGroup
 from ..translation_manager_results import TranslationManagerResults, TranslationAction, LocaleStatus
@@ -20,52 +18,47 @@ from utils.logging_setup import get_logger
 logger = get_logger("ruby_i18n_manager")
 
 class RubyI18NManager(I18NManagerBase):
-    """Manages the Ruby internationalization (i18n) workflow for translation files.
+    """Manages the Ruby/Rails internationalization (i18n) workflow for YAML translation files.
     
-    This manager supports Ruby projects using gettext-style internationalization.
-    It can handle both standard Ruby gettext usage and Rails i18n patterns.
+    This manager supports Ruby on Rails projects using the standard Rails i18n YAML format.
+    Rails i18n uses YAML files organized in config/locales/ with nested key structures.
     
-    The workflow for managing Ruby translations consists of several steps:
+    The workflow for managing Ruby/Rails translations consists of several steps:
     
-    1. POT File Generation:
-       - Scan Ruby source files for translatable strings using Babel
-       - Generate base.pot file containing all extracted strings
-       - Each string becomes a msgid in the POT file
+    1. YAML File Structure:
+       - Translations are stored in YAML files under config/locales/
+       - Files are organized by namespace (models/, views/, etc.)
+       - Keys use dot notation (e.g., "tasks.form.title")
+       - Each locale has its own directory (e.g., config/locales/en/, config/locales/es/)
     
     2. Base Translation Set:
-       - Parse the POT file to establish the base set of translations
-       - Each msgid from POT becomes a TranslationGroup marked as 'in_base'
-       - This represents the current, valid set of strings needing translation
+       - Parse YAML files from the default locale to establish base translations
+       - Extract nested keys and flatten them (e.g., en.tasks.form.title -> "tasks.form.title")
+       - Each key becomes a TranslationGroup marked as 'in_base'
     
     3. Locale Translations:
-       - Parse existing PO files for each locale (e.g., fr/LC_MESSAGES/base.po)
-       - Each PO file may contain:
-         * Translations for current base strings
-         * Missing translations (empty msgstr)
-         * Stale translations (msgid not in current base)
-         * Invalid translations (Unicode/format string issues)
+       - Parse YAML files for each locale
+       - Track missing translations (keys in base but not in locale)
+       - Identify invalid translations (Unicode/format string issues)
+       - Support nested YAML structures
     
     4. Translation Management:
        - Track missing translations for each locale
        - Identify invalid Unicode sequences
-       - Identify invalid format string indices
+       - Identify invalid format string indices/braces
        - Allow user to fix/add translations via UI
     
-    5. PO File Updates:
-       - Write updated PO files for each locale
-       - Include only translations for current base strings
-       - Exclude stale translations not in current base
-       - Maintain proper headers and metadata
+    5. YAML File Updates:
+       - Write updated YAML files organized by namespace
+       - Maintain Rails i18n file structure (models/, views/, etc.)
+       - Preserve nested key structure in YAML format
     
-    The class provides methods to handle each step of this workflow and maintains
-    the state of translations in memory between file operations.
+    Note: For extracting translatable strings from Ruby/ERB source files,
+    consider using external tools like `i18n-tasks`.
     """
-    
-    MSGID = "msgid"
-    MSGSTR = "msgstr"
 
     def __init__(self, directory, locales=[], intro_details=None, settings_manager=None):
-        logger.debug(f"Initializing RubyI18NManager with directory: {directory}, locales: {locales}")
+        logger.info(f"Initializing RubyI18NManager with directory: {directory}, locales: {locales}")
         super().__init__(directory, locales, intro_details, settings_manager)
         
     @property
@@ -81,32 +74,35 @@ class RubyI18NManager(I18NManagerBase):
             return self.intro_details.get('translation.default_locale', 'en')
 
     def _detect_locale_directory(self):
-        """Detect which directory structure is being used (locale or locales).
+        """Detect which directory structure is being used for Rails i18n.
+        
+        Rails projects typically use config/locales for YAML translation files.
         
         Returns:
-            str: The name of the locale directory being used ('locale' or 'locales')
+            str: The path to the locales directory (e.g., 'config/locales')
         """
+        # Rails projects use config/locales
+        config_locales_dir = os.path.join(self._directory, "config", "locales")
+        
+        if os.path.exists(config_locales_dir):
+            logger.info("Using 'config/locales' directory structure (Rails i18n)")
+            return "config/locales"
+        
+        # Fallback: check for locale or locales at root (for non-Rails Ruby projects)
         locale_dir = os.path.join(self._directory, "locale")
         locales_dir = os.path.join(self._directory, "locales")
         
-        # Check if both directories exist
-        if os.path.exists(locale_dir) and os.path.exists(locales_dir):
-            logger.warning("Both 'locale' and 'locales' directories exist. Using 'locale' by default.")
-            return "locale"
-        
-        # Check if locale directory exists
-        if os.path.exists(locale_dir):
-            logger.info("Using 'locale' directory structure")
-            return "locale"
-        
-        # Check if locales directory exists
         if os.path.exists(locales_dir):
             logger.info("Using 'locales' directory structure")
             return "locales"
         
-        # If neither exists, default to 'locale'
-        logger.info("No locale directory found. Defaulting to 'locale' directory structure")
-        return "locale"
+        if os.path.exists(locale_dir):
+            logger.info("Using 'locale' directory structure")
+            return "locale"
+        
+        # Default to config/locales for Rails projects
+        logger.info("No locale directory found. Defaulting to 'config/locales' directory structure")
+        return "config/locales"
 
     def set_directory(self, directory):
         """Set a new project directory and reset translation state.
@@ -131,39 +127,77 @@ class RubyI18NManager(I18NManagerBase):
         self._locale_dir = self._detect_locale_directory()
 
     def create_mo_files(self, results: TranslationManagerResults):
-        for locale in results.locale_statuses:
-            if results.locale_statuses[locale].has_po_file:
-                if not self._create_mo_file(locale):
-                    results.failed_locales.append(locale)
-            else:
-                results.failed_locales.append(locale)
-        if results.failed_locales:
-            results.extend_error_message(f"Failed to create MO files for locales: {results.failed_locales}")
-
-    def _create_mo_file(self, locale: str):
-        """Create a MO file from a PO file using polib.
+        """Create compiled translation files.
+        
+        For Ruby/Rails projects, this is a no-op since Rails doesn't use
+        compiled MO files - it loads YAML files directly.
         
         Args:
-            locale (str): Locale code
-            
-        Returns:
-            bool: True if successful, False otherwise
+            results: Results object to track failures (unused for Ruby)
         """
-        try:
-            po_directory = os.path.join(self._directory, self._locale_dir, locale, "LC_MESSAGES")
-            po_file = os.path.join(po_directory, "base.po")
-            mo_file = os.path.join(po_directory, "base.mo")
-            
-            # Load PO file and save as MO
-            po = polib.pofile(po_file, encoding='utf-8')
-            po.save_as_mofile(mo_file)
-            
-            print("Created mo for locale " + locale)
-            return True
-            
-        except Exception as e:
-            print("Error while creating mo file for locale " + locale + ": " + str(e))
-            return False
+        logger.info("Rails projects don't use MO files - YAML files are loaded directly")
+        # No-op for Ruby/Rails projects
+
+    def _create_ruby_results(self, action: TranslationAction) -> 'TranslationManagerResults':
+        """Create TranslationManagerResults for Ruby/Rails YAML-based projects.
+        
+        For Ruby projects, we interpret:
+        - has_pot_file: True if locale directory exists and has any YAML files
+        - has_po_file: True if locale has YAML files
+        - has_mo_file: Always False (Rails doesn't use MO files)
+        """
+        from i18n.translation_manager_results import TranslationManagerResults, LocaleStatus
+        
+        locale_dir = os.path.join(self._directory, self._locale_dir)
+        has_locale = os.path.exists(locale_dir) and os.path.isdir(locale_dir)
+        
+        # Check if there are any YAML files (equivalent to "has POT file")
+        has_yaml_files = False
+        if has_locale:
+            yaml_files = list(Path(locale_dir).rglob("*.yml"))
+            has_yaml_files = len(yaml_files) > 0
+        
+        # Scan for locales (subdirectories in config/locales)
+        locale_statuses = {}
+        if has_locale:
+            for item in os.listdir(locale_dir):
+                full_path = os.path.join(locale_dir, item)
+                if os.path.isdir(full_path) and not item.startswith('__'):
+                    # Check if this locale directory has YAML files
+                    yaml_files = list(Path(full_path).rglob("*.yml"))
+                    has_yaml = len(yaml_files) > 0
+                    
+                    # Get the most recent modification time from YAML files
+                    last_mod = None
+                    if yaml_files:
+                        last_mod = datetime.fromtimestamp(max(os.path.getmtime(f) for f in yaml_files))
+                    
+                    # For Ruby, we use has_po_file to indicate YAML files exist
+                    status = LocaleStatus(
+                        locale_code=item,
+                        has_directory=True,
+                        has_po_file=has_yaml,  # YAML files = "PO files" for Ruby
+                        has_mo_file=False,    # Rails doesn't use MO files
+                        po_file_path=full_path if has_yaml else None,
+                        mo_file_path=None,
+                        last_modified=last_mod
+                    )
+                    locale_statuses[item] = status
+        
+        results = TranslationManagerResults(
+            project_dir=self._directory,
+            action=action,
+            action_timestamp=datetime.now(),
+            action_successful=True,
+            locale_statuses=locale_statuses,
+            failed_locales=[],
+            default_locale=self.default_locale,
+            has_locale_dir=has_locale,
+            has_pot_file=has_yaml_files,  # YAML files = "POT file" for Ruby
+            pot_file_path=locale_dir if has_yaml_files else None,
+            pot_last_modified=datetime.fromtimestamp(os.path.getmtime(locale_dir)) if has_locale else None,
+        )
+        return results
 
     def manage_translations(self, action: TranslationAction = TranslationAction.CHECK_STATUS, modified_locales: set[str] = None):
         """Manage translations based on the specified action.
@@ -175,34 +209,26 @@ class RubyI18NManager(I18NManagerBase):
         Returns:
             TranslationManagerResults: Results of the translation management operation.
         """
-        results = TranslationManagerResults.create(self._directory, action)
-        results.default_locale = self.default_locale
+        results = self._create_ruby_results(action)
         results.failed_locales = []
         results.action_successful = True
         
         try:
-            # Get POT and PO files
-            pot_file, po_files = self.gather_files()
-            logger.debug(f"Found POT file: {pot_file}")
-            logger.debug(f"Found PO files: {len(po_files)}")
-            
-            # TODO: Investigate false positives in status check after PO updates
-            # Possible causes to check:
-            # 1. Translation state not being properly reset between write and check
-            # 2. Cache/memory state of translations persisting after file updates
-            # 3. File system delays in updating PO files before status check
-            # 4. Stale translations not being properly purged after writes
-            # 5. Locale status tracking getting out of sync with file state
+            # Get YAML files for all locales
+            yaml_files_by_locale = self.gather_yaml_files()
+            logger.debug(f"Found YAML files for {len(yaml_files_by_locale)} locales")
             
             # Only parse files and fill translations during CHECK_STATUS
             if action == TranslationAction.CHECK_STATUS:
-                # Parse POT file if it exists
-                if results.has_pot_file:
-                    self._parse_pot(pot_file)
-                
-                # Parse existing PO files
+                # Parse YAML files to extract translations
                 if results.has_locale_dir:
-                    self._fill_translations(po_files)
+                    self._parse_yaml_files(yaml_files_by_locale)
+                    # Populate self.locales from the parsed YAML files
+                    # Only include actual locale directories (subdirectories), sorted
+                    self.locales = sorted(list(yaml_files_by_locale.keys()))
+                    logger.info(f"Populated {len(self.locales)} locales from YAML files: {self.locales}")
+                else:
+                    logger.warning("No locale directory found, cannot parse YAML files")
             
             # Update statistics
             if self.translations:
@@ -219,11 +245,12 @@ class RubyI18NManager(I18NManagerBase):
                     logger.debug("Applied fixes for invalid translations")
                 self.write_po_files(modified_locales, results)
             elif action == TranslationAction.WRITE_MO_FILES:
-                self.create_mo_files(results)
+                # Rails doesn't use MO files, so this is a no-op
+                logger.info("Rails projects don't use MO files, skipping")
             elif action == TranslationAction.GENERATE_POT:
                 if not self.generate_pot_file():
                     results.action_successful = False
-                    results.extend_error_message("Failed to generate POT file")
+                    results.extend_error_message("Failed to generate base translation structure")
             
             results.determine_action_successful()
             return results
@@ -231,54 +258,186 @@ class RubyI18NManager(I18NManagerBase):
         except Exception as e:
             results.action_successful = False
             results.error_message = str(e)
+            logger.error(f"Error in manage_translations: {e}", exc_info=True)
             return results
 
     def get_po_file_path(self, locale):
-        return os.path.join(self._directory, self._locale_dir, locale, "LC_MESSAGES", "base.po")
-    
-    def get_pot_file_path(self):
-        """Get the path to the POT file for this project.
+        """Get the path to the translation file for a specific locale.
         
-        Returns:
-            str: Path to the POT file
-        """
-        return os.path.join(self._directory, self._locale_dir, "base.pot")
-
-    def gather_files(self):
-        POT_files = glob.glob(os.path.join(self._directory, "*.pot"))
-        if len(POT_files) != 1:
-            locale_dir = os.path.join(self._directory, self._locale_dir)
-            if os.path.exists(locale_dir):
-                POT_files = glob.glob(os.path.join(locale_dir, "*.pot"))
-            if len(POT_files) != 1:
-                raise Exception("Invalid number of POT files found: " + str(len(POT_files)))
-        base_name = os.path.splitext(os.path.basename(POT_files[0]))[0]
-        search_dir = os.path.dirname(POT_files[0])  # Use the directory where POT was found
-        PO_files = glob.glob(os.path.join(search_dir, "**/*.po"), recursive=True)
-        i = 0
-        while i < len(PO_files):
-            if os.path.splitext(os.path.basename(PO_files[i]))[0] != base_name:
-                logger.warning(f"Invalid PO file found in directory: {os.path.basename(PO_files[i])}")
-                PO_files.remove(PO_files[i])
-            else:
-                i += 1
-        return POT_files[0], PO_files
-
-    def _parse_pot(self, POT):
-        """Parse a POT file using polib.
+        For Ruby/Rails projects, this returns the locale directory path
+        (YAML files are organized in subdirectories).
         
         Args:
-            POT (str): Path to the POT file
+            locale: Locale code
+            
+        Returns:
+            str: Path to the locale directory
         """
-        logger.debug(f"Parsing POT file: {POT}")
-        # Use include_obsolete=True and include_previous=True to ensure comments are parsed
-        po = polib.pofile(POT, encoding='utf-8', include_obsolete=True, include_previous=True)
-        logger.debug(f"Found {len(po)} entries in POT file")
+        return os.path.join(self._directory, self._locale_dir, locale)
+    
+    def get_pot_file_path(self):
+        """Get the path to the base translation directory.
         
-        for entry in po:
-            if entry.msgid and entry.msgid.strip():
-                group = TranslationGroup.from_polib_entry(entry, is_in_base=True)
-                self.translations[entry.msgid] = group
+        For Ruby/Rails projects, this returns the locales directory path
+        (equivalent to POT file location for gettext projects).
+        
+        Returns:
+            str: Path to the locales directory
+        """
+        return os.path.join(self._directory, self._locale_dir)
+
+    def gather_yaml_files(self) -> dict[str, list[str]]:
+        """Gather all YAML translation files organized by locale.
+        
+        In Rails, locales are subdirectories under config/locales/.
+        YAML files directly in config/locales/ (like devise.en.yml) are not locale directories.
+        
+        Returns:
+            dict: Dictionary mapping locale codes to lists of YAML file paths
+        """
+        locale_dir = os.path.join(self._directory, self._locale_dir)
+        yaml_files_by_locale = {}
+        
+        if not os.path.exists(locale_dir):
+            return yaml_files_by_locale
+        
+        # Look for locale subdirectories (e.g., config/locales/en/, config/locales/es/)
+        # Ignore YAML files directly in config/locales/ (like devise.en.yml, en.yml)
+        for item in os.listdir(locale_dir):
+            item_path = os.path.join(locale_dir, item)
+            
+            # Only process subdirectories (locales), not files
+            if os.path.isdir(item_path) and not item.startswith('__'):
+                locale = item
+                # Find all YAML files in this locale directory
+                locale_yaml_files = list(Path(item_path).rglob("*.yml"))
+                
+                if locale_yaml_files:
+                    yaml_files_by_locale[locale] = [str(f) for f in locale_yaml_files]
+                    logger.debug(f"Found {len(locale_yaml_files)} YAML files for locale {locale}")
+                else:
+                    logger.debug(f"Locale directory {locale} exists but has no YAML files")
+            else:
+                # Skip files directly in config/locales/ (they're not locale directories)
+                if os.path.isfile(item_path) and item.endswith('.yml'):
+                    logger.debug(f"Skipping YAML file directly in locales directory: {item} (not a locale)")
+        
+        logger.info(f"Gathered YAML files for {len(yaml_files_by_locale)} locales: {list(yaml_files_by_locale.keys())}")
+        return yaml_files_by_locale
+    
+    def gather_files(self):
+        """Legacy method for compatibility. For Ruby, use gather_yaml_files() instead."""
+        # This method is kept for interface compatibility but shouldn't be used for Ruby
+        raise NotImplementedError("Ruby projects use YAML files. Use gather_yaml_files() instead.")
+
+    def _parse_yaml_files(self, yaml_files_by_locale: dict[str, list[str]]):
+        """Parse YAML translation files and extract translations.
+        
+        Rails i18n uses nested YAML structures like:
+        en:
+          tasks:
+            form:
+              title: "Task Details"
+        
+        We flatten these to translation keys like "tasks.form.title" and use
+        the locale as the key (e.g., "en").
+        
+        Args:
+            yaml_files_by_locale: Dictionary mapping locale codes to lists of YAML file paths
+        """
+        logger.debug(f"Parsing YAML files for {len(yaml_files_by_locale)} locales")
+        
+        # Track which translation keys exist in the default locale (base)
+        default_locale = self.default_locale
+        base_keys = set()
+        
+        # First pass: parse default locale to establish base translations
+        if default_locale in yaml_files_by_locale:
+            for yaml_file in yaml_files_by_locale[default_locale]:
+                try:
+                    with open(yaml_file, 'r', encoding='utf-8') as f:
+                        data = yaml.safe_load(f)
+                        if data and default_locale in data:
+                            keys = self._extract_translation_keys(data[default_locale], prefix="")
+                            for key in keys:
+                                base_keys.add(key)
+                                # Create translation group if it doesn't exist
+                                if key not in self.translations:
+                                    group = TranslationGroup(key, is_in_base=True)
+                                    self.translations[key] = group
+                                # Add the default locale translation
+                                value = self._get_nested_value(data[default_locale], key)
+                                if value:
+                                    self.translations[key].add_translation(default_locale, value)
+                except Exception as e:
+                    logger.warning(f"Error parsing YAML file {yaml_file}: {e}")
+        
+        # Second pass: parse all other locales
+        for locale, yaml_files in yaml_files_by_locale.items():
+            if locale == default_locale:
+                continue  # Already processed
+            
+            for yaml_file in yaml_files:
+                try:
+                    with open(yaml_file, 'r', encoding='utf-8') as f:
+                        data = yaml.safe_load(f)
+                        if data and locale in data:
+                            keys = self._extract_translation_keys(data[locale], prefix="")
+                            for key in keys:
+                                # Only add translations for keys in base
+                                if key in base_keys or key in self.translations:
+                                    if key not in self.translations:
+                                        # Key exists in this locale but not in base
+                                        group = TranslationGroup(key, is_in_base=False)
+                                        self.translations[key] = group
+                                    
+                                    value = self._get_nested_value(data[locale], key)
+                                    if value:
+                                        self.translations[key].add_translation(locale, value)
+                except Exception as e:
+                    logger.warning(f"Error parsing YAML file {yaml_file}: {e}")
+        
+        logger.debug(f"Parsed {len(self.translations)} translation keys")
+    
+    def _extract_translation_keys(self, data: dict, prefix: str = "") -> list[str]:
+        """Recursively extract translation keys from nested YAML structure.
+        
+        Args:
+            data: Dictionary from YAML file
+            prefix: Current key prefix (for nested keys)
+            
+        Returns:
+            list: List of flattened translation keys (e.g., ["tasks.form.title"])
+        """
+        keys = []
+        for key, value in data.items():
+            full_key = f"{prefix}.{key}" if prefix else key
+            if isinstance(value, dict):
+                # Recursively extract keys from nested dictionaries
+                keys.extend(self._extract_translation_keys(value, full_key))
+            else:
+                # Leaf node - this is a translation key
+                keys.append(full_key)
+        return keys
+    
+    def _get_nested_value(self, data: dict, key: str) -> str:
+        """Get a value from nested dictionary using dot-notation key.
+        
+        Args:
+            data: Dictionary from YAML file
+            key: Dot-notation key (e.g., "tasks.form.title")
+            
+        Returns:
+            str: The translation value, or None if not found
+        """
+        parts = key.split('.')
+        current = data
+        for part in parts:
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            else:
+                return None
+        return str(current) if current is not None else None
 
     def get_msgid(self, line):
         msgid = line[7:-2]
@@ -292,10 +451,13 @@ class RubyI18NManager(I18NManagerBase):
     def _parse_po(self, PO, locale):
         """Parse a PO file using polib.
         
+        NOTE: This is a legacy method for POT/PO workflow. Not used in YAML workflow.
+        
         Args:
             PO (str): Path to the PO file
             locale (str): Locale code
         """
+        import polib
         logger.debug(f"Parsing PO file: {PO} for locale: {locale}")
         # Use include_obsolete=True and include_previous=True to ensure comments are parsed
         po = polib.pofile(PO, encoding='utf-8', include_obsolete=True, include_previous=True)
@@ -372,7 +534,10 @@ class RubyI18NManager(I18NManagerBase):
             self.write_po_file(PO, locale)
 
     def write_po_files(self, modified_locales: set[str], results: TranslationManagerResults):
-        """Write PO files for modified locales.
+        """Write YAML translation files for modified locales.
+        
+        For Ruby/Rails projects, this writes YAML files organized by namespace
+        (models, views, etc.) as per Rails i18n conventions.
         
         Args:
             modified_locales (set[str]): Set of locales to update. If None, updates all locales.
@@ -383,15 +548,16 @@ class RubyI18NManager(I18NManagerBase):
         
         for locale in locales_to_update:
             if locale in results.locale_statuses:
-                if self.write_locale_po_file(locale):
+                if self.write_locale_yaml_files(locale):
                     successful_updates.append(locale)
+                    self.written_locales.add(locale)
                 else:
                     results.failed_locales.append(locale)
                     
         if results.failed_locales:
-            results.extend_error_message(f"Failed to write PO files for locales: {results.failed_locales}")
+            results.extend_error_message(f"Failed to write YAML files for locales: {results.failed_locales}")
             
-        # Set flag if any PO files were successfully updated
+        # Set flag if any files were successfully updated
         if successful_updates:
             results.po_files_updated = True
             results.updated_locales = successful_updates
@@ -399,10 +565,13 @@ class RubyI18NManager(I18NManagerBase):
     def write_po_file(self, po_file, locale):
         """Write translations to a PO file for a specific locale using polib.
         
+        NOTE: This is a legacy method for POT/PO workflow. Not used in YAML workflow.
+        
         Args:
             po_file (str): Path to the PO file
             locale (str): Locale code
         """
+        import polib
         try:
             logger.debug(f"Starting to write PO file for locale {locale}: {po_file}")
             
@@ -518,42 +687,174 @@ msgstr ""
 
 '''
 
-    def write_locale_po_file(self, locale):
-        """Write the PO file for a specific locale.
+    def write_locale_yaml_files(self, locale: str) -> bool:
+        """Write YAML translation files for a specific locale.
+        
+        Organizes translations into YAML files based on their namespace prefix
+        (e.g., "tasks.form.title" goes into tasks/_form.yml or tasks/form.yml).
         
         Args:
-            locale (str): The locale code to write the PO file for
+            locale (str): The locale code to write YAML files for
             
         Returns:
             bool: True if successful, False otherwise
         """
         try:
-            po_file = self.get_po_file_path(locale)
-            if not os.path.exists(po_file):
-                logger.warning(f"PO file not found for locale {locale}: {po_file}")
-                return False
+            locale_dir = os.path.join(self._directory, self._locale_dir, locale)
+            os.makedirs(locale_dir, exist_ok=True)
+            
+            # Organize translations by file/namespace
+            translations_by_file = {}
+            
+            for key, group in self.translations.items():
+                if not group.is_in_base:
+                    continue
                 
-            self.write_po_file(po_file, locale)
+                # Get translation value for this locale
+                value = group.get_translation_unescaped(locale)
+                if not value:
+                    continue
+                
+                # Determine which YAML file this key belongs to
+                file_path = self._determine_yaml_file_path(key, locale_dir)
+                
+                if file_path not in translations_by_file:
+                    translations_by_file[file_path] = {}
+                
+                # Add to nested structure
+                self._add_to_nested_dict(translations_by_file[file_path], key, value)
+            
+            # Write each YAML file
+            for file_path, data in translations_by_file.items():
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                
+                # Wrap in locale key for Rails i18n format
+                yaml_data = {locale: data}
+                
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    yaml.dump(yaml_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                
+                logger.debug(f"Wrote YAML file: {file_path}")
+            
+            logger.info(f"Successfully wrote {len(translations_by_file)} YAML files for locale {locale}")
             return True
+            
         except Exception as e:
-            logger.error(f"Error writing PO file for locale {locale}: {e}")
+            logger.error(f"Error writing YAML files for locale {locale}: {e}", exc_info=True)
             return False
+    
+    def _determine_yaml_file_path(self, key: str, locale_dir: str) -> str:
+        """Determine which YAML file a translation key should be written to.
+        
+        Rails i18n organizes files by namespace:
+        - "tasks.form.title" -> tasks/_form.yml or tasks/form.yml
+        - "models.task.title" -> models/task.yml
+        - "priorities.leisure" -> priorities.yml or en.yml (root level)
+        
+        Args:
+            key: Translation key (e.g., "tasks.form.title")
+            locale_dir: Base directory for locale files
+            
+        Returns:
+            str: Full path to the YAML file
+        """
+        parts = key.split('.')
+        
+        # Simple heuristic: use first part as directory, rest as nested structure
+        if len(parts) >= 2:
+            # Check if first part is a known namespace (models, views, etc.)
+            namespace = parts[0]
+            if namespace in ['models', 'views', 'activerecord', 'activemodel']:
+                # For models/task.yml or views/tasks/_form.yml
+                if len(parts) >= 3:
+                    # views.tasks.form -> views/tasks/_form.yml
+                    subdir = parts[1]
+                    filename = parts[2] if len(parts) == 3 else 'form'
+                    return os.path.join(locale_dir, namespace, subdir, f"_{filename}.yml")
+                else:
+                    # models.task -> models/task.yml
+                    filename = parts[1]
+                    return os.path.join(locale_dir, namespace, f"{filename}.yml")
+            else:
+                # For other keys, put in a file named after the first part
+                filename = f"{parts[0]}.yml"
+                return os.path.join(locale_dir, filename)
+        else:
+            # Single-part key, put in application.yml or en.yml
+            return os.path.join(locale_dir, "application.yml")
+    
+    def _add_to_nested_dict(self, data: dict, key: str, value: str):
+        """Add a value to a nested dictionary using dot-notation key.
+        
+        Args:
+            data: Dictionary to add to
+            key: Dot-notation key (e.g., "tasks.form.title")
+            value: Value to set
+        """
+        parts = key.split('.')
+        current = data
+        
+        # Navigate/create nested structure
+        for part in parts[:-1]:
+            if part not in current:
+                current[part] = {}
+            current = current[part]
+        
+        # Set the final value
+        current[parts[-1]] = value
+    
+    def write_locale_po_file(self, locale):
+        """Legacy method name - redirects to write_locale_yaml_files().
+        
+        Args:
+            locale (str): The locale code
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        return self.write_locale_yaml_files(locale)
 
     def generate_pot_file(self):
-        """Generate the base.pot file using Babel.
-        TODO double check that polib doesn't actually support this out of the box
+        """Generate base translation structure for Ruby/Rails projects.
+        
+        For Rails projects, this creates/updates the default locale YAML files
+        based on existing translations. For full string extraction from Ruby/ERB files,
+        consider using tools like `i18n-tasks`.
         
         Returns:
             bool: True if successful, False otherwise
         """
         try:
-            # Check if we should use Babel configuration
-            if self._get_babel_cfg_path() != "":
-                return self._generate_pot_file_with_babel()
+            # For Ruby/Rails, "generating POT" means ensuring base locale structure exists
+            default_locale = self.default_locale
+            locale_dir = os.path.join(self._directory, self._locale_dir, default_locale)
+            
+            # If we have translations in memory, write them to the default locale
+            if self.translations:
+                logger.info(f"Writing base translation structure for locale {default_locale}")
+                return self.write_locale_yaml_files(default_locale)
             else:
-                return self._generate_pot_file_with_default()
+                # No translations in memory, create a basic structure
+                os.makedirs(locale_dir, exist_ok=True)
+                application_yml = os.path.join(locale_dir, "application.yml")
+                
+                if not os.path.exists(application_yml):
+                    # Create a basic application.yml file
+                    basic_data = {
+                        default_locale: {
+                            "application": {
+                                "name": "Application Name"
+                            }
+                        }
+                    }
+                    with open(application_yml, 'w', encoding='utf-8') as f:
+                        yaml.dump(basic_data, f, default_flow_style=False, allow_unicode=True)
+                    logger.info(f"Created basic application.yml for locale {default_locale}")
+                
+                return True
+                
         except Exception as e:
-            logger.error(f"Error generating POT file: {e}")
+            logger.error(f"Error generating base translation structure: {e}", exc_info=True)
             return False
 
     def _get_project_root(self) -> str:
@@ -592,12 +893,16 @@ msgstr ""
                 
         return ""
 
-    def _create_catalog(self) -> Catalog:
+    def _create_catalog(self):
         """Create a new Babel catalog with current project metadata.
         
+        NOTE: This is a legacy method for POT file generation. Not used in YAML workflow.
+        
         Returns:
-            Catalog: New Babel catalog instance
+            Babel Catalog: New Babel catalog instance
         """
+        # Legacy method - not used for YAML-based Ruby projects
+        from babel.messages.catalog import Catalog
         now = datetime.now()
         return Catalog(
             project=self.intro_details["application_name"],
@@ -608,7 +913,7 @@ msgstr ""
             revision_date=now
         )
 
-    def _write_pot_file(self, catalog: Catalog, method_name: str) -> bool:
+    def _write_pot_file(self, catalog, method_name: str) -> bool:
         """Write a catalog to a POT file with post-processing.
         
         Args:
@@ -620,6 +925,7 @@ msgstr ""
         """
         try:
             # Write the catalog to a POT file
+            from babel.messages.pofile import write_po
             pot_file = self.get_pot_file_path()
             with open(pot_file, 'wb') as f:
                 write_po(f, catalog, width=120)
@@ -693,6 +999,7 @@ msgstr ""
             catalog = self._create_catalog()
             
             # Extract messages using Babel configuration
+            from babel.messages.extract import extract_from_dir
             for filename, lineno, message, comments, context in extract_from_dir(
                 project_dir,
                 method_map=method_map,
@@ -727,6 +1034,7 @@ msgstr ""
             catalog = self._create_catalog()
             
             # Extract messages from Ruby files
+            from babel.messages.extract import extract_from_dir
             for filename, lineno, message, comments, context in extract_from_dir(
                 project_dir,
                 method_map=[('**.rb', 'ruby')],

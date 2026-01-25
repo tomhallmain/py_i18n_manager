@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QMessageBox, QFrame, QComboBox)
 from PyQt6.QtCore import Qt, pyqtSignal
 import os
+import yaml
 
 from utils.globals import valid_language_codes, valid_country_codes, valid_script_codes, ProjectType
 from utils.logging_setup import get_logger
@@ -154,13 +155,56 @@ class SetupTranslationProjectWindow(QDialog):
     def load_existing_locales(self):
         """Load existing locales from the project directory."""
         temp_locales = set()
-        locale_dir = os.path.join(self.project_dir, 'locale')
+        
+        # Determine locale directory based on project type
+        if self.project_type == ProjectType.RUBY.value:
+            # Ruby/Rails projects use config/locales/
+            locale_dir = os.path.join(self.project_dir, 'config', 'locales')
+        else:
+            # Python projects use locale/ or locales/
+            locale_dir = os.path.join(self.project_dir, 'locale')
+            if not os.path.exists(locale_dir):
+                locale_dir = os.path.join(self.project_dir, 'locales')
+        
         if os.path.exists(locale_dir):
             for item in os.listdir(locale_dir):
                 full_path = os.path.join(locale_dir, item)
+                # For Ruby, check if it's a directory with YAML files
+                # For Python, check if it's a directory (locale structure)
                 if os.path.isdir(full_path) and not item.startswith('__'):
-                    self.locales_list.addItem(item)
-                    temp_locales.add(item)
+                    if self.project_type == ProjectType.RUBY.value:
+                        # For Ruby, verify it has YAML files
+                        import glob
+                        yaml_files = glob.glob(os.path.join(full_path, '**', '*.yml'), recursive=True)
+                        if yaml_files:
+                            self.locales_list.addItem(item)
+                            temp_locales.add(item)
+                    else:
+                        # For Python, just check if it's a directory
+                        self.locales_list.addItem(item)
+                        temp_locales.add(item)
+        
+        # Also load from saved project locales if they exist
+        if self.project_locales:
+            for locale in self.project_locales:
+                if locale not in temp_locales:
+                    self.locales_list.addItem(locale)
+                    temp_locales.add(locale)
+        
+        # Ensure default locale is in the list if it exists in the filesystem
+        default_locale = self.intro_details.get("translation.default_locale", "en")
+        if default_locale and default_locale not in temp_locales:
+            # Check if default locale exists in filesystem
+            if self.project_type == ProjectType.RUBY.value:
+                default_locale_path = os.path.join(self.project_dir, 'config', 'locales', default_locale)
+            else:
+                default_locale_path = os.path.join(self.project_dir, 'locale', default_locale)
+            
+            if os.path.exists(default_locale_path):
+                self.locales_list.addItem(default_locale)
+                temp_locales.add(default_locale)
+                logger.debug(f"Added default locale {default_locale} from filesystem")
+        
         if temp_locales and self.project_locales:
             last_seen_set = set(self.project_locales)
             new_locales = temp_locales - last_seen_set
@@ -273,20 +317,46 @@ class SetupTranslationProjectWindow(QDialog):
             # Save to global settings for backward compatibility
             self.settings_manager.save_intro_details(self.intro_details)
             
-            # Create locale directories
-            locale_dir = os.path.join(self.project_dir, 'locale')
-            os.makedirs(locale_dir, exist_ok=True)
-            
-            for i in range(self.locales_list.count()):
-                locale_code = self.locales_list.item(i).text().strip()
-                locale_path = os.path.join(locale_dir, locale_code, 'LC_MESSAGES')
-                os.makedirs(locale_path, exist_ok=True)
+            # Create locale directories and files based on project type
+            if self.project_type_combo.currentData() == ProjectType.RUBY.value:
+                # Ruby/Rails projects: create config/locales/{locale}/ structure
+                locale_dir = os.path.join(self.project_dir, 'config', 'locales')
+                os.makedirs(locale_dir, exist_ok=True)
                 
-                # Create empty PO file if it doesn't exist
-                po_file = os.path.join(locale_path, 'base.po')
-                if not os.path.exists(po_file):
-                    with open(po_file, 'w', encoding='utf-8') as f:
-                        f.write(self.get_po_header(locale_code))
+                for i in range(self.locales_list.count()):
+                    locale_code = self.locales_list.item(i).text().strip()
+                    locale_path = os.path.join(locale_dir, locale_code)
+                    os.makedirs(locale_path, exist_ok=True)
+                    
+                    # Create a basic application.yml file if it doesn't exist
+                    import yaml
+                    application_yml = os.path.join(locale_path, 'application.yml')
+                    if not os.path.exists(application_yml):
+                        yaml_data = {
+                            locale_code: {
+                                "application": {
+                                    "name": self.app_name.text() or "Application Name"
+                                }
+                            }
+                        }
+                        with open(application_yml, 'w', encoding='utf-8') as f:
+                            yaml.dump(yaml_data, f, default_flow_style=False, allow_unicode=True)
+                        logger.info(f"Created application.yml for locale {locale_code}")
+            else:
+                # Python projects: create locale/{locale}/LC_MESSAGES/ structure
+                locale_dir = os.path.join(self.project_dir, 'locale')
+                os.makedirs(locale_dir, exist_ok=True)
+                
+                for i in range(self.locales_list.count()):
+                    locale_code = self.locales_list.item(i).text().strip()
+                    locale_path = os.path.join(locale_dir, locale_code, 'LC_MESSAGES')
+                    os.makedirs(locale_path, exist_ok=True)
+                    
+                    # Create empty PO file if it doesn't exist
+                    po_file = os.path.join(locale_path, 'base.po')
+                    if not os.path.exists(po_file):
+                        with open(po_file, 'w', encoding='utf-8') as f:
+                            f.write(self.get_po_header(locale_code))
             
             self.project_configured.emit()
             self.accept()

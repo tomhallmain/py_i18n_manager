@@ -43,6 +43,9 @@ class I18NManager(I18NManagerBase):
         if project_type is None:
             project_type = self._detect_project_type()
         
+        # Store the project type for comparison when directory changes
+        self._project_type = project_type
+        
         # Create the appropriate project-specific manager
         self._manager = self._create_manager(project_type, directory, locales, intro_details, settings_manager)
         
@@ -103,11 +106,25 @@ class I18NManager(I18NManagerBase):
     def _delegate_attributes(self):
         """Delegate all attributes to the underlying manager."""
         # Delegate all the main attributes
-        self.locales = self._manager.locales
-        self.translations = self._manager.translations
-        self.written_locales = self._manager.written_locales
+        # Note: locales, translations, and written_locales are dynamic and change
+        # during manage_translations(), so we use properties or __getattr__ for those
         self.intro_details = self._manager.intro_details
         self._locale_dir = self._manager._locale_dir
+    
+    @property
+    def locales(self):
+        """Get locales from the underlying manager."""
+        return getattr(self._manager, 'locales', [])
+    
+    @property
+    def translations(self):
+        """Get translations from the underlying manager."""
+        return getattr(self._manager, 'translations', {})
+    
+    @property
+    def written_locales(self):
+        """Get written locales from the underlying manager."""
+        return getattr(self._manager, 'written_locales', set())
     
     @property
     def default_locale(self) -> str:
@@ -119,14 +136,35 @@ class I18NManager(I18NManagerBase):
         return self._manager._detect_locale_directory()
     
     def set_directory(self, directory: str):
-        """Set a new project directory and reset translation state."""
+        """Set a new project directory and reset translation state.
+        
+        If the new directory has a different project type, the manager will be recreated.
+        """
         self._directory = directory
-        self._manager.set_directory(directory)
+        
+        # Detect project type for the new directory
+        new_project_type = self._detect_project_type()
+        
+        # If project type changed, recreate the manager
+        if new_project_type != self._project_type:
+            logger.info(f"Project type changed from {self._project_type.value} to {new_project_type.value}, recreating manager")
+            self._project_type = new_project_type
+            # Get current locales and intro_details from existing manager if available
+            locales = getattr(self._manager, 'locales', None)
+            intro_details = getattr(self._manager, 'intro_details', None)
+            self._manager = self._create_manager(new_project_type, directory, locales, intro_details, self.settings_manager)
+        else:
+            # Same project type, just update the directory
+            self._manager.set_directory(directory)
+        
         self._delegate_attributes()
     
     def manage_translations(self, action=None, modified_locales=None):
         """Manage translations based on the specified action."""
-        return self._manager.manage_translations(action, modified_locales)
+        result = self._manager.manage_translations(action, modified_locales)
+        # Refresh delegated attributes after manage_translations may have updated them
+        # (locales, translations, written_locales are now properties, so they're always current)
+        return result
     
     def get_po_file_path(self, locale: str) -> str:
         """Get the path to the PO file for a specific locale."""
