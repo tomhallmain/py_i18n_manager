@@ -171,17 +171,30 @@ class RubyI18NManager(I18NManagerBase):
     def _custom_yaml_dump(self, data, stream, original_content=None, **kwargs):
         """Custom YAML dumper that quotes values but not keys, and preserves comments if possible.
         
-        Uses ruamel.yaml if available for comment preservation, otherwise falls back to PyYAML.
+        Uses ruamel.yaml if available, even for new files to ensure consistent quoting,
+        otherwise falls back to PyYAML with custom dumper.
         """
-        if RUAMEL_AVAILABLE and original_content:
-            # Use ruamel.yaml for comment preservation
-            return self._ruamel_yaml_dump(data, stream, original_content, **kwargs)
+        if RUAMEL_AVAILABLE:
+            # Use ruamel.yaml for consistent quoting (even for new files without original_content)
+            if original_content:
+                # Has original content - preserve comments
+                return self._ruamel_yaml_dump(data, stream, original_content, **kwargs)
+            else:
+                # New file - still use ruamel.yaml to ensure values are quoted consistently
+                return self._ruamel_yaml_dump_new_file(data, stream, **kwargs)
         else:
             # Use PyYAML with custom dumper
             return self._pyyaml_dump(data, stream, **kwargs)
     
-    def _ruamel_yaml_dump(self, data, stream, original_content, **kwargs):
-        """Dump YAML using ruamel.yaml to preserve comments and quote values."""
+    def _ruamel_yaml_dump(self, data, stream, original_content, target_locale=None, **kwargs):
+        """Dump YAML using ruamel.yaml to preserve comments and quote values.
+        
+        Args:
+            data: The data to write (should be {locale: {...}})
+            stream: File stream to write to
+            original_content: Original file content to preserve comments
+            target_locale: Target locale code (if original_content is from a different locale file)
+        """
         ryaml = RuamelYAML()
         ryaml.preserve_quotes = True
         ryaml.width = 1000  # Prevent line wrapping
@@ -193,6 +206,27 @@ class RubyI18NManager(I18NManagerBase):
         try:
             original_data = ryaml.load(original_content)
             
+            # If original_content is from a different locale file (e.g., en.yml used as template for de.yml),
+            # we need to replace the locale key in original_data
+            if target_locale and isinstance(original_data, dict):
+                # Find the default locale key in original_data
+                default_locale_key = None
+                for key in list(original_data.keys()):  # Use list() to avoid modification during iteration
+                    if str(key) == str(self.default_locale):
+                        default_locale_key = key
+                        break
+                
+                # If we found the default locale key and it's different from target, replace it
+                if default_locale_key and str(default_locale_key) != str(target_locale):
+                    # Move the data from default locale to target locale
+                    # IMPORTANT: Preserve ruamel.yaml structure to keep comments
+                    locale_data = original_data.pop(default_locale_key)
+                    # Assign to new key first (preserves structure)
+                    original_data[target_locale] = locale_data
+                    # Then quote string values in place (preserves comments)
+                    self._quote_string_values_in_place(locale_data)
+                    logger.debug(f"Replaced locale key '{default_locale_key}' with '{target_locale}' in original data")
+            
             # Update with new data while preserving structure
             if isinstance(original_data, dict) and isinstance(data, dict):
                 # Extract locale from data (data is {locale: {...}})
@@ -202,16 +236,19 @@ class RubyI18NManager(I18NManagerBase):
                     if locale_key in original_data:
                         # Merge the locale's data, not the whole structure
                         # This ensures we merge at the correct nesting level
-                        self._merge_ruamel_data(original_data[locale_key], data[locale_key])
+                        # Ensure new values are quoted
+                        quoted_data = self._quote_string_values(data[locale_key])
+                        self._merge_ruamel_data(original_data[locale_key], quoted_data)
                     else:
-                        # Locale doesn't exist in original, add it
+                        # Locale doesn't exist in original, add it (with quoted values)
                         quoted_locale_data = self._quote_string_values(data[locale_key])
                         original_data[locale_key] = quoted_locale_data
                 else:
                     # Multiple locales - merge each
                     for key, value in data.items():
                         if key in original_data:
-                            self._merge_ruamel_data(original_data[key], value)
+                            quoted_value = self._quote_string_values(value)
+                            self._merge_ruamel_data(original_data[key], quoted_value)
                         else:
                             original_data[key] = self._quote_string_values(value)
                 
@@ -226,6 +263,21 @@ class RubyI18NManager(I18NManagerBase):
             logger.warning(f"Could not preserve comments with ruamel.yaml: {e}, falling back to PyYAML")
             return self._pyyaml_dump(data, stream, **kwargs)
     
+    def _ruamel_yaml_dump_new_file(self, data, stream, **kwargs):
+        """Dump YAML using ruamel.yaml for new files (no original content to preserve).
+        
+        Ensures all string values are quoted consistently, even for new files.
+        """
+        ryaml = RuamelYAML()
+        ryaml.preserve_quotes = True
+        ryaml.width = 1000  # Prevent line wrapping
+        ryaml.indent(mapping=2, sequence=4, offset=2)
+        ryaml.allow_duplicate_keys = True
+        
+        # Quote all string values to ensure consistency
+        quoted_data = self._quote_string_values(data)
+        ryaml.dump(quoted_data, stream)
+    
     def _merge_ruamel_data(self, original, new):
         """Merge new data into original ruamel.yaml structure.
         
@@ -233,7 +285,7 @@ class RubyI18NManager(I18NManagerBase):
         - If both original[key] and new[key] are dicts, recursively merge them
         - If original[key] exists but is not a dict (or new[key] is not a dict), replace it
         - If key doesn't exist in original, add it
-        - String values are wrapped in DoubleQuotedScalarString to ensure they're quoted
+        - String values (including empty strings) are wrapped in DoubleQuotedScalarString to ensure they're quoted
         
         This prevents duplicate keys by always replacing/updating existing keys rather than
         creating new ones.
@@ -253,6 +305,7 @@ class RubyI18NManager(I18NManagerBase):
                     # This handles the case where original has a string and new has a string
                     # or where types don't match (shouldn't happen, but be safe)
                     if isinstance(value, str):
+                        # Quote all strings, including empty strings
                         original[key] = DoubleQuotedScalarString(value)
                     elif isinstance(value, dict):
                         # New value is a dict but original wasn't - replace entirely
@@ -262,6 +315,7 @@ class RubyI18NManager(I18NManagerBase):
             else:
                 # Key doesn't exist - add it
                 if isinstance(value, str):
+                    # Quote all strings, including empty strings
                     original[key] = DoubleQuotedScalarString(value)
                 elif isinstance(value, dict):
                     original[key] = self._quote_string_values(value)
@@ -269,15 +323,53 @@ class RubyI18NManager(I18NManagerBase):
                     original[key] = value
     
     def _quote_string_values(self, data):
-        """Recursively wrap string values in DoubleQuotedScalarString."""
+        """Recursively wrap string values in DoubleQuotedScalarString.
+        
+        This ensures all string values (including empty strings) are quoted
+        when written to YAML files.
+        
+        Note: This converts ruamel.yaml structures to plain dicts, which loses comments.
+        Use _quote_string_values_preserve_structure() if you need to preserve comments.
+        """
         if isinstance(data, dict):
             return {k: self._quote_string_values(v) for k, v in data.items()}
         elif isinstance(data, list):
             return [self._quote_string_values(item) for item in data]
         elif isinstance(data, str):
+            # Quote all strings, including empty strings
             return DoubleQuotedScalarString(data)
         else:
             return data
+    
+    def _quote_string_values_in_place(self, data):
+        """Recursively wrap string values in DoubleQuotedScalarString while preserving ruamel.yaml structure.
+        
+        This modifies the data structure in place, preserving all comments and structure.
+        
+        Args:
+            data: Data structure (may be ruamel.yaml CommentedMap/CommentedSeq or plain dict/list)
+        """
+        try:
+            from ruamel.yaml.comments import CommentedMap, CommentedSeq
+        except ImportError:
+            # Fallback if ruamel.yaml structure types aren't available
+            # Can't modify in place, so return quoted version
+            return self._quote_string_values(data)
+        
+        if isinstance(data, (dict, CommentedMap)):
+            # Work directly with the structure to preserve comments
+            for k, v in list(data.items()):
+                if isinstance(v, str):
+                    data[k] = DoubleQuotedScalarString(v)
+                elif isinstance(v, (dict, CommentedMap, list, CommentedSeq)):
+                    self._quote_string_values_in_place(v)
+        elif isinstance(data, (list, CommentedSeq)):
+            # Work directly with the structure to preserve comments
+            for i, item in enumerate(data):
+                if isinstance(item, str):
+                    data[i] = DoubleQuotedScalarString(item)
+                elif isinstance(item, (dict, CommentedMap, list, CommentedSeq)):
+                    self._quote_string_values_in_place(item)
     
     def _pyyaml_dump(self, data, stream, **kwargs):
         """Dump YAML using PyYAML with custom dumper that quotes values but not keys."""
@@ -973,6 +1065,29 @@ msgstr ""
         Updates existing source files when available, otherwise creates new files
         based on namespace heuristics. Preserves existing file structure.
         
+        COMMENT PRESERVATION BEHAVIOR:
+        =============================
+        This method preserves comments in YAML files according to the following priority:
+        
+        1. **Current Locale File Exists**: If the target locale already has a YAML file,
+           comments from that file are preserved. This ensures locale-specific comments
+           (e.g., translator notes, locale-specific instructions) are maintained.
+        
+        2. **Default Locale Template**: If the target locale file does NOT exist, comments
+           are transferred from the corresponding default locale file. This allows new
+           locale files to inherit helpful comments from the default locale (e.g., "# Load
+           structured locale files", "# Models", etc.) while still allowing locale-specific
+           files to override with their own comments once created.
+        
+        3. **New Files**: For completely new files (not based on default locale structure),
+           no comments are preserved (new files start without comments).
+        
+        This behavior ensures that:
+        - Existing locale files maintain their own comments
+        - New locale files inherit helpful comments from the default locale
+        - Comments are never lost when updating existing files
+        - Locale-specific comments can be added and will be preserved in future updates
+        
         Args:
             locale (str): The locale code to write YAML files for
             
@@ -1005,10 +1120,11 @@ msgstr ""
                     continue
                 
                 # Get translation value for this locale
+                # If no translation exists, use empty string (will be written as "")
                 value = group.get_translation_unescaped(locale)
                 if not value:
-                    skipped_no_value += 1
-                    continue
+                    # Use empty string instead of skipping - this ensures all keys are present
+                    value = ""
                 
                 # Determine target file - prefer source file if available
                 source_file = self._source_files.get(key, {}).get(locale)
@@ -1120,9 +1236,10 @@ msgstr ""
                                 if not group.is_in_base:
                                     continue
                                 
+                                # Get translation value (use empty string if missing)
                                 value = group.get_translation_unescaped(locale)
                                 if not value:
-                                    continue
+                                    value = ""  # Use empty string instead of skipping
                                 
                                 # Check if this key's default locale source file matches default_file
                                 default_source = self._source_files.get(key, {}).get(self.default_locale)
@@ -1158,14 +1275,16 @@ msgstr ""
                 
                 # Write YAML file with custom dumper (quotes values, not keys)
                 with open(file_path, 'w', encoding='utf-8') as f:
-                    # Try to preserve comments if we have original content
+                    # Use ruamel.yaml if available (for consistent quoting, even for new files)
+                    # Pass original_content if available for comment preservation
                     original_content = metadata.get('original_content')
-                    if original_content and RUAMEL_AVAILABLE:
-                        # Use ruamel.yaml for comment preservation
-                        self._custom_yaml_dump(yaml_data, f, original_content=original_content)
-                    else:
-                        # Use PyYAML fallback
-                        self._custom_yaml_dump(yaml_data, f)
+                    # If original_content is from default locale file but we're writing to a different locale,
+                    # pass target_locale so we can replace the locale key in the original content
+                    # This happens when we're creating new files for non-default locales using the default locale file as a template
+                    # Simple check: if we have original_content and we're writing to a non-default locale, replace the key
+                    target_locale_for_dump = locale if (original_content and locale != self.default_locale) else None
+                    
+                    self._custom_yaml_dump(yaml_data, f, original_content=original_content, target_locale=target_locale_for_dump)
                 
                 logger.debug(f"Wrote YAML file: {file_path} ({len(data)} top-level keys, flat={metadata['is_flat']})")
             
