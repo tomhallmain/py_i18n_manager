@@ -62,8 +62,10 @@ class RubyI18NManager(I18NManagerBase):
         super().__init__(directory, locales, intro_details, settings_manager)
         # Track source files for each translation key: {key: {locale: source_file_path}}
         self._source_files: dict[str, dict[str, str]] = {}
-        # Setup custom YAML representer to preserve quotes
-        self._setup_yaml_representer()
+        # Track all files that exist for default locale (to replicate structure for other locales)
+        self._default_locale_files: set[str] = set()
+        # Store original file content (with comments) for each file
+        self._original_file_content: dict[str, str] = {}
         
     @property
     def default_locale(self) -> str:
@@ -121,6 +123,8 @@ class RubyI18NManager(I18NManagerBase):
         self.written_locales = set()
         self.locales = []
         self._source_files = {}  # Reset source file tracking
+        self._default_locale_files = set()  # Reset default locale files
+        self._original_file_content = {}  # Reset original file content
         self.intro_details = {
             "first_author": "AUTHOR NAME <author@example.com>",
             "last_translator": "Translator Name <translator@example.com>",
@@ -131,17 +135,35 @@ class RubyI18NManager(I18NManagerBase):
         # Detect which directory structure is being used
         self._locale_dir = self._detect_locale_directory()
     
-    def _setup_yaml_representer(self):
-        """Setup custom YAML representer to always quote string values."""
-        def str_presenter(dumper, data):
-            """Custom representer that always uses double quotes for strings."""
-            if '\n' in data:
-                # Multi-line strings use literal block style
-                return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
-            # Single-line strings use double quotes
-            return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='"')
+    def _custom_yaml_dump(self, data, stream, **kwargs):
+        """Custom YAML dumper that quotes values but not keys.
         
-        yaml.add_representer(str, str_presenter)
+        Uses a post-processing approach: dump with quotes, then unquote keys using regex.
+        """
+        import io
+        import re
+        output = io.StringIO()
+        
+        # Dump with default settings (will quote strings)
+        yaml.dump(data, output, default_flow_style=False, allow_unicode=True, sort_keys=False, **kwargs)
+        content = output.getvalue()
+        
+        # Post-process to unquote keys (but keep values quoted)
+        # Pattern: lines that end with ':' and have quoted keys at the start
+        # Match: "key": or  "key": value
+        def unquote_key(match):
+            indent = match.group(1)
+            quoted_key = match.group(2)
+            rest = match.group(3)
+            # Remove quotes from key
+            key = quoted_key[1:-1]  # Remove surrounding quotes
+            return f"{indent}{key}:{rest}"
+        
+        # Match lines with quoted keys: spaces + "key": (possibly with value)
+        pattern = r'^(\s+)"([^"]+)":(\s|$)'
+        content = re.sub(pattern, unquote_key, content, flags=re.MULTILINE)
+        
+        stream.write(content)
 
     def create_mo_files(self, results: TranslationManagerResults):
         """Create compiled translation files.
@@ -400,26 +422,36 @@ class RubyI18NManager(I18NManagerBase):
         if default_locale in yaml_files_by_locale:
             for yaml_file in yaml_files_by_locale[default_locale]:
                 try:
+                    # Store original file content to preserve comments
+                    with open(yaml_file, 'r', encoding='utf-8') as f:
+                        original_content = f.read()
+                        self._original_file_content[yaml_file] = original_content
+                    
+                    # Parse YAML data
                     with open(yaml_file, 'r', encoding='utf-8') as f:
                         data = yaml.safe_load(f)
-                        if data and default_locale in data:
-                            keys = self._extract_translation_keys(data[default_locale], prefix="")
-                            for key in keys:
-                                base_keys.add(key)
-                                # Create translation group if it doesn't exist
-                                if key not in self.translations:
-                                    group = TranslationGroup(key, is_in_base=True)
-                                    self.translations[key] = group
-                                
-                                # Track source file for this key/locale
-                                if key not in self._source_files:
-                                    self._source_files[key] = {}
-                                self._source_files[key][default_locale] = yaml_file
-                                
-                                # Add the default locale translation
-                                value = self._get_nested_value(data[default_locale], key)
-                                if value:
-                                    self.translations[key].add_translation(default_locale, value)
+                    
+                    # Track this file as a default locale file (for replicating structure)
+                    self._default_locale_files.add(yaml_file)
+                    
+                    if data and default_locale in data:
+                        keys = self._extract_translation_keys(data[default_locale], prefix="")
+                        for key in keys:
+                            base_keys.add(key)
+                            # Create translation group if it doesn't exist
+                            if key not in self.translations:
+                                group = TranslationGroup(key, is_in_base=True)
+                                self.translations[key] = group
+                            
+                            # Track source file for this key/locale
+                            if key not in self._source_files:
+                                self._source_files[key] = {}
+                            self._source_files[key][default_locale] = yaml_file
+                            
+                            # Add the default locale translation
+                            value = self._get_nested_value(data[default_locale], key)
+                            if value:
+                                self.translations[key].add_translation(default_locale, value)
                 except Exception as e:
                     logger.warning(f"Error parsing YAML file {yaml_file}: {e}")
         
@@ -430,26 +462,33 @@ class RubyI18NManager(I18NManagerBase):
             
             for yaml_file in yaml_files:
                 try:
+                    # Store original file content to preserve comments
+                    with open(yaml_file, 'r', encoding='utf-8') as f:
+                        original_content = f.read()
+                        self._original_file_content[yaml_file] = original_content
+                    
+                    # Parse YAML data
                     with open(yaml_file, 'r', encoding='utf-8') as f:
                         data = yaml.safe_load(f)
-                        if data and locale in data:
-                            keys = self._extract_translation_keys(data[locale], prefix="")
-                            for key in keys:
-                                # Only add translations for keys in base
-                                if key in base_keys or key in self.translations:
-                                    if key not in self.translations:
-                                        # Key exists in this locale but not in base
-                                        group = TranslationGroup(key, is_in_base=False)
-                                        self.translations[key] = group
-                                    
-                                    # Track source file for this key/locale
-                                    if key not in self._source_files:
-                                        self._source_files[key] = {}
-                                    self._source_files[key][locale] = yaml_file
-                                    
-                                    value = self._get_nested_value(data[locale], key)
-                                    if value:
-                                        self.translations[key].add_translation(locale, value)
+                    
+                    if data and locale in data:
+                        keys = self._extract_translation_keys(data[locale], prefix="")
+                        for key in keys:
+                            # Only add translations for keys in base
+                            if key in base_keys or key in self.translations:
+                                if key not in self.translations:
+                                    # Key exists in this locale but not in base
+                                    group = TranslationGroup(key, is_in_base=False)
+                                    self.translations[key] = group
+                                
+                                # Track source file for this key/locale
+                                if key not in self._source_files:
+                                    self._source_files[key] = {}
+                                self._source_files[key][locale] = yaml_file
+                                
+                                value = self._get_nested_value(data[locale], key)
+                                if value:
+                                    self.translations[key].add_translation(locale, value)
                 except Exception as e:
                     logger.warning(f"Error parsing YAML file {yaml_file}: {e}")
         
@@ -823,13 +862,25 @@ msgstr ""
                         file_path = self._determine_yaml_file_path(key, locale_dir)
                         is_flat = False
                 
-                # Load existing file content if it exists (to preserve structure)
+                # Load existing file content if it exists (to preserve structure and comments)
                 if file_path not in translations_by_file:
                     translations_by_file[file_path] = {}
-                    file_metadata[file_path] = {'is_flat': is_flat, 'original_data': None}
+                    file_metadata[file_path] = {
+                        'is_flat': is_flat, 
+                        'original_data': None,
+                        'original_content': None,
+                        'preserve_comments': False
+                    }
                     
                     if os.path.exists(file_path):
                         try:
+                            # Store original content for comment preservation
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                original_content = f.read()
+                                file_metadata[file_path]['original_content'] = original_content
+                                file_metadata[file_path]['preserve_comments'] = True
+                            
+                            # Parse YAML data
                             with open(file_path, 'r', encoding='utf-8') as f:
                                 existing_data = yaml.safe_load(f) or {}
                                 file_metadata[file_path]['original_data'] = existing_data
@@ -839,9 +890,72 @@ msgstr ""
                                 logger.debug(f"Loaded existing content from {file_path}")
                         except Exception as e:
                             logger.warning(f"Could not load existing content from {file_path}: {e}")
+                    elif file_path in self._original_file_content:
+                        # Use original content from default locale file if available
+                        file_metadata[file_path]['original_content'] = self._original_file_content.get(file_path)
+                        file_metadata[file_path]['preserve_comments'] = True
                 
                 # Add/update translation in nested structure
                 self._add_to_nested_dict(translations_by_file[file_path], key, value)
+            
+            # For non-default locales, create all files that exist in default locale
+            if locale != self.default_locale:
+                default_locale_dir = os.path.join(base_locale_dir, self.default_locale)
+                for default_file in self._default_locale_files:
+                    # Convert default locale file path to target locale file path
+                    if default_file.startswith(base_locale_dir):
+                        # Get relative path from base_locale_dir
+                        rel_path = os.path.relpath(default_file, base_locale_dir)
+                        target_file = None
+                        
+                        # Replace default locale with target locale in path
+                        if rel_path.startswith(self.default_locale + os.sep):
+                            # Directory structure: en/application.yml -> de/application.yml
+                            target_rel_path = rel_path.replace(self.default_locale + os.sep, locale + os.sep, 1)
+                            target_file = os.path.join(base_locale_dir, target_rel_path)
+                        elif rel_path == f"{self.default_locale}.yml":
+                            # Flat file: en.yml -> de.yml
+                            target_file = os.path.join(base_locale_dir, f"{locale}.yml")
+                        else:
+                            # File like devise.en.yml -> devise.de.yml
+                            base_name = os.path.basename(default_file)
+                            if f".{self.default_locale}." in base_name:
+                                target_base = base_name.replace(f".{self.default_locale}.", f".{locale}.")
+                                target_file = os.path.join(base_locale_dir, target_base)
+                            elif base_name.startswith(f"{self.default_locale}."):
+                                # Pattern: en.something.yml -> de.something.yml
+                                target_base = base_name.replace(f"{self.default_locale}.", f"{locale}.", 1)
+                                target_file = os.path.join(base_locale_dir, target_base)
+                        
+                        # If target file doesn't exist, create it with empty structure
+                        if target_file and not os.path.exists(target_file) and target_file not in translations_by_file:
+                            # Determine if it's a flat file
+                            is_flat = (os.path.dirname(target_file) == base_locale_dir)
+                            
+                            # Create empty structure - we'll populate it with translations
+                            translations_by_file[target_file] = {}
+                            file_metadata[target_file] = {
+                                'is_flat': is_flat,
+                                'original_data': None,
+                                'original_content': self._original_file_content.get(default_file),
+                                'preserve_comments': default_file in self._original_file_content
+                            }
+                            
+                            # Populate with translations that belong to this file
+                            # We need to determine which keys go to which files
+                            for key, group in self.translations.items():
+                                if not group.is_in_base:
+                                    continue
+                                
+                                value = group.get_translation_unescaped(locale)
+                                if not value:
+                                    continue
+                                
+                                # Check if this key's default locale source file matches default_file
+                                default_source = self._source_files.get(key, {}).get(self.default_locale)
+                                if default_source == default_file:
+                                    # This key belongs to this file - add it
+                                    self._add_to_nested_dict(translations_by_file[target_file], key, value)
             
             if not translations_by_file:
                 logger.warning(f"No translations to write for locale {locale} (skipped {skipped_no_value} with no value, {skipped_not_in_base} not in base)")
@@ -869,8 +983,15 @@ msgstr ""
                     # For directory structure, wrap in locale key
                     yaml_data = {locale: data}
                 
+                # Write YAML file with custom dumper (quotes values, not keys)
                 with open(file_path, 'w', encoding='utf-8') as f:
-                    yaml.dump(yaml_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                    # Try to preserve comments if we have original content
+                    if metadata.get('preserve_comments') and metadata.get('original_content'):
+                        # For now, just write new content (comment preservation is complex)
+                        # TODO: Implement proper comment preservation using ruamel.yaml
+                        self._custom_yaml_dump(yaml_data, f)
+                    else:
+                        self._custom_yaml_dump(yaml_data, f)
                 
                 logger.debug(f"Wrote YAML file: {file_path} ({len(data)} top-level keys, flat={metadata['is_flat']})")
             
