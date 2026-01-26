@@ -8,7 +8,30 @@ import re
 import yaml
 from pathlib import Path
 
-# Try to import ruamel.yaml for better YAML handling (preserves comments)
+# IMPORTANT: Why we use both PyYAML and ruamel.yaml
+#
+# Ruby/Rails i18n YAML files typically use quoted string values (e.g., "value" instead of value).
+# This is a Rails convention that:
+#   1. Prevents YAML from interpreting special strings as booleans/null (e.g., "yes", "no", "true", "false")
+#   2. Provides visual consistency in translation files
+#   3. Is widely used in Rails projects
+#
+# PyYAML can READ quoted strings perfectly fine, but it does NOT preserve quote style when WRITING:
+#   - PyYAML parses YAML into Python objects and discards formatting (quotes, comments, spacing)
+#   - When dumping, PyYAML makes its own formatting decisions and doesn't preserve original quote style
+#   - This is by design - PyYAML focuses on data structure, not formatting preservation
+#
+# ruamel.yaml was created specifically to preserve YAML formatting:
+#   - Preserves quotes, comments, indentation, and other formatting during round-trip operations
+#   - Allows us to maintain the Rails convention of quoted string values
+#   - Better suited for configuration files and i18n files where formatting matters
+#
+# Strategy:
+#   - Use PyYAML for reading (works fine with quoted strings, simpler, faster)
+#   - Use ruamel.yaml for writing when available (preserves quotes and comments)
+#   - Fall back to PyYAML for writing if ruamel.yaml is not available (values won't be quoted, but still valid YAML)
+#
+# Try to import ruamel.yaml for better YAML handling (preserves comments and quotes)
 try:
     from ruamel.yaml import YAML as RuamelYAML
     from ruamel.yaml.scalarstring import DoubleQuotedScalarString
