@@ -163,14 +163,36 @@ class RubyI18NManager(I18NManagerBase):
         ryaml.preserve_quotes = True
         ryaml.width = 1000  # Prevent line wrapping
         ryaml.indent(mapping=2, sequence=4, offset=2)
+        # Allow duplicate keys - the last value will be used, duplicates will be removed
+        ryaml.allow_duplicate_keys = True
         
         # Load original to preserve structure and comments
         try:
             original_data = ryaml.load(original_content)
+            
             # Update with new data while preserving structure
             if isinstance(original_data, dict) and isinstance(data, dict):
-                # Merge new data into original, preserving comments
-                self._merge_ruamel_data(original_data, data)
+                # Extract locale from data (data is {locale: {...}})
+                # We need to merge into the same locale in original_data
+                if len(data) == 1:
+                    locale_key = list(data.keys())[0]
+                    if locale_key in original_data:
+                        # Merge the locale's data, not the whole structure
+                        # This ensures we merge at the correct nesting level
+                        self._merge_ruamel_data(original_data[locale_key], data[locale_key])
+                    else:
+                        # Locale doesn't exist in original, add it
+                        quoted_locale_data = self._quote_string_values(data[locale_key])
+                        original_data[locale_key] = quoted_locale_data
+                else:
+                    # Multiple locales - merge each
+                    for key, value in data.items():
+                        if key in original_data:
+                            self._merge_ruamel_data(original_data[key], value)
+                        else:
+                            original_data[key] = self._quote_string_values(value)
+                
+                # Dump the merged data
                 ryaml.dump(original_data, stream)
             else:
                 # New file or structure changed, just dump new data
@@ -182,17 +204,46 @@ class RubyI18NManager(I18NManagerBase):
             return self._pyyaml_dump(data, stream, **kwargs)
     
     def _merge_ruamel_data(self, original, new):
-        """Merge new data into original ruamel.yaml structure."""
-        if isinstance(original, dict) and isinstance(new, dict):
-            for key, value in new.items():
-                if key in original:
-                    if isinstance(original[key], dict) and isinstance(value, dict):
-                        self._merge_ruamel_data(original[key], value)
-                    else:
-                        # Replace value but preserve any comments
-                        original[key] = DoubleQuotedScalarString(value) if isinstance(value, str) else value
+        """Merge new data into original ruamel.yaml structure.
+        
+        This performs a deep merge where:
+        - If both original[key] and new[key] are dicts, recursively merge them
+        - If original[key] exists but is not a dict (or new[key] is not a dict), replace it
+        - If key doesn't exist in original, add it
+        - String values are wrapped in DoubleQuotedScalarString to ensure they're quoted
+        
+        This prevents duplicate keys by always replacing/updating existing keys rather than
+        creating new ones.
+        """
+        if not isinstance(original, dict) or not isinstance(new, dict):
+            # If either is not a dict, can't merge - this shouldn't happen in normal flow
+            return
+        
+        for key, value in new.items():
+            if key in original:
+                # Key exists - need to merge or replace
+                if isinstance(original[key], dict) and isinstance(value, dict):
+                    # Both are dicts - recursively merge
+                    self._merge_ruamel_data(original[key], value)
                 else:
-                    original[key] = DoubleQuotedScalarString(value) if isinstance(value, str) else value
+                    # One or both are not dicts - replace the value
+                    # This handles the case where original has a string and new has a string
+                    # or where types don't match (shouldn't happen, but be safe)
+                    if isinstance(value, str):
+                        original[key] = DoubleQuotedScalarString(value)
+                    elif isinstance(value, dict):
+                        # New value is a dict but original wasn't - replace entirely
+                        original[key] = self._quote_string_values(value)
+                    else:
+                        original[key] = value
+            else:
+                # Key doesn't exist - add it
+                if isinstance(value, str):
+                    original[key] = DoubleQuotedScalarString(value)
+                elif isinstance(value, dict):
+                    original[key] = self._quote_string_values(value)
+                else:
+                    original[key] = value
     
     def _quote_string_values(self, data):
         """Recursively wrap string values in DoubleQuotedScalarString."""
@@ -236,17 +287,17 @@ class RubyI18NManager(I18NManagerBase):
         
         for i, line in enumerate(lines):
             # Check if this line has a quoted key
-            # Pattern: spaces + "key": (possibly with value)
-            # We need to be careful - a value might also be quoted and on the same line
+            # Pattern: (optional spaces) + "key": (possibly with value)
+            # We need to handle both top-level keys (no indentation) and nested keys (with indentation)
             
-            # Match: "key": value or "key":
+            # Match: "key": value or "key": (with or without leading whitespace)
             # Key pattern: quoted string followed by colon (possibly with space and value)
-            key_pattern = r'^(\s+)"([^"]+)":(\s+.*)?$'
+            key_pattern = r'^(\s*)"([^"]+)":(\s+.*)?$'
             match = re.match(key_pattern, line)
             
             if match:
                 # This is a key line - unquote the key
-                indent = match.group(1)
+                indent = match.group(1)  # Can be empty for top-level keys
                 quoted_key = match.group(2)
                 rest = match.group(3) or ''
                 key = quoted_key
@@ -979,8 +1030,11 @@ msgstr ""
                                 existing_data = yaml.safe_load(f) or {}
                                 file_metadata[file_path]['original_data'] = existing_data
                                 # Extract existing translations for this locale
+                                # IMPORTANT: Preserve ALL existing keys, not just ones we're updating
                                 if locale in existing_data and isinstance(existing_data[locale], dict):
-                                    translations_by_file[file_path] = existing_data[locale].copy()
+                                    # Deep copy to preserve all nested structure
+                                    import copy
+                                    translations_by_file[file_path] = copy.deepcopy(existing_data[locale])
                                 logger.debug(f"Loaded existing content from {file_path}")
                         except Exception as e:
                             logger.warning(f"Could not load existing content from {file_path}: {e}")
@@ -990,6 +1044,8 @@ msgstr ""
                         file_metadata[file_path]['preserve_comments'] = True
                 
                 # Add/update translation in nested structure
+                # The key format is like "views.tasks.index.select_project"
+                # _add_to_nested_dict will overwrite if the key already exists, preventing duplicates
                 self._add_to_nested_dict(translations_by_file[file_path], key, value)
             
             # For non-default locales, create all files that exist in default locale
@@ -1140,6 +1196,9 @@ msgstr ""
     def _add_to_nested_dict(self, data: dict, key: str, value: str):
         """Add a value to a nested dictionary using dot-notation key.
         
+        Preserves existing nested structure - only updates the specific key,
+        doesn't overwrite the entire nested dict.
+        
         Args:
             data: Dictionary to add to
             key: Dot-notation key (e.g., "tasks.form.title")
@@ -1152,9 +1211,13 @@ msgstr ""
         for part in parts[:-1]:
             if part not in current:
                 current[part] = {}
+            elif not isinstance(current[part], dict):
+                # If the path exists but isn't a dict, convert it
+                # This shouldn't happen in normal cases, but be safe
+                current[part] = {}
             current = current[part]
         
-        # Set the final value
+        # Set the final value (this will update existing or create new)
         current[parts[-1]] = value
     
     def write_locale_po_file(self, locale):
