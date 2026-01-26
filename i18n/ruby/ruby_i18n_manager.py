@@ -8,6 +8,16 @@ import re
 import yaml
 from pathlib import Path
 
+# Try to import ruamel.yaml for better YAML handling (preserves comments)
+try:
+    from ruamel.yaml import YAML as RuamelYAML
+    from ruamel.yaml.scalarstring import DoubleQuotedScalarString
+    RUAMEL_AVAILABLE = True
+except ImportError:
+    RUAMEL_AVAILABLE = False
+    RuamelYAML = None
+    DoubleQuotedScalarString = None
+
 from i18n.translation_group import TranslationGroup
 from ..translation_manager_results import TranslationManagerResults, TranslationAction, LocaleStatus
 from ..invalid_translation_groups import InvalidTranslationGroups
@@ -135,34 +145,118 @@ class RubyI18NManager(I18NManagerBase):
         # Detect which directory structure is being used
         self._locale_dir = self._detect_locale_directory()
     
-    def _custom_yaml_dump(self, data, stream, **kwargs):
-        """Custom YAML dumper that quotes values but not keys.
+    def _custom_yaml_dump(self, data, stream, original_content=None, **kwargs):
+        """Custom YAML dumper that quotes values but not keys, and preserves comments if possible.
         
-        Uses a post-processing approach: dump with quotes, then unquote keys using regex.
+        Uses ruamel.yaml if available for comment preservation, otherwise falls back to PyYAML.
         """
+        if RUAMEL_AVAILABLE and original_content:
+            # Use ruamel.yaml for comment preservation
+            return self._ruamel_yaml_dump(data, stream, original_content, **kwargs)
+        else:
+            # Use PyYAML with custom dumper
+            return self._pyyaml_dump(data, stream, **kwargs)
+    
+    def _ruamel_yaml_dump(self, data, stream, original_content, **kwargs):
+        """Dump YAML using ruamel.yaml to preserve comments and quote values."""
+        ryaml = RuamelYAML()
+        ryaml.preserve_quotes = True
+        ryaml.width = 1000  # Prevent line wrapping
+        ryaml.indent(mapping=2, sequence=4, offset=2)
+        
+        # Load original to preserve structure and comments
+        try:
+            original_data = ryaml.load(original_content)
+            # Update with new data while preserving structure
+            if isinstance(original_data, dict) and isinstance(data, dict):
+                # Merge new data into original, preserving comments
+                self._merge_ruamel_data(original_data, data)
+                ryaml.dump(original_data, stream)
+            else:
+                # New file or structure changed, just dump new data
+                # Wrap string values in DoubleQuotedScalarString to force quotes
+                quoted_data = self._quote_string_values(data)
+                ryaml.dump(quoted_data, stream)
+        except Exception as e:
+            logger.warning(f"Could not preserve comments with ruamel.yaml: {e}, falling back to PyYAML")
+            return self._pyyaml_dump(data, stream, **kwargs)
+    
+    def _merge_ruamel_data(self, original, new):
+        """Merge new data into original ruamel.yaml structure."""
+        if isinstance(original, dict) and isinstance(new, dict):
+            for key, value in new.items():
+                if key in original:
+                    if isinstance(original[key], dict) and isinstance(value, dict):
+                        self._merge_ruamel_data(original[key], value)
+                    else:
+                        # Replace value but preserve any comments
+                        original[key] = DoubleQuotedScalarString(value) if isinstance(value, str) else value
+                else:
+                    original[key] = DoubleQuotedScalarString(value) if isinstance(value, str) else value
+    
+    def _quote_string_values(self, data):
+        """Recursively wrap string values in DoubleQuotedScalarString."""
+        if isinstance(data, dict):
+            return {k: self._quote_string_values(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._quote_string_values(item) for item in data]
+        elif isinstance(data, str):
+            return DoubleQuotedScalarString(data)
+        else:
+            return data
+    
+    def _pyyaml_dump(self, data, stream, **kwargs):
+        """Dump YAML using PyYAML with custom dumper that quotes values but not keys."""
+        class QuotedValueDumper(yaml.SafeDumper):
+            """Custom dumper that quotes string values but not keys."""
+            pass
+        
+        def str_representer(dumper, data):
+            """Represent strings with double quotes."""
+            # Force all strings to be quoted
+            return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='"')
+        
+        QuotedValueDumper.add_representer(str, str_representer)
+        
+        # Dump with custom dumper
         import io
         import re
         output = io.StringIO()
-        
-        # Dump with default settings (will quote strings)
-        yaml.dump(data, output, default_flow_style=False, allow_unicode=True, sort_keys=False, **kwargs)
+        yaml.dump(data, output, Dumper=QuotedValueDumper, default_flow_style=False, 
+                 allow_unicode=True, sort_keys=False, width=1000, **kwargs)
         content = output.getvalue()
         
         # Post-process to unquote keys (but keep values quoted)
-        # Pattern: lines that end with ':' and have quoted keys at the start
-        # Match: "key": or  "key": value
-        def unquote_key(match):
-            indent = match.group(1)
-            quoted_key = match.group(2)
-            rest = match.group(3)
-            # Remove quotes from key
-            key = quoted_key[1:-1]  # Remove surrounding quotes
-            return f"{indent}{key}:{rest}"
+        # The challenge: we need to identify which quoted strings are keys vs values
+        # Keys are always followed by ':' on the same line
+        # Values are on lines that don't end with ':' (or are indented more)
         
-        # Match lines with quoted keys: spaces + "key": (possibly with value)
-        pattern = r'^(\s+)"([^"]+)":(\s|$)'
-        content = re.sub(pattern, unquote_key, content, flags=re.MULTILINE)
+        lines = content.split('\n')
+        processed_lines = []
         
+        for i, line in enumerate(lines):
+            # Check if this line has a quoted key
+            # Pattern: spaces + "key": (possibly with value)
+            # We need to be careful - a value might also be quoted and on the same line
+            
+            # Match: "key": value or "key":
+            # Key pattern: quoted string followed by colon (possibly with space and value)
+            key_pattern = r'^(\s+)"([^"]+)":(\s+.*)?$'
+            match = re.match(key_pattern, line)
+            
+            if match:
+                # This is a key line - unquote the key
+                indent = match.group(1)
+                quoted_key = match.group(2)
+                rest = match.group(3) or ''
+                key = quoted_key
+                processed_lines.append(f"{indent}{key}:{rest}")
+            else:
+                # Check if this is a value line (indented, starts with quote, doesn't end with :)
+                # If it's a value line, keep it quoted
+                processed_lines.append(line)
+        
+        content = '\n'.join(processed_lines)
         stream.write(content)
 
     def create_mo_files(self, results: TranslationManagerResults):
@@ -986,11 +1080,12 @@ msgstr ""
                 # Write YAML file with custom dumper (quotes values, not keys)
                 with open(file_path, 'w', encoding='utf-8') as f:
                     # Try to preserve comments if we have original content
-                    if metadata.get('preserve_comments') and metadata.get('original_content'):
-                        # For now, just write new content (comment preservation is complex)
-                        # TODO: Implement proper comment preservation using ruamel.yaml
-                        self._custom_yaml_dump(yaml_data, f)
+                    original_content = metadata.get('original_content')
+                    if original_content and RUAMEL_AVAILABLE:
+                        # Use ruamel.yaml for comment preservation
+                        self._custom_yaml_dump(yaml_data, f, original_content=original_content)
                     else:
+                        # Use PyYAML fallback
                         self._custom_yaml_dump(yaml_data, f)
                 
                 logger.debug(f"Wrote YAML file: {file_path} ({len(data)} top-level keys, flat={metadata['is_flat']})")

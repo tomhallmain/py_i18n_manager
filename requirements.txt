@@ -3,3 +3,4 @@ polib>=1.2.0
 argostranslate
 babel>=2.17.0
 pyyaml
+ruamel.yaml>=0.18.0
