@@ -21,16 +21,19 @@ class GitStatus(Enum):
 
 @dataclass
 class ProjectAnalysisResult:
-    """Results of analyzing a single project for POT generation and missing translations."""
+    """Results of analyzing a single project for base translation file generation and missing translations.
+    
+    Works for both Python projects (POT/PO files) and Ruby projects (YAML files).
+    """
     project_path: str
     project_name: str
-    pot_file_path: str
+    base_file_path: str  # POT file path for Python, locales directory for Ruby
     has_missing_translations: bool = False
     missing_translations_count: int = 0
     total_translations: int = 0
     locales_with_missing: List[str] = field(default_factory=list)
     error_message: Optional[str] = None
-    pot_was_modified: bool = False
+    base_was_modified: bool = False  # Whether base translation files were modified
     git_status: GitStatus = GitStatus.UNKNOWN
     
     @property
@@ -58,8 +61,13 @@ class BulkPotAnalyzer:
     def _get_project_last_modified_time(self, project_path: str) -> Optional[datetime]:
         """Get the last modification time of relevant files in the project.
         
-        This checks Python files, POT files, and PO files for the most recent
-        modification time. This is a relatively fast operation.
+        This checks source files and translation files for the most recent
+        modification time. Used for caching analysis results - if project files
+        haven't changed since last analysis, we can skip re-analyzing.
+        
+        Checks for:
+        - Python: .py, .pot, .po files
+        - Ruby: .rb, .erb, .yml, .yaml files
         
         Args:
             project_path (str): Path to the project
@@ -76,7 +84,8 @@ class BulkPotAnalyzer:
                 dirs[:] = [d for d in dirs if d not in {'.git', '__pycache__', 'node_modules', 'venv', '.venv', 'build', 'dist'}]
                 
                 for file in files:
-                    if file.endswith(('.py', '.pot', '.po')):
+                    # Check for Python, Ruby, and translation files
+                    if file.endswith(('.py', '.pot', '.po', '.rb', '.erb', '.yml', '.yaml')):
                         file_path = os.path.join(root, file)
                         try:
                             mtime = os.path.getmtime(file_path)
@@ -241,7 +250,7 @@ class BulkPotAnalyzer:
         result = ProjectAnalysisResult(
             project_path=project_path,
             project_name=project_name,
-            pot_file_path=""
+            base_file_path=""
         )
         
         try:
@@ -254,11 +263,12 @@ class BulkPotAnalyzer:
                 result.error_message = "Failed to create project manager"
                 return result
             
-            # Get POT file path using the manager's locale directory
-            result.pot_file_path = manager.get_pot_file_path()
+            # Get base file path using the manager's locale directory
+            # For Python: returns POT file path, for Ruby: returns locales directory path
+            result.base_file_path = manager.get_pot_file_path()
             
-            # Check if translations actually changed
-            result.pot_was_modified = manager.check_translations_changed()
+            # Check if base translation files actually changed
+            result.base_was_modified = manager.check_translations_changed()
             
             # Reload translations after POT generation
             manager.translations.clear()

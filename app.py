@@ -16,6 +16,7 @@ from ui.outstanding_items_window import OutstandingItemsWindow
 from ui.recent_projects_dialog import RecentProjectsDialog
 from ui.setup_translation_project_window import SetupTranslationProjectWindow
 from ui.stats_widget import StatsWidget
+from utils.globals import ProjectType
 from utils.logging_setup import get_logger
 from utils.project_detector import ProjectDetector
 from utils.settings_manager import SettingsManager
@@ -72,6 +73,11 @@ class MainWindow(QMainWindow):
         self.project_label.setStyleSheet("font-size: 14px;")
         title_layout.addWidget(title_label)
         title_layout.addWidget(self.project_label)
+        
+        # Add project type label (after project name)
+        self.project_type_label = QLabel("")
+        self.project_type_label.setStyleSheet("font-size: 12px; color: #666; padding-left: 10px;")
+        title_layout.addWidget(self.project_type_label)
         
         # Add locales label (right-aligned)
         self.locales_label = QLabel("")
@@ -139,11 +145,11 @@ class MainWindow(QMainWindow):
 
         # Second row of buttons
         second_row_layout = QHBoxLayout()
-        self.bulk_pot_btn = QPushButton(_("Bulk POT Analysis"))
+        self.bulk_pot_btn = QPushButton(_("Bulk Project Status"))
         self.cross_project_btn = QPushButton(_("Cross-Project Analysis"))
-        self.generate_pot_btn = QPushButton(_("Generate POT"))
-        self.update_po_btn = QPushButton(_("Update PO Files"))
-        self.create_mo_btn = QPushButton(_("Create MO Files"))
+        self.generate_pot_btn = QPushButton(_("Generate Base File"))
+        self.update_po_btn = QPushButton(_("Update Translation Files"))
+        self.create_mo_btn = QPushButton(_("Compile Translations"))
 
         self.bulk_pot_btn.clicked.connect(self.show_bulk_pot_analysis)
         self.cross_project_btn.clicked.connect(self.show_cross_project_analysis)
@@ -186,6 +192,7 @@ class MainWindow(QMainWindow):
             project_name = os.path.basename(last_project)
             self.project_label.setText(project_name)
             self.update_window_title(project_name)
+            self.update_project_type_display()
             self.update_button_states()
 
             # Clear previous status
@@ -227,6 +234,9 @@ class MainWindow(QMainWindow):
                 # Default to Python if detection fails
                 self.settings_manager.save_project_type(directory, "python")
                 logger.warning(f"Could not detect project type for {directory}, defaulting to Python")
+        
+        # Update project type display
+        self.update_project_type_display()
 
         # Save the selected project
         self.settings_manager.save_last_project(directory)
@@ -253,12 +263,47 @@ class MainWindow(QMainWindow):
         if directory:
             self.handle_project_selection(directory)
 
+    def update_project_type_display(self):
+        """Update the project type label based on the current project."""
+        if not self.current_project:
+            self.project_type_label.setText("")
+            return
+        
+        project_type = self.settings_manager.get_project_type_as_type(self.current_project)
+        if project_type:
+            type_display = project_type.get_display_name()
+            self.project_type_label.setText(f"({type_display})")
+        else:
+            self.project_type_label.setText("")
+    
     def update_button_states(self):
         has_project = self.current_project is not None
         has_translations = self.i18n_manager is not None and self.i18n_manager.translations is not None
+        
+        # Get project type to determine if compilation is relevant
+        project_type = None
+        if has_project:
+            project_type = self.settings_manager.get_project_type_as_type(self.current_project)
+        
+        # Compile Translations button - only enabled for Python projects (MO files are gettext-specific)
+        compile_enabled = has_project and project_type == ProjectType.PYTHON
+        self.create_mo_btn.setEnabled(compile_enabled)
+        
+        if not compile_enabled and has_project and project_type:
+            # Set tooltip explaining why it's disabled
+            project_type_display = project_type.get_display_name()
+            self.create_mo_btn.setToolTip(
+                _("Translation file compilation is not relevant for {} projects. "
+                  "{} projects use YAML files directly without a compilation step.").format(
+                    project_type_display, project_type_display
+                )
+            )
+        else:
+            # Clear tooltip for enabled state
+            self.create_mo_btn.setToolTip("")
+        
         self.check_status_btn.setEnabled(has_project)
         self.update_po_btn.setEnabled(has_project)
-        self.create_mo_btn.setEnabled(has_project)
         self.show_outstanding_btn.setEnabled(has_project and has_translations)
         self.show_all_btn.setEnabled(has_project and has_translations)
         self.write_default_btn.setEnabled(has_project and has_translations)
@@ -431,6 +476,7 @@ class MainWindow(QMainWindow):
             self.current_project = None
             self.project_label.setText("No project selected")
             self.locales_label.setText("")  # Clear locales label
+            self.project_type_label.setText("")  # Clear project type label
             self.update_window_title()  # Reset window title
             self.update_button_states()
             # Clear stats and translations
@@ -457,34 +503,34 @@ class MainWindow(QMainWindow):
             # Use project-specific default locale if available, otherwise fall back to global
             default_locale = self.settings_manager.get_project_default_locale(self.current_project)
             if default_locale in self.locales:
-                self.status_text.append(f"\nWriting PO file for default locale ({default_locale})...")
+                self.status_text.append(f"\nWriting translation file for default locale ({default_locale})...")
                 if self.i18n_manager.write_locale_po_file(default_locale):
-                    self.status_text.append("Default locale PO file written successfully!")
+                    self.status_text.append("Default locale translation file written successfully!")
                 else:
-                    QMessageBox.warning(self, "Error", f"Failed to write PO file for default locale ({default_locale})")
+                    QMessageBox.warning(self, "Error", f"Failed to write translation file for default locale ({default_locale})")
             else:
                 QMessageBox.warning(self, "Error", f"Default locale ({default_locale}) not found in project")
         except Exception as e:
-            error_msg = f"Failed to write default locale PO file: {e}"
+            error_msg = f"Failed to write default locale translation file: {e}"
             logger.error(error_msg)
             QMessageBox.critical(self, "Error", error_msg)
 
     def generate_pot(self):
-        """Generate the base.pot file for the current project."""
+        """Generate the base translation file for the current project."""
         if not self.current_project:
             QMessageBox.warning(self, "Error", "Please select a project first")
             return
             
         try:
-            self.status_text.append("\nGenerating base.pot file...")
+            self.status_text.append("\nGenerating base translation file...")
             if self.i18n_manager and self.i18n_manager.generate_pot_file():
-                self.status_text.append("Successfully generated base.pot file")
+                self.status_text.append("Successfully generated base translation file")
                 # Run status check to refresh translations
                 self.run_translation_task()
             else:
-                QMessageBox.warning(self, "Error", "Failed to generate base.pot file")
+                QMessageBox.warning(self, "Error", "Failed to generate base translation file")
         except Exception as e:
-            error_msg = f"Failed to generate POT file: {e}"
+            error_msg = f"Failed to generate base translation file: {e}"
             logger.error(error_msg)
             QMessageBox.critical(self, "Error", error_msg)
 
@@ -573,15 +619,15 @@ class MainWindow(QMainWindow):
         if not results.action_successful:
             return
             
-        # Show reminder if PO files were updated
+        # Show reminder if translation files were updated
         if results.po_files_updated:
             locales_str = ", ".join(results.updated_locales)
             QMessageBox.information(
                 self,
-                _("MO Files Need Update"),
-                _("PO files have been updated for the following locales:")
+                _("Compiled Files Need Update"),
+                _("Translation files have been updated for the following locales:")
                 + f"\n{locales_str}\n\n"
-                + _("Remember to run Create MO Files to apply these changes.")
+                + _("Remember to run Compile Translations to apply these changes.")
             )
 
 def main():

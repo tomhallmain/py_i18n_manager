@@ -3,7 +3,6 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QMessageBox, QFrame, QComboBox)
 from PyQt6.QtCore import Qt, pyqtSignal
 import os
-import yaml
 
 from utils.globals import valid_language_codes, valid_country_codes, valid_script_codes, ProjectType
 from utils.logging_setup import get_logger
@@ -366,8 +365,25 @@ class SetupTranslationProjectWindow(QDialog):
                                _("Failed to save configuration: {}").format(str(e)))
             
     def get_po_header(self, locale):
-        """Generate a PO file header for the given locale."""
-        return f'''msgid ""
+        """Generate a PO file header for the given locale.
+        
+        For Python projects, returns a standard gettext PO file header.
+        For Ruby projects, returns an empty string since YAML files don't use
+        PO-style headers. Ruby projects may have YAML comments, but those are
+        handled separately when writing YAML files.
+        
+        TODO: Consider defining a standard header format for Ruby projects
+        (e.g., YAML comments at the top of files) if needed in the future.
+        
+        Args:
+            locale: Locale code
+            
+        Returns:
+            str: PO file header for Python projects, empty string for Ruby projects
+        """
+        if self.project_type == ProjectType.PYTHON.value:
+            # Python projects: return standard PO file header
+            return f'''msgid ""
 msgstr ""
 "Project-Id-Version: {self.app_name.text()} {self.version.text()}\\n"
 "Language: {locale}\\n"
@@ -377,6 +393,10 @@ msgstr ""
 "First-Author: {self.author.text()}\\n"
 "Last-Translator: {self.translator.text()}\\n"
 '''
+
+        # Ruby projects don't use PO headers - YAML files may have comments
+        # but those are handled separately. Return empty string for now.
+        return ""
     
     def is_valid_locale_code(self, locale_code):
         """Validate a locale code against ISO standards.

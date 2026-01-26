@@ -431,11 +431,14 @@ class RubyI18NManager(I18NManagerBase):
         For Ruby/Rails projects, this is a no-op since Rails doesn't use
         compiled MO files - it loads YAML files directly.
         
+        This method intentionally does nothing for Ruby projects. No errors
+        are set in results since this is expected behavior, not a failure.
+        
         Args:
-            results: Results object to track failures (unused for Ruby)
+            results: Results object to track failures (unused for Ruby, no errors set)
         """
-        logger.info("Rails projects don't use MO files - YAML files are loaded directly")
-        # No-op for Ruby/Rails projects
+        logger.info("Rails projects don't use MO files - YAML files are loaded directly. Skipping compilation step.")
+        # No-op for Ruby/Rails projects - this is intentional, not an error
 
     def _create_ruby_results(self, action: TranslationAction) -> 'TranslationManagerResults':
         """Create TranslationManagerResults for Ruby/Rails YAML-based projects.

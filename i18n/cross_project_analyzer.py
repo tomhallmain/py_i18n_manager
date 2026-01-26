@@ -86,39 +86,11 @@ class CrossProjectAnalyzer:
         logger.debug(f"Settings manager returned projects: {projects}")
         return projects
     
-    def _detect_locale_directory(self, project_path: str) -> str:
-        """Detect which directory structure is being used (locale or locales).
-        
-        Args:
-            project_path (str): Path to the project
-            
-        Returns:
-            str: The name of the locale directory being used ('locale' or 'locales')
-        """
-        locale_dir = os.path.join(project_path, "locale")
-        locales_dir = os.path.join(project_path, "locales")
-        
-        # Check if both directories exist
-        if os.path.exists(locale_dir) and os.path.exists(locales_dir):
-            logger.warning("Both 'locale' and 'locales' directories exist. Using 'locale' by default.")
-            return "locale"
-        
-        # Check if locale directory exists
-        if os.path.exists(locale_dir):
-            logger.debug("Using 'locale' directory structure")
-            return "locale"
-        
-        # Check if locales directory exists
-        if os.path.exists(locales_dir):
-            logger.debug("Using 'locales' directory structure")
-            return "locales"
-        
-        # If neither exists, default to 'locale'
-        logger.debug("No locale directory found. Defaulting to 'locale' directory structure")
-        return "locale"
-
     def _get_project_default_locale(self, project_path: str) -> Optional[str]:
-        """Get the default locale for a project without creating a full manager.
+        """Get the default locale for a project.
+        
+        Uses the manager's polymorphic locale directory detection to handle
+        different project types (Python, Ruby, etc.) correctly.
         
         Args:
             project_path (str): Path to the project
@@ -127,20 +99,23 @@ class CrossProjectAnalyzer:
             Optional[str]: Default locale if project is valid, None otherwise
         """
         try:
-            # Check if project has required structure
-            locale_dir_name = self._detect_locale_directory(project_path)
-            locale_dir = os.path.join(project_path, locale_dir_name)
-            if not os.path.exists(locale_dir):
-                return None
-                
-            # Try to get project-specific default locale first
+            # Try to get project-specific default locale first (fast path)
             project_default = self.settings_manager.get_project_default_locale(project_path)
             if project_default:
                 logger.debug(f"Using project-specific default locale for {project_path}: {project_default}")
                 return project_default
                 
-            # Fall back to creating a minimal manager to get the default locale
+            # Create a minimal manager to get the default locale
+            # The manager will use project-specific _detect_locale_directory() method
+            # which handles Python (locale/locales) and Ruby (config/locales) correctly
             manager = I18NManager(project_path, intro_details=self.settings_manager.get_intro_details(), settings_manager=self.settings_manager)
+            
+            # Verify the locale directory exists using the manager's detected path
+            locale_dir = os.path.join(project_path, manager._locale_dir)
+            if not os.path.exists(locale_dir):
+                logger.debug(f"Locale directory does not exist: {locale_dir}")
+                return None
+                
             return manager.default_locale
             
         except Exception as e:

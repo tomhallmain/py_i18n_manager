@@ -8,6 +8,7 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QColor
 
 from i18n.bulk_pot_analyzer import BulkPotAnalyzer, ProjectAnalysisResult, GitStatus
+from utils.globals import ProjectType
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
 from utils.translations import I18N
@@ -18,7 +19,7 @@ _ = I18N._
 logger = get_logger("bulk_pot_analysis_window")
 
 class BulkAnalysisWorker(QThread):
-    """Worker thread for performing bulk POT analysis."""
+    """Worker thread for performing bulk project status checks."""
     
     progress = pyqtSignal(str)
     project_complete = pyqtSignal(ProjectAnalysisResult)
@@ -38,7 +39,7 @@ class BulkAnalysisWorker(QThread):
                 self.error.emit(_("No projects available for analysis."))
                 return
             
-            self.progress.emit(_("Starting bulk POT analysis for {} projects...").format(len(projects)))
+            self.progress.emit(_("Starting bulk project status check for {} projects...").format(len(projects)))
             
             results = []
             for i, project_path in enumerate(projects):
@@ -59,11 +60,18 @@ class BulkAnalysisWorker(QThread):
             self.error.emit(str(e))
 
 class BulkPotAnalysisWindow(QDialog):
-    """Window for bulk POT generation and analysis across all projects."""
+    """Window for bulk project status checking and base file generation across all projects.
+    
+    This window generates/updates base translation files for all projects and reports on:
+    - Missing translations per locale
+    - Git repository status
+    - Base file modification status
+    - Overall project health
+    """
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(_("Bulk POT Analysis"))
+        self.setWindowTitle(_("Bulk Project Status"))
         self.setModal(True)
         
         # Set window size
@@ -115,21 +123,22 @@ class BulkPotAnalysisWindow(QDialog):
         table_layout = QVBoxLayout(table_group)
         
         self.results_table = QTableWidget()
-        self.results_table.setColumnCount(7)
+        self.results_table.setColumnCount(8)
         self.results_table.setHorizontalHeaderLabels([
-            _("Project"), _("Status"), _("Missing"), _("Total"), 
-            _("Locales"), _("Git Status"), _("POT Modified")
+            _("Project"), _("Type"), _("Status"), _("Missing"), _("Total"), 
+            _("Locales"), _("Git Status"), _("Base Modified")
         ])
         
         # Set column widths
         header = self.results_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)  # Project name
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Status
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Missing
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Total
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Locales
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Git Status
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # POT Modified
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Type
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Status
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Missing
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Total
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Locales
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # Git Status
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)  # Base Modified
         
         self.results_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.results_table.itemSelectionChanged.connect(self.on_selection_changed)
@@ -207,6 +216,19 @@ class BulkPotAnalysisWindow(QDialog):
         project_item.setData(Qt.ItemDataRole.UserRole, result)
         self.results_table.setItem(row, 0, project_item)
         
+        # Project type
+        project_type = self.settings_manager.get_project_type(result.project_path)
+        if project_type:
+            try:
+                type_enum = ProjectType(project_type)
+                type_display = type_enum.get_display_name()
+            except ValueError:
+                type_display = project_type.capitalize()
+        else:
+            type_display = "—"
+        type_item = QTableWidgetItem(type_display)
+        self.results_table.setItem(row, 1, type_item)
+        
         # Status
         if result.error_message:
             status_item = QTableWidgetItem(_("Error"))
@@ -217,20 +239,20 @@ class BulkPotAnalysisWindow(QDialog):
         else:
             status_item = QTableWidgetItem(_("Complete"))
             status_item.setBackground(QColor(200, 255, 200))  # Light green
-        self.results_table.setItem(row, 1, status_item)
+        self.results_table.setItem(row, 2, status_item)
         
         # Missing translations count
         missing_item = QTableWidgetItem(str(result.missing_translations_count))
-        self.results_table.setItem(row, 2, missing_item)
+        self.results_table.setItem(row, 3, missing_item)
         
         # Total translations
         total_item = QTableWidgetItem(str(result.total_translations))
-        self.results_table.setItem(row, 3, total_item)
+        self.results_table.setItem(row, 4, total_item)
         
         # Locales with missing
         locales_text = ", ".join(result.locales_with_missing) if result.locales_with_missing else _("None")
         locales_item = QTableWidgetItem(locales_text)
-        self.results_table.setItem(row, 4, locales_item)
+        self.results_table.setItem(row, 5, locales_item)
         
         # Git status
         git_status_map = {
@@ -241,11 +263,11 @@ class BulkPotAnalysisWindow(QDialog):
             GitStatus.UNKNOWN: _("Unknown")
         }
         git_item = QTableWidgetItem(git_status_map.get(result.git_status, result.git_status.value))
-        self.results_table.setItem(row, 5, git_item)
+        self.results_table.setItem(row, 6, git_item)
         
-        # POT modified
-        pot_modified_item = QTableWidgetItem(_("Yes") if result.pot_was_modified else _("No"))
-        self.results_table.setItem(row, 6, pot_modified_item)
+        # Base modified (POT for Python, YAML for Ruby)
+        base_modified_item = QTableWidgetItem(_("Yes") if result.base_was_modified else _("No"))
+        self.results_table.setItem(row, 7, base_modified_item)
         
     def on_analysis_complete(self, results: List[ProjectAnalysisResult]):
         """Handle completion of the entire analysis."""
@@ -294,11 +316,23 @@ class BulkPotAnalysisWindow(QDialog):
         details = []
         details.append(f"<h3>{result.project_name}</h3>")
         details.append(f"<b>{_('Project Path:')}</b> {result.project_path}")
-        details.append(f"<b>{_('POT File:')}</b> {result.pot_file_path}")
+        
+        # Get project type for display
+        project_type = self.settings_manager.get_project_type(result.project_path)
+        if project_type:
+            try:
+                type_enum = ProjectType(project_type)
+                type_display = type_enum.get_display_name()
+            except ValueError:
+                type_display = project_type.capitalize()
+            details.append(f"<b>{_('Project Type:')}</b> {type_display}")
+        
+        # Use generic "Base File" label instead of "POT File"
+        details.append(f"<b>{_('Base File:')}</b> {result.base_file_path}")
         details.append(f"<b>{_('Total Translations:')}</b> {result.total_translations}")
         details.append(f"<b>{_('Missing Translations:')}</b> {result.missing_translations_count}")
         details.append(f"<b>{_('Git Status:')}</b> {result.git_status.value}")
-        details.append(f"<b>{_('POT Modified:')}</b> {_('Yes') if result.pot_was_modified else _('No')}")
+        details.append(f"<b>{_('Base Modified:')}</b> {_('Yes') if result.base_was_modified else _('No')}")
         
         if result.locales_with_missing:
             details.append(f"<b>{_('Locales with Missing Translations:')}</b>")

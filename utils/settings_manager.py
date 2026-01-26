@@ -1,7 +1,10 @@
 import json
 import os
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from utils.globals import ProjectType
 
 from utils.logging_setup import get_logger
 
@@ -279,6 +282,25 @@ class SettingsManager:
             Optional[str]: Project type if set, None otherwise
         """
         return self.get_project_setting(project_path, 'project_type')
+    
+    def get_project_type_as_type(self, project_path: str) -> Optional['ProjectType']:
+        """Get the project type for a specific project as a ProjectType enum.
+        
+        Args:
+            project_path (str): Path to the project
+            
+        Returns:
+            Optional[ProjectType]: ProjectType enum if set and valid, None otherwise
+        """
+        project_type_str = self.get_project_setting(project_path, 'project_type')
+        if not project_type_str:
+            return None
+        
+        try:
+            from utils.globals import ProjectType
+            return ProjectType(project_type_str)
+        except ValueError:
+            return None
         
     def save_project_type(self, project_path: str, project_type: str) -> bool:
         """Save the project type for a specific project.

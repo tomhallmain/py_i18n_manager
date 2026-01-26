@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QWidget)
 from PyQt6.QtCore import Qt, pyqtSignal
 from utils.translations import I18N
+from utils.settings_manager import SettingsManager
 
 _ = I18N._
 
@@ -10,7 +11,7 @@ class ProjectListItem(QWidget):
     remove_clicked = pyqtSignal(str)  # Signal to emit when remove is clicked
     select_clicked = pyqtSignal(str)  # Signal to emit when select is clicked
     
-    def __init__(self, project_path, parent=None):
+    def __init__(self, project_path, project_type=None, parent=None):
         super().__init__(parent)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -20,8 +21,17 @@ class ProjectListItem(QWidget):
         self.path_label.setStyleSheet("padding: 5px;")
         layout.addWidget(self.path_label)
         
-        # Button container
+        # Project type label (right-aligned)
+        type_display = project_type.capitalize() if project_type else "—"
+        self.type_label = QLabel(type_display)
+        self.type_label.setStyleSheet("padding: 5px; color: #666;")
+        self.type_label.setMinimumWidth(80)
+        self.type_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(self.type_label)
+        
+        # Button container (fixed width to prevent flexing)
         button_container = QWidget()
+        button_container.setFixedWidth(200)  # Fixed width for button area
         button_layout = QHBoxLayout(button_container)
         button_layout.setContentsMargins(0, 0, 0, 0)
         button_layout.setSpacing(5)
@@ -66,7 +76,8 @@ class RecentProjectsDialog(QDialog):
     def __init__(self, recent_projects, parent=None):
         super().__init__(parent)
         self.setWindowTitle(_("Select Project"))
-        self.setMinimumSize(500, 300)
+        self.setMinimumSize(700, 300)
+        self.settings_manager = SettingsManager()
         self.setup_ui(recent_projects)
         
     def setup_ui(self, recent_projects):
@@ -112,9 +123,10 @@ class RecentProjectsDialog(QDialog):
         
     def add_project_item(self, project_path):
         """Add a project item to the list."""
+        project_type = self.settings_manager.get_project_type(project_path)
         item = QListWidgetItem()
-        item.setSizeHint(ProjectListItem(project_path).sizeHint())
-        widget = ProjectListItem(project_path)
+        item.setSizeHint(ProjectListItem(project_path, project_type).sizeHint())
+        widget = ProjectListItem(project_path, project_type)
         widget.remove_clicked.connect(self.remove_project)
         widget.select_clicked.connect(self.handle_selection)
         self.list_widget.addItem(item)
