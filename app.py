@@ -412,9 +412,12 @@ class MainWindow(QMainWindow):
             self.outstanding_window = OutstandingItemsWindow(self)
             self.outstanding_window.translation_updated.connect(self.handle_translation_update)
 
-        self.outstanding_window.load_data(self.i18n_manager.translations, self.locales)
+        has_items = self.outstanding_window.load_data(self.i18n_manager.translations, self.locales)
         self.outstanding_window.setup_properties()
-        self.outstanding_window.exec()
+        
+        # Only open the window if there are items to display
+        if has_items:
+            self.outstanding_window.exec()
 
         # The timer will handle running the translation task when needed
 

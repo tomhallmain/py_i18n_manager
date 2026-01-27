@@ -71,6 +71,10 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.default_locale = self.config.get('translation.default_locale', 'en')
         self.translation_service = TranslationService(default_locale=self.default_locale)
         self.is_translating = False
+        # Track duplicate value matches: {default_value: [list of msgids]}
+        self.duplicate_value_groups = {}
+        # Track which outstanding translation represents a group: {displayed_msgid: [all_matched_msgids]}
+        self.outstanding_duplicate_groups = {}
 
     def closeEvent(self, event):
         """Handle cleanup when the window is closed."""
@@ -193,6 +197,21 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         """Copy the given text to the clipboard."""
         QApplication.clipboard().setText(text)
 
+    def _get_msgid_from_row(self, row):
+        """Extract the original msgid from a table row, handling duplicate indicators.
+        
+        Args:
+            row (int): The row number
+            
+        Returns:
+            str: The original msgid (without duplicate indicator)
+        """
+        msgid_display = self.table.item(row, 0).text()
+        # Extract original msgid by removing "(N duplicates)" suffix if present
+        if " (" in msgid_display and " duplicates)" in msgid_display:
+            return msgid_display.split(" (")[0]
+        return msgid_display
+
     def copy_default_translation(self, item, default_locale):
         """Copy the default locale's translation for the selected item.
         
@@ -201,7 +220,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             default_locale (str): The default locale code
         """
         row = item.row()
-        msgid = self.table.item(row, 0).text()
+        msgid = self._get_msgid_from_row(row)
         if msgid in self.translations:
             default_text = self.translations[msgid].get_translation(default_locale)
             if default_text:
@@ -219,7 +238,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         if col == 0:  # Don't translate the key column
             return
             
-        msgid = self.table.item(row, 0).text()
+        msgid = self._get_msgid_from_row(row)
         locale = self.table.horizontalHeaderItem(col).text()
         self.translate_item(row, col, msgid, locale, use_llm)
 
@@ -269,7 +288,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         # Create a list of items to translate
         self.translation_queue = []
         for row in range(self.table.rowCount()):
-            msgid = self.table.item(row, 0).text()
+            msgid = self._get_msgid_from_row(row)
             for col in range(1, self.table.columnCount()):
                 locale = self.table.horizontalHeaderItem(col).text()
                 item = self.table.item(row, col)
@@ -304,9 +323,119 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.translate_all_btn.setEnabled(True)
         self.cancel_btn.setEnabled(False)
         
+    def _detect_duplicate_values(self, translations, locales):
+        """Detect duplicate translation values in the default locale.
+        
+        Returns:
+            tuple: (existing_to_outstanding_matches, outstanding_duplicates)
+                - existing_to_outstanding_matches: dict mapping default_value to list of (existing_msgid, outstanding_msgid) tuples
+                - outstanding_duplicates: dict mapping default_value to list of outstanding msgids
+        """
+        default_locale = self.config.get('translation.default_locale', 'en')
+        
+        # Build map of default locale values to msgids
+        value_to_msgids = {}
+        for msgid, group in translations.items():
+            if not group.is_in_base:
+                continue
+            default_value = group.get_translation(default_locale)
+            if default_value and default_value.strip():
+                if default_value not in value_to_msgids:
+                    value_to_msgids[default_value] = []
+                value_to_msgids[default_value].append(msgid)
+        
+        # Find duplicates (values with multiple keys)
+        existing_to_outstanding_matches = {}  # {default_value: [(existing_msgid, outstanding_msgid), ...]}
+        outstanding_duplicates = {}  # {default_value: [outstanding_msgids]}
+        
+        # Find all outstanding translations (those with errors)
+        outstanding_msgids = set()
+        for msgid, group in translations.items():
+            if not group.is_in_base:
+                continue
+            invalid_locales = group.get_invalid_translations(locales)
+            if invalid_locales.has_errors:
+                outstanding_msgids.add(msgid)
+        
+        # Check for matches
+        for default_value, msgids in value_to_msgids.items():
+            if len(msgids) > 1:
+                # This value appears in multiple keys
+                existing_msgids = []
+                outstanding_msgids_for_value = []
+                
+                for msgid in msgids:
+                    # Check if this translation has existing translations for non-default locales
+                    group = translations[msgid]
+                    has_existing_translations = False
+                    for locale in locales:
+                        if locale != default_locale:
+                            if locale in group.values and group.values[locale].strip():
+                                has_existing_translations = True
+                                break
+                    
+                    if msgid in outstanding_msgids:
+                        outstanding_msgids_for_value.append(msgid)
+                    elif has_existing_translations:
+                        existing_msgids.append(msgid)
+                
+                # If we have both existing and outstanding, create matches
+                if existing_msgids and outstanding_msgids_for_value:
+                    if default_value not in existing_to_outstanding_matches:
+                        existing_to_outstanding_matches[default_value] = []
+                    # Match each outstanding to the first existing (or could match all)
+                    for outstanding_msgid in outstanding_msgids_for_value:
+                        for existing_msgid in existing_msgids:
+                            existing_to_outstanding_matches[default_value].append((existing_msgid, outstanding_msgid))
+                
+                # If we have multiple outstanding with same value, track them
+                if len(outstanding_msgids_for_value) > 1:
+                    outstanding_duplicates[default_value] = outstanding_msgids_for_value
+        
+        return existing_to_outstanding_matches, outstanding_duplicates
+    
+    def _ask_combine_duplicates(self, existing_to_outstanding_count, outstanding_duplicates_count):
+        """Ask user if they want to combine duplicate translations.
+        
+        Args:
+            existing_to_outstanding_count: Number of matches between existing and outstanding
+            outstanding_duplicates_count: Number of duplicate groups in outstanding translations
+            
+        Returns:
+            bool: True if user wants to combine, False otherwise
+        """
+        total_matches = existing_to_outstanding_count + outstanding_duplicates_count
+        if total_matches == 0:
+            return False
+        
+        message_parts = []
+        if existing_to_outstanding_count > 0:
+            message_parts.append(f"{existing_to_outstanding_count} match(es) between existing translations and outstanding translations")
+        if outstanding_duplicates_count > 0:
+            message_parts.append(f"{outstanding_duplicates_count} duplicate value group(s) in outstanding translations")
+        
+        message = (
+            f"Found {total_matches} duplicate translation value(s) in the default locale:\n\n"
+            f"{' | '.join(message_parts)}\n\n"
+            "Would you like to combine these translations to avoid re-translation?\n\n"
+            "- Existing translations will be pre-filled for matching outstanding translations\n"
+            "- Duplicate outstanding translations will be grouped (only one shown, all updated on save)"
+        )
+        
+        reply = QMessageBox.question(
+            self,
+            _("Combine Duplicate Translations?"),
+            message,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+        
+        return reply == QMessageBox.StandardButton.Yes
+
     def load_data(self, translations, locales):
         """Load translation data into the table."""
         self.translations = translations
+        self.outstanding_duplicate_groups = {}  # Reset duplicate groups
 
         # Get default locale and exclude it from the list
         default_locale = self.config.get('translation.default_locale', 'en')
@@ -330,6 +459,75 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             if invalid_locales.has_errors:
                 all_invalid_groups[group.key] = (invalid_locales, group)
 
+        # Detect duplicate values
+        existing_to_outstanding_matches, outstanding_duplicates = self._detect_duplicate_values(translations, locales)
+        
+        # Ask user if they want to combine duplicates
+        if existing_to_outstanding_matches or outstanding_duplicates:
+            if self._ask_combine_duplicates(len(existing_to_outstanding_matches), len(outstanding_duplicates)):
+                # Pre-fill outstanding translations from existing translations
+                pre_filled_keys = set()  # Track which outstanding keys were pre-filled
+                for default_value, matches in existing_to_outstanding_matches.items():
+                    for existing_msgid, outstanding_msgid in matches:
+                        existing_group = translations[existing_msgid]
+                        outstanding_group = translations[outstanding_msgid]
+                        
+                        # Copy translations from existing to outstanding for all non-default locales
+                        for locale in display_locales:
+                            if locale in existing_group.values and existing_group.values[locale].strip():
+                                outstanding_group.add_translation(locale, existing_group.values[locale])
+                                logger.debug(f"Pre-filled {outstanding_msgid} in {locale} from {existing_msgid}")
+                                pre_filled_keys.add(outstanding_msgid)
+                
+                # Track outstanding duplicates - we'll show only one of each group
+                for default_value, duplicate_msgids in outstanding_duplicates.items():
+                    # Use the first msgid as the representative
+                    representative_msgid = duplicate_msgids[0]
+                    # Store all matched msgids
+                    self.outstanding_duplicate_groups[representative_msgid] = duplicate_msgids
+                    logger.debug(f"Grouped duplicate outstanding translations: {representative_msgid} represents {duplicate_msgids}")
+                
+                # Re-check invalid translations after pre-filling (they may now be resolved)
+                all_invalid_groups = {}
+                for msgid, group in translations.items():
+                    if not group.is_in_base:
+                        continue
+
+                    invalid_locales = group.get_invalid_translations(locales)
+                    if invalid_locales.has_errors:
+                        all_invalid_groups[group.key] = (invalid_locales, group)
+                
+                # Filter out duplicate outstanding translations (keep only representative)
+                filtered_invalid_groups = {}
+                excluded_msgids = set()
+                for msgid, (invalid_locales, group) in all_invalid_groups.items():
+                    # Check if this msgid is part of a duplicate group (but not the representative)
+                    is_excluded = False
+                    for rep_msgid, matched_msgids in self.outstanding_duplicate_groups.items():
+                        if msgid in matched_msgids and msgid != rep_msgid:
+                            excluded_msgids.add(msgid)
+                            is_excluded = True
+                            break
+                    
+                    if not is_excluded:
+                        filtered_invalid_groups[msgid] = (invalid_locales, group)
+                
+                all_invalid_groups = filtered_invalid_groups
+                logger.info(f"Filtered out {len(excluded_msgids)} duplicate outstanding translations")
+                
+                # If all outstanding translations were resolved by pre-filling, show success dialog
+                if len(all_invalid_groups) == 0:
+                    resolved_count = len(pre_filled_keys)
+                    QMessageBox.information(
+                        self,
+                        _("All Translations Resolved"),
+                        f"All outstanding translation(s) were automatically filled from existing translations with matching default values.\n\n"
+                        f"Resolved {resolved_count} outstanding translation key(s). No outstanding translations remain.",
+                        QMessageBox.StandardButton.Ok
+                    )
+                    # Return False to indicate no items to display
+                    return False
+
         self.table.setRowCount(len(all_invalid_groups))
         
         # Define custom colors
@@ -338,8 +536,18 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         style_color = QColor(255, 220, 180)      # Light orange for style issues
 
         for row, (invalid_locales, group) in enumerate(all_invalid_groups.values()):
-            msgid_item = QTableWidgetItem(group.key)
+            msgid = group.key
+            msgid_item = QTableWidgetItem(msgid)
             msgid_item.setFlags(msgid_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            
+            # If this msgid represents a duplicate group, add indicator to the key
+            if msgid in self.outstanding_duplicate_groups:
+                matched_msgids = self.outstanding_duplicate_groups[msgid]
+                if len(matched_msgids) > 1:
+                    msgid_item.setText(f"{msgid} ({len(matched_msgids)} duplicates)")
+                    msgid_item.setToolTip(f"This translation represents {len(matched_msgids)} keys with the same default value:\n" + 
+                                        "\n".join(f"  • {m}" for m in matched_msgids))
+            
             self.table.setItem(row, 0, msgid_item)
 
             # Add translations for each locale (excluding default)
@@ -380,6 +588,9 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 self.table.setItem(row, col, item)
 
         self.table.resizeColumnsToContents()
+        
+        # Return True to indicate there are items to display
+        return True
 
     def save_changes(self):
         """Save changes to the translations."""
@@ -417,7 +628,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             rows_to_remove = []
             
             for row in range(self.table.rowCount()):
-                msgid = self.table.item(row, 0).text()
+                msgid = self._get_msgid_from_row(row)
                 row_complete = True
                 
                 for col in range(1, self.table.columnCount()):
@@ -431,6 +642,15 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                             if locale not in changes_by_locale:
                                 changes_by_locale[locale] = []
                             changes_by_locale[locale].append((msgid, new_value))
+                            
+                            # If this msgid represents a duplicate group, apply to all matched msgids
+                            if msgid in self.outstanding_duplicate_groups:
+                                matched_msgids = self.outstanding_duplicate_groups[msgid]
+                                logger.debug(f"Applying translation to duplicate group: {matched_msgids}")
+                                for matched_msgid in matched_msgids:
+                                    if matched_msgid != msgid:  # Don't duplicate the representative
+                                        changes_by_locale[locale].append((matched_msgid, new_value))
+                                        logger.debug(f"Applied translation to matched key {matched_msgid} in {locale}")
                         else:
                             row_complete = False
                             has_remaining_empty = True
@@ -474,7 +694,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             return
             
         for row in range(self.table.rowCount()):
-            msgid = self.table.item(row, 0).text()
+            msgid = self._get_msgid_from_row(row)
             for col in range(1, self.table.columnCount()):
                 locale = self.table.horizontalHeaderItem(col).text()
                 group = self.translations.get(msgid)
