@@ -402,11 +402,12 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             outstanding_duplicates_count: Number of duplicate groups in outstanding translations
             
         Returns:
-            bool: True if user wants to combine, False otherwise
+            str: One of "yes", "no", "cancel". "cancel" means user closed the dialog (X/Escape)
+                 and the outstanding window should not open.
         """
         total_matches = existing_to_outstanding_count + outstanding_duplicates_count
         if total_matches == 0:
-            return False
+            return "no"
         
         message_parts = []
         if existing_to_outstanding_count > 0:
@@ -418,22 +419,44 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             f"Found {total_matches} duplicate translation value(s) in the default locale:\n\n"
             f"{' | '.join(message_parts)}\n\n"
             "Would you like to combine these translations to avoid re-translation?\n\n"
-            "- Existing translations will be pre-filled for matching outstanding translations\n"
-            "- Duplicate outstanding translations will be grouped (only one shown, all updated on save)"
+            "- Yes: Pre-fill from existing translations and group duplicates (one row per value)\n"
+            "- No: Open without combining; show all outstanding items\n"
+            "- Cancel: Do not open Outstanding Translations"
         )
         
-        reply = QMessageBox.question(
-            self,
-            _("Combine Duplicate Translations?"),
-            message,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        msgbox = QMessageBox(self)
+        msgbox.setWindowTitle(_("Combine Duplicate Translations?"))
+        msgbox.setText(message)
+        msgbox.setStandardButtons(
             QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No
+            | QMessageBox.StandardButton.Cancel
         )
+        msgbox.setDefaultButton(QMessageBox.StandardButton.Yes)
+        msgbox.setEscapeButton(QMessageBox.StandardButton.Cancel)
         
-        return reply == QMessageBox.StandardButton.Yes
+        reply = msgbox.exec()
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            return "yes"
+        if reply == QMessageBox.StandardButton.No:
+            return "no"
+        # Cancel, or X, or Escape
+        return "cancel"
 
     def load_data(self, translations, locales):
-        """Load translation data into the table."""
+        """Load translation data into the table.
+        
+        translations is the manager's in-memory dict (by reference). Choosing "Yes"
+        on the combine-duplicates dialog pre-fills that dict in place, so the manager
+        becomes dirty immediately; nothing is reverted by closing this window without
+        saving. The window itself is a view only—each open calls load_data with the
+        current manager state, so it does not hold persistent dirty state.
+        
+        Returns:
+            bool: True if there are items to display (caller should open the window),
+                  False if nothing to show (e.g. user chose Cancel, or all resolved).
+        """
         self.translations = translations
         self.outstanding_duplicate_groups = {}  # Reset duplicate groups
 
@@ -464,7 +487,13 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         
         # Ask user if they want to combine duplicates
         if existing_to_outstanding_matches or outstanding_duplicates:
-            if self._ask_combine_duplicates(len(existing_to_outstanding_matches), len(outstanding_duplicates)):
+            combine_reply = self._ask_combine_duplicates(
+                len(existing_to_outstanding_matches), len(outstanding_duplicates)
+            )
+            if combine_reply == "cancel":
+                # User closed dialog (X) or chose Cancel: do not open outstanding window
+                return False
+            if combine_reply == "yes":
                 # Pre-fill outstanding translations from existing translations
                 pre_filled_keys = set()  # Track which outstanding keys were pre-filled
                 for default_value, matches in existing_to_outstanding_matches.items():
@@ -527,6 +556,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                     )
                     # Return False to indicate no items to display
                     return False
+            # combine_reply == "no": fall through and open window with all items (no combining)
 
         self.table.setRowCount(len(all_invalid_groups))
         
