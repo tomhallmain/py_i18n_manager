@@ -1125,14 +1125,16 @@ msgstr ""
                 # Get translation value for this locale
                 # If no translation exists, use empty string (will be written as "")
                 value = group.get_translation_unescaped(locale)
-                if not value:
+                is_empty = not value
+                if is_empty:
                     # Use empty string instead of skipping - this ensures all keys are present
                     value = ""
+                    skipped_no_value += 1
                 
                 # Determine target file - prefer source file if available
                 source_file = self._source_files.get(key, {}).get(locale)
                 if source_file and os.path.exists(source_file):
-                    # Use existing source file
+                    # Use existing source file for this locale
                     file_path = source_file
                     # Check if it's a flat file (directly in config/locales/, not in locale subdirectory)
                     file_dir = os.path.dirname(source_file)
@@ -1140,14 +1142,61 @@ msgstr ""
                     # Not flat if it's in a locale subdirectory (e.g., config/locales/en/application.yml)
                     is_flat = (os.path.normpath(file_dir) == os.path.normpath(base_locale_dir))
                 else:
-                    # Determine new file path using heuristics
-                    # If we have a flat file for this locale, use it; otherwise use directory structure
-                    if has_flat_file:
-                        file_path = flat_file
-                        is_flat = True
+                    # No source file for this locale - try to use default locale's source file and convert path
+                    default_source_file = self._source_files.get(key, {}).get(self.default_locale)
+                    if default_source_file:
+                        # Convert default locale file path to target locale file path
+                        if default_source_file.startswith(base_locale_dir):
+                            rel_path = os.path.relpath(default_source_file, base_locale_dir)
+                            target_file = None
+                            
+                            # Replace default locale with target locale in path
+                            if rel_path.startswith(self.default_locale + os.sep):
+                                # Directory structure: en/application.yml -> de/application.yml
+                                target_rel_path = rel_path.replace(self.default_locale + os.sep, locale + os.sep, 1)
+                                target_file = os.path.join(base_locale_dir, target_rel_path)
+                            elif rel_path == f"{self.default_locale}.yml":
+                                # Flat file: en.yml -> de.yml
+                                target_file = os.path.join(base_locale_dir, f"{locale}.yml")
+                            else:
+                                # File like devise.en.yml -> devise.de.yml
+                                base_name = os.path.basename(default_source_file)
+                                if f".{self.default_locale}." in base_name:
+                                    target_base = base_name.replace(f".{self.default_locale}.", f".{locale}.")
+                                    target_file = os.path.join(base_locale_dir, target_base)
+                                elif base_name.startswith(f"{self.default_locale}."):
+                                    # Pattern: en.something.yml -> de.something.yml
+                                    target_base = base_name.replace(f"{self.default_locale}.", f"{locale}.", 1)
+                                    target_file = os.path.join(base_locale_dir, target_base)
+                            
+                            if target_file:
+                                file_path = target_file
+                                is_flat = (os.path.normpath(os.path.dirname(target_file)) == os.path.normpath(base_locale_dir))
+                            else:
+                                # Fallback to heuristics if conversion failed
+                                if has_flat_file:
+                                    file_path = flat_file
+                                    is_flat = True
+                                else:
+                                    file_path = self._determine_yaml_file_path(key, locale_dir)
+                                    is_flat = False
+                        else:
+                            # Fallback to heuristics if path doesn't start with base_locale_dir
+                            if has_flat_file:
+                                file_path = flat_file
+                                is_flat = True
+                            else:
+                                file_path = self._determine_yaml_file_path(key, locale_dir)
+                                is_flat = False
                     else:
-                        file_path = self._determine_yaml_file_path(key, locale_dir)
-                        is_flat = False
+                        # No source file at all - determine new file path using heuristics
+                        # If we have a flat file for this locale, use it; otherwise use directory structure
+                        if has_flat_file:
+                            file_path = flat_file
+                            is_flat = True
+                        else:
+                            file_path = self._determine_yaml_file_path(key, locale_dir)
+                            is_flat = False
                 
                 # Load existing file content if it exists (to preserve structure and comments)
                 if file_path not in translations_by_file:
@@ -1190,7 +1239,8 @@ msgstr ""
                 # _add_to_nested_dict will overwrite if the key already exists, preventing duplicates
                 self._add_to_nested_dict(translations_by_file[file_path], key, value)
             
-            # For non-default locales, create all files that exist in default locale
+            # For non-default locales, ensure all files from default locale are created
+            # This handles cases where the first loop didn't create a file (e.g., no keys matched heuristics)
             if locale != self.default_locale:
                 default_locale_dir = os.path.join(base_locale_dir, self.default_locale)
                 for default_file in self._default_locale_files:
@@ -1219,12 +1269,13 @@ msgstr ""
                                 target_base = base_name.replace(f"{self.default_locale}.", f"{locale}.", 1)
                                 target_file = os.path.join(base_locale_dir, target_base)
                         
-                        # If target file doesn't exist, create it with empty structure
+                        # Only create file if it doesn't exist and wasn't already handled in the main loop
+                        # The main loop should have already handled all keys, so this is just for empty files
                         if target_file and not os.path.exists(target_file) and target_file not in translations_by_file:
                             # Determine if it's a flat file
-                            is_flat = (os.path.dirname(target_file) == base_locale_dir)
+                            is_flat = (os.path.normpath(os.path.dirname(target_file)) == os.path.normpath(base_locale_dir))
                             
-                            # Create empty structure - we'll populate it with translations
+                            # Create empty structure - we'll populate it with translations that belong to this file
                             translations_by_file[target_file] = {}
                             file_metadata[target_file] = {
                                 'is_flat': is_flat,
@@ -1248,6 +1299,9 @@ msgstr ""
                                 default_source = self._source_files.get(key, {}).get(self.default_locale)
                                 if default_source == default_file:
                                     # This key belongs to this file - add it
+                                    # Note: The main loop should have already handled this key with the correct file path
+                                    # This section is mainly for creating empty files that weren't created in the main loop
+                                    # So we only add if the file wasn't in translations_by_file before this loop
                                     self._add_to_nested_dict(translations_by_file[target_file], key, value)
             
             if not translations_by_file:
@@ -1291,7 +1345,23 @@ msgstr ""
                 
                 logger.debug(f"Wrote YAML file: {file_path} ({len(data)} top-level keys, flat={metadata['is_flat']})")
             
-            logger.info(f"Successfully wrote {len(translations_by_file)} YAML files for locale {locale} (skipped {skipped_no_value} keys with no value)")
+            # Count actual empty values written
+            empty_values_written = 0
+            for file_data in translations_by_file.values():
+                def count_empty_values(d):
+                    count = 0
+                    for v in d.values():
+                        if isinstance(v, dict):
+                            count += count_empty_values(v)
+                        elif v == "":
+                            count += 1
+                    return count
+                empty_values_written += count_empty_values(file_data)
+            
+            if empty_values_written > 0:
+                logger.info(f"Successfully wrote {len(translations_by_file)} YAML files for locale {locale} ({empty_values_written} empty values written)")
+            else:
+                logger.info(f"Successfully wrote {len(translations_by_file)} YAML files for locale {locale}")
             return True
             
         except Exception as e:
