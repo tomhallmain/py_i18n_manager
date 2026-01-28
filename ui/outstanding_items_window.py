@@ -476,6 +476,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                   False if nothing to show (e.g. user chose Cancel, or all resolved).
         """
         self.translations = translations
+        logger.debug("Resetting duplicate groups at start of load_data")
         self.outstanding_duplicate_groups = {}  # Reset duplicate groups
 
         # Get default locale and exclude it from the list
@@ -533,6 +534,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                     # Store all matched msgids
                     self.outstanding_duplicate_groups[representative_msgid] = duplicate_msgids
                     logger.debug(f"Grouped duplicate outstanding translations: {representative_msgid} represents {duplicate_msgids}")
+                    logger.debug(f"  Default value: '{default_value[:50] if len(default_value) > 50 else default_value}...'")
+                    logger.debug(f"  Will show only '{representative_msgid}' in table, apply to all {len(duplicate_msgids)} keys on save")
                 
                 # Re-check invalid translations after pre-filling (they may now be resolved)
                 all_invalid_groups = {}
@@ -569,7 +572,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                         self,
                         _("All Translations Resolved"),
                         f"All outstanding translation(s) were automatically filled from existing translations with matching default values.\n\n"
-                        f"Resolved {resolved_count} outstanding translation key(s). No outstanding translations remain.",
+                        f"Resolved {resolved_count} outstanding translation key(s). No outstanding translations remain.\n\n"
+                        f"⚠️ Please remember to run a Translation Update to save the duplicate translations.",
                         QMessageBox.StandardButton.Ok
                     )
                     # Return False to indicate no items to display
@@ -673,6 +677,10 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                     logger.error(f"Error during translation service cleanup/reinitialization: {e}")
             
             logger.debug("Processing table changes...")
+            logger.debug(f"Duplicate groups tracked: {len(self.outstanding_duplicate_groups)} groups")
+            for rep_msgid, matched_msgids in self.outstanding_duplicate_groups.items():
+                logger.debug(f"  Group: {rep_msgid} -> {matched_msgids}")
+            
             # Collect all changes first, grouped by locale
             changes_by_locale = {}
             has_remaining_empty = False
@@ -680,6 +688,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             
             for row in range(self.table.rowCount()):
                 msgid = self._get_msgid_from_row(row)
+                logger.debug(f"Processing row {row}: extracted msgid='{msgid}'")
                 row_complete = True
                 
                 for col in range(1, self.table.columnCount()):
@@ -697,11 +706,15 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                             # If this msgid represents a duplicate group, apply to all matched msgids
                             if msgid in self.outstanding_duplicate_groups:
                                 matched_msgids = self.outstanding_duplicate_groups[msgid]
-                                logger.debug(f"Applying translation to duplicate group: {matched_msgids}")
+                                logger.debug(f"Found duplicate group for {msgid}: {matched_msgids}")
+                                logger.debug(f"Applying translation '{new_value[:50]}...' to {len(matched_msgids)} keys in {locale}")
                                 for matched_msgid in matched_msgids:
                                     if matched_msgid != msgid:  # Don't duplicate the representative
+                                        logger.debug(f"  Adding translation for matched key: {matched_msgid} in {locale}")
                                         changes_by_locale[locale].append((matched_msgid, new_value))
-                                        logger.debug(f"Applied translation to matched key {matched_msgid} in {locale}")
+                                logger.debug(f"Completed duplicate group application for {msgid}")
+                            else:
+                                logger.debug(f"No duplicate group found for {msgid}")
                         else:
                             row_complete = False
                             has_remaining_empty = True
@@ -716,6 +729,13 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             logger.debug(f"Emitting batches for {len(changes_by_locale)} locales...")
             for i, (locale, changes) in enumerate(changes_by_locale.items()):
                 logger.debug(f"Emitting batch of {len(changes)} updates for locale {locale}")
+                # Log all msgids being updated for this locale (first 20 to avoid spam)
+                msgids_in_batch = [msgid for msgid, _ in changes]
+                logger.debug(f"  Updating {len(msgids_in_batch)} keys in {locale}")
+                if len(msgids_in_batch) <= 20:
+                    logger.debug(f"  Keys: {msgids_in_batch}")
+                else:
+                    logger.debug(f"  First 20 keys: {msgids_in_batch[:20]}...")
                 self.translation_updated.emit(locale, changes)
                 if i < len(changes_by_locale) - 1:  # Don't sleep after the last one
                     QThread.msleep(100)  # 100ms delay between locales
