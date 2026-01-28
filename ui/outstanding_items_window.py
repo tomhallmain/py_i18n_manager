@@ -75,6 +75,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.duplicate_value_groups = {}
         # Track which outstanding translation represents a group: {displayed_msgid: [all_matched_msgids]}
         self.outstanding_duplicate_groups = {}
+        # Minimum width for first column (Translation Key); set in load_data after resizeColumnsToContents
+        self._min_key_column_width = None
 
     def closeEvent(self, event):
         """Handle cleanup when the window is closed."""
@@ -99,6 +101,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         # Enable context menu for header
         self.table.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.horizontalHeader().customContextMenuRequested.connect(self.show_header_context_menu)
+        # Enforce minimum width on first column when user resizes (set in load_data)
+        self.table.horizontalHeader().sectionResized.connect(self._clamp_key_column_width)
         
         # Set row height to accommodate multiple lines
         self.table.verticalHeader().setDefaultSectionSize(100)
@@ -187,6 +191,20 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         menu.addAction(copy_text)
         
         menu.exec(self.table.horizontalHeader().mapToGlobal(position))
+
+    def _clamp_key_column_width(self, logical_index: int, _old_size: int, new_size: int):
+        """Keep the first column (Translation Key) at or above its content-based minimum."""
+        if logical_index != 0:
+            return
+        min_w = getattr(self, "_min_key_column_width", None)
+        if min_w is not None and new_size < min_w:
+            self.table.setColumnWidth(0, min_w)
+
+    def set_dynamic_column_widths(self, num_locales: int):
+        """Override so the first column can be wide (long Ruby YAML keys); base caps all at ~90–160."""
+        super().set_dynamic_column_widths(num_locales)
+        # Allow first column to grow; base uses one max for all sections
+        self.table.horizontalHeader().setMaximumSectionSize(800)
 
     def copy_cell_text(self, item):
         """Copy the text from a cell to the clipboard."""
@@ -618,6 +636,9 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 self.table.setItem(row, col, item)
 
         self.table.resizeColumnsToContents()
+        
+        # Store first column (Translation Key) width as minimum so user can only widen it
+        self._min_key_column_width = self.table.columnWidth(0)
         
         # Return True to indicate there are items to display
         return True
