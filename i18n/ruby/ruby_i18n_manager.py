@@ -529,6 +529,23 @@ class RubyI18NManager(I18NManagerBase):
                     # Only include actual locale directories (subdirectories), sorted
                     self.locales = sorted(list(yaml_files_by_locale.keys()))
                     logger.info(f"Populated {len(self.locales)} locales from YAML files: {self.locales}")
+                    
+                    # Check for file structure discrepancies
+                    discrepancies = self.check_file_structure_parity()
+                    if discrepancies:
+                        for locale, issues in discrepancies.items():
+                            if issues['missing']:
+                                logger.warning(f"Locale {locale} is missing {len(issues['missing'])} files present in default locale:")
+                                for missing_file in issues['missing']:
+                                    rel_path = os.path.relpath(missing_file, self._directory).replace('\\', '/')
+                                    logger.warning(f"  Missing: {rel_path}")
+                            if issues['extra']:
+                                logger.info(f"Locale {locale} has {len(issues['extra'])} extra files not in default locale:")
+                                for extra_file in issues['extra']:
+                                    rel_path = os.path.relpath(extra_file, self._directory).replace('\\', '/')
+                                    logger.info(f"  Extra: {rel_path}")
+                    else:
+                        logger.debug("All locales have file structure parity with default locale")
                 else:
                     logger.warning("No locale directory found, cannot parse YAML files")
             
@@ -587,6 +604,66 @@ class RubyI18NManager(I18NManagerBase):
             str: Path to the locales directory
         """
         return os.path.join(self._directory, self._locale_dir)
+
+    def check_file_structure_parity(self) -> dict[str, dict[str, list[str]]]:
+        """Check if all locales have the same file structure as the default locale.
+        
+        Returns:
+            dict: {locale: {'missing': [files], 'extra': [files]}} for each non-default locale
+                  Missing files are files in default locale but not in this locale
+                  Extra files are files in this locale but not in default locale
+        """
+        if not self._default_locale_files:
+            return {}
+        
+        base_locale_dir = os.path.join(self._directory, self._locale_dir)
+        default_locale = self.default_locale
+        discrepancies = {}
+        
+        # Get all files for default locale (normalized paths)
+        default_files_normalized = {os.path.normpath(f) for f in self._default_locale_files}
+        
+        # Check each non-default locale
+        yaml_files_by_locale = self.gather_yaml_files()
+        for locale, locale_files in yaml_files_by_locale.items():
+            if locale == default_locale:
+                continue
+            
+            locale_files_normalized = {os.path.normpath(f) for f in locale_files}
+            
+            # Convert default locale file paths to expected target locale paths
+            expected_files = set()
+            for default_file in self._default_locale_files:
+                rel_path = os.path.relpath(default_file, base_locale_dir)
+                target_file = None
+                
+                if rel_path.startswith(default_locale + os.sep):
+                    target_rel_path = rel_path.replace(default_locale + os.sep, locale + os.sep, 1)
+                    target_file = os.path.join(base_locale_dir, target_rel_path)
+                elif rel_path == f"{default_locale}.yml":
+                    target_file = os.path.join(base_locale_dir, f"{locale}.yml")
+                else:
+                    base_name = os.path.basename(default_file)
+                    if f".{default_locale}." in base_name:
+                        target_base = base_name.replace(f".{default_locale}.", f".{locale}.")
+                        target_file = os.path.join(base_locale_dir, target_base)
+                    elif base_name.startswith(f"{default_locale}."):
+                        target_base = base_name.replace(f"{default_locale}.", f"{locale}.", 1)
+                        target_file = os.path.join(base_locale_dir, target_base)
+                
+                if target_file:
+                    expected_files.add(os.path.normpath(target_file))
+            
+            missing = [f for f in expected_files if f not in locale_files_normalized]
+            extra = [f for f in locale_files_normalized if f not in expected_files]
+            
+            if missing or extra:
+                discrepancies[locale] = {
+                    'missing': sorted(missing),
+                    'extra': sorted(extra)
+                }
+        
+        return discrepancies
 
     def gather_yaml_files(self) -> dict[str, list[str]]:
         """Gather all YAML translation files organized by locale.
@@ -1065,6 +1142,19 @@ msgstr ""
     def write_locale_yaml_files(self, locale: str) -> bool:
         """Write YAML translation files for a specific locale.
         
+        Ensures file structure parity: all non-default locales will have the same
+        file structure as the default locale. Missing files are created, and all
+        keys from default locale files are ensured to be present (with empty strings
+        if translations are missing).
+        
+        NOTE: This parity enforcement is still imperfect for projects that already
+        have a partially-localized tree (extra/missing files, mixed flat vs.
+        directory layouts, etc.). We currently detect discrepancies and try to
+        create/update missing files, but there are known edge cases where content
+        still ends up only in the flat `de.yml` / `es.yml` / `fr.yml` files instead
+        of per-namespace files. This will need a dedicated, more robust \"repair
+        parity\" pass in the future.
+        
         Updates existing source files when available, otherwise creates new files
         based on namespace heuristics. Preserves existing file structure.
         
@@ -1130,6 +1220,9 @@ msgstr ""
                     # Use empty string instead of skipping - this ensures all keys are present
                     value = ""
                     skipped_no_value += 1
+                    # Log if this key was expected to have a value (for debugging duplicate issues)
+                    if key in self._source_files.get(self.default_locale, {}):
+                        logger.debug(f"Writing empty value for {key} in {locale} (no translation found)")
                 
                 # Determine target file - prefer source file if available
                 source_file = self._source_files.get(key, {}).get(locale)
@@ -1226,7 +1319,8 @@ msgstr ""
                                     # Deep copy to preserve all nested structure
                                     import copy
                                     translations_by_file[file_path] = copy.deepcopy(existing_data[locale])
-                                logger.debug(f"Loaded existing content from {file_path}")
+                                normalized_file_path = os.path.normpath(file_path).replace('\\', '/')
+                                logger.debug(f"Loaded existing content from {normalized_file_path}")
                         except Exception as e:
                             logger.warning(f"Could not load existing content from {file_path}: {e}")
                     elif file_path in self._original_file_content:
@@ -1239,10 +1333,11 @@ msgstr ""
                 # _add_to_nested_dict will overwrite if the key already exists, preventing duplicates
                 self._add_to_nested_dict(translations_by_file[file_path], key, value)
             
-            # For non-default locales, ensure all files from default locale are created
-            # This handles cases where the first loop didn't create a file (e.g., no keys matched heuristics)
+            # For non-default locales, ensure all files from default locale are created/updated
+            # This ensures file structure parity: all locales have the same files as the default locale
             if locale != self.default_locale:
                 default_locale_dir = os.path.join(base_locale_dir, self.default_locale)
+                files_created_for_parity = []
                 for default_file in self._default_locale_files:
                     # Convert default locale file path to target locale file path
                     if default_file.startswith(base_locale_dir):
@@ -1269,13 +1364,13 @@ msgstr ""
                                 target_base = base_name.replace(f"{self.default_locale}.", f"{locale}.", 1)
                                 target_file = os.path.join(base_locale_dir, target_base)
                         
-                        # Only create file if it doesn't exist and wasn't already handled in the main loop
-                        # The main loop should have already handled all keys, so this is just for empty files
-                        if target_file and not os.path.exists(target_file) and target_file not in translations_by_file:
+                        # Ensure file exists in translations_by_file (create if missing, even if file exists on disk)
+                        # This ensures file structure parity: all locales have the same files as default locale
+                        if target_file and target_file not in translations_by_file:
                             # Determine if it's a flat file
                             is_flat = (os.path.normpath(os.path.dirname(target_file)) == os.path.normpath(base_locale_dir))
                             
-                            # Create empty structure - we'll populate it with translations that belong to this file
+                            # Initialize file structure (will be populated with translations)
                             translations_by_file[target_file] = {}
                             file_metadata[target_file] = {
                                 'is_flat': is_flat,
@@ -1284,25 +1379,46 @@ msgstr ""
                                 'preserve_comments': default_file in self._original_file_content
                             }
                             
-                            # Populate with translations that belong to this file
-                            # We need to determine which keys go to which files
+                            # If file exists on disk, load its existing content to preserve structure
+                            if os.path.exists(target_file):
+                                try:
+                                    with open(target_file, 'r', encoding='utf-8') as f:
+                                        existing_content = f.read()
+                                        file_metadata[target_file]['original_content'] = existing_content
+                                        file_metadata[target_file]['preserve_comments'] = True
+                                    
+                                    with open(target_file, 'r', encoding='utf-8') as f:
+                                        existing_data = yaml.safe_load(f) or {}
+                                        if locale in existing_data and isinstance(existing_data[locale], dict):
+                                            import copy
+                                            translations_by_file[target_file] = copy.deepcopy(existing_data[locale])
+                                            file_metadata[target_file]['original_data'] = existing_data
+                                    normalized_target = os.path.normpath(target_file).replace('\\', '/')
+                                    logger.debug(f"Loaded existing content from {normalized_target} for structure parity")
+                                except Exception as e:
+                                    logger.warning(f"Could not load existing content from {target_file}: {e}")
+                            
+                            # Populate with all translations that belong to this file (from default locale)
+                            # This ensures all keys from default locale file are present in target locale file
                             for key, group in self.translations.items():
                                 if not group.is_in_base:
                                     continue
                                 
-                                # Get translation value (use empty string if missing)
-                                value = group.get_translation_unescaped(locale)
-                                if not value:
-                                    value = ""  # Use empty string instead of skipping
-                                
                                 # Check if this key's default locale source file matches default_file
                                 default_source = self._source_files.get(key, {}).get(self.default_locale)
                                 if default_source == default_file:
-                                    # This key belongs to this file - add it
-                                    # Note: The main loop should have already handled this key with the correct file path
-                                    # This section is mainly for creating empty files that weren't created in the main loop
-                                    # So we only add if the file wasn't in translations_by_file before this loop
+                                    # Get translation value (use empty string if missing)
+                                    value = group.get_translation_unescaped(locale)
+                                    if not value:
+                                        value = ""  # Use empty string instead of skipping
+                                    
+                                    # Add/update this key in the file (will overwrite existing if present)
                                     self._add_to_nested_dict(translations_by_file[target_file], key, value)
+                            
+                            files_created_for_parity.append(target_file)
+                
+                if files_created_for_parity:
+                    logger.info(f"Ensured file structure parity for locale {locale}: created/updated {len(files_created_for_parity)} files to match default locale")
             
             if not translations_by_file:
                 logger.warning(f"No translations to write for locale {locale} (skipped {skipped_no_value} with no value, {skipped_not_in_base} not in base)")
@@ -1343,7 +1459,9 @@ msgstr ""
                     
                     self._custom_yaml_dump(yaml_data, f, original_content=original_content, target_locale=target_locale_for_dump)
                 
-                logger.debug(f"Wrote YAML file: {file_path} ({len(data)} top-level keys, flat={metadata['is_flat']})")
+                # Normalize path for consistent logging (use forward slashes for readability)
+                normalized_path = os.path.normpath(file_path).replace('\\', '/')
+                logger.debug(f"Wrote YAML file: {normalized_path} ({len(data)} top-level keys, flat={metadata['is_flat']})")
             
             # Count actual empty values written
             empty_values_written = 0

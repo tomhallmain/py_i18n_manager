@@ -2,8 +2,10 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
                             QMessageBox, QMenu, QCheckBox, QTextEdit, QStyledItemDelegate)
 from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer
-from PyQt6.QtGui import QColor, QAction, QKeyEvent
+from PyQt6.QtGui import QColor, QAction, QKeyEvent, QShortcut, QKeySequence
 from PyQt6.QtWidgets import QApplication
+import random
+import string
 
 from lib.translation_service import TranslationService
 from utils.config import ConfigManager
@@ -64,6 +66,13 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.config = ConfigManager()
 
         self.show_escaped = False  # By default it should be encoded, not escaped
+        # Track duplicate value matches: {default_value: [list of msgids]}
+        self.duplicate_value_groups = {}
+        # Track which outstanding translation represents a group: {displayed_msgid: [all_matched_msgids]}
+        self.outstanding_duplicate_groups = {}
+        # Minimum width for first column (Translation Key); set in load_data after resizeColumnsToContents
+        self._min_key_column_width = None
+
         self.setup_properties()
         self.setup_ui()
 
@@ -71,12 +80,6 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.default_locale = self.config.get('translation.default_locale', 'en')
         self.translation_service = TranslationService(default_locale=self.default_locale)
         self.is_translating = False
-        # Track duplicate value matches: {default_value: [list of msgids]}
-        self.duplicate_value_groups = {}
-        # Track which outstanding translation represents a group: {displayed_msgid: [all_matched_msgids]}
-        self.outstanding_duplicate_groups = {}
-        # Minimum width for first column (Translation Key); set in load_data after resizeColumnsToContents
-        self._min_key_column_width = None
 
     def closeEvent(self, event):
         """Handle cleanup when the window is closed."""
@@ -109,6 +112,10 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         
         # Set the delegate for multiline editing
         self.table.setItemDelegate(MultilineItemDelegate())
+        
+        # Add keyboard shortcut for testing: F5 to fill all cells with random strings
+        fill_shortcut = QShortcut(QKeySequence(Qt.Key.Key_F5), self)
+        fill_shortcut.activated.connect(self.fill_all_cells_with_random_strings)
         
         layout.addWidget(self.table)
         
@@ -534,7 +541,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                     # Store all matched msgids
                     self.outstanding_duplicate_groups[representative_msgid] = duplicate_msgids
                     logger.debug(f"Grouped duplicate outstanding translations: {representative_msgid} represents {duplicate_msgids}")
-                    logger.debug(f"  Default value: '{default_value[:50] if len(default_value) > 50 else default_value}...'")
+                    default_value_display = default_value[:50] + "..." if len(default_value) > 50 else default_value
+                    logger.debug(f"  Default value: '{default_value_display}'")
                     logger.debug(f"  Will show only '{representative_msgid}' in table, apply to all {len(duplicate_msgids)} keys on save")
                 
                 # Re-check invalid translations after pre-filling (they may now be resolved)
@@ -677,9 +685,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                     logger.error(f"Error during translation service cleanup/reinitialization: {e}")
             
             logger.debug("Processing table changes...")
-            logger.debug(f"Duplicate groups tracked: {len(self.outstanding_duplicate_groups)} groups")
-            for rep_msgid, matched_msgids in self.outstanding_duplicate_groups.items():
-                logger.debug(f"  Group: {rep_msgid} -> {matched_msgids}")
+            logger.debug(f"Duplicate groups tracked: {len(self.outstanding_duplicate_groups)}")
             
             # Collect all changes first, grouped by locale
             changes_by_locale = {}
@@ -688,7 +694,6 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             
             for row in range(self.table.rowCount()):
                 msgid = self._get_msgid_from_row(row)
-                logger.debug(f"Processing row {row}: extracted msgid='{msgid}'")
                 row_complete = True
                 
                 for col in range(1, self.table.columnCount()):
@@ -698,7 +703,6 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                         new_value = item.text()
                         # Only include if the value is non-empty
                         if len(new_value) > 0:
-                            logger.debug(f"Collecting translation update for {msgid} in {locale}")
                             if locale not in changes_by_locale:
                                 changes_by_locale[locale] = []
                             changes_by_locale[locale].append((msgid, new_value))
@@ -706,15 +710,9 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                             # If this msgid represents a duplicate group, apply to all matched msgids
                             if msgid in self.outstanding_duplicate_groups:
                                 matched_msgids = self.outstanding_duplicate_groups[msgid]
-                                logger.debug(f"Found duplicate group for {msgid}: {matched_msgids}")
-                                logger.debug(f"Applying translation '{new_value[:50]}...' to {len(matched_msgids)} keys in {locale}")
                                 for matched_msgid in matched_msgids:
                                     if matched_msgid != msgid:  # Don't duplicate the representative
-                                        logger.debug(f"  Adding translation for matched key: {matched_msgid} in {locale}")
                                         changes_by_locale[locale].append((matched_msgid, new_value))
-                                logger.debug(f"Completed duplicate group application for {msgid}")
-                            else:
-                                logger.debug(f"No duplicate group found for {msgid}")
                         else:
                             row_complete = False
                             has_remaining_empty = True
@@ -729,13 +727,6 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             logger.debug(f"Emitting batches for {len(changes_by_locale)} locales...")
             for i, (locale, changes) in enumerate(changes_by_locale.items()):
                 logger.debug(f"Emitting batch of {len(changes)} updates for locale {locale}")
-                # Log all msgids being updated for this locale (first 20 to avoid spam)
-                msgids_in_batch = [msgid for msgid, _ in changes]
-                logger.debug(f"  Updating {len(msgids_in_batch)} keys in {locale}")
-                if len(msgids_in_batch) <= 20:
-                    logger.debug(f"  Keys: {msgids_in_batch}")
-                else:
-                    logger.debug(f"  First 20 keys: {msgids_in_batch[:20]}...")
                 self.translation_updated.emit(locale, changes)
                 if i < len(changes_by_locale) - 1:  # Don't sleep after the last one
                     QThread.msleep(100)  # 100ms delay between locales
@@ -783,5 +774,42 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         """Toggle the Unicode display mode."""
         self.show_escaped = not self.show_escaped
         self.update_table_display()
+        # Force UI update
+        QTimer.singleShot(0, lambda: self.table.viewport().update())
+    
+    def fill_all_cells_with_random_strings(self):
+        """Fill all translation cells with random strings for testing purposes.
+        
+        Press F5 to trigger this function. Only fills editable cells (translation columns),
+        not the key column (column 0).
+        """
+        if not hasattr(self, 'table') or self.table.rowCount() == 0:
+            return
+        
+        def generate_random_string(length=6):
+            """Generate a random string of given length (default 6 chars)."""
+            # Use letters and digits only for the random part
+            chars = string.ascii_lowercase + string.digits
+            return ''.join(random.choice(chars) for _ in range(length))
+        
+        filled_count = 0
+        for row in range(self.table.rowCount()):
+            # Generate one random part per row (so duplicate groups get the same value when saved)
+            random_part = generate_random_string()
+            
+            for col in range(1, self.table.columnCount()):  # Skip column 0 (key column)
+                item = self.table.item(row, col)
+                if item:
+                    # Get locale for this column
+                    locale = self.table.horizontalHeaderItem(col).text()
+                    
+                    # Format: {locale}_{row_index}_{random_string}
+                    # Same row index for all locales in this row (ensures duplicate groups match)
+                    # Same random part for all locales in this row (ensures duplicate groups match)
+                    test_string = f"{locale}_{row}_{random_part}"
+                    item.setText(test_string)
+                    filled_count += 1
+        
+        logger.debug(f"Filled {filled_count} cells with random strings (F5 pressed)")
         # Force UI update
         QTimer.singleShot(0, lambda: self.table.viewport().update()) 

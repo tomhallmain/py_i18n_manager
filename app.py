@@ -412,8 +412,9 @@ class MainWindow(QMainWindow):
             self.outstanding_window = OutstandingItemsWindow(self)
             self.outstanding_window.translation_updated.connect(self.handle_translation_update)
 
-        has_items = self.outstanding_window.load_data(self.i18n_manager.translations, self.locales)
+        # Ensure properties (like translation_service) are up to date before loading data
         self.outstanding_window.setup_properties()
+        has_items = self.outstanding_window.load_data(self.i18n_manager.translations, self.locales)
         
         # Only open the window if there are items to display
         if has_items:
@@ -431,12 +432,17 @@ class MainWindow(QMainWindow):
         logger.debug(f"Handling translation updates for locale {locale} - {len(changes)} changes")
         
         # Update the translations in memory
+        missing_keys = []
         for msgid, new_value in changes:
             if msgid in self.i18n_manager.translations:
                 logger.debug(f"Updating translation in memory for {msgid} in {locale}")
                 self.i18n_manager.translations[msgid].add_translation(locale, new_value)
             else:
-                logger.warning(f"Translation key {msgid} not found in translations")
+                missing_keys.append(msgid)
+                logger.warning(f"Translation key {msgid} not found in translations dict")
+        
+        if missing_keys:
+            logger.warning(f"Total {len(missing_keys)} keys were missing from translations dict: {missing_keys[:10]}{'...' if len(missing_keys) > 10 else ''}")
         
         # Add to pending updates
         self.pending_updates[locale] = changes
