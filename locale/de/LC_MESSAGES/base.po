@@ -2,9 +2,9 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2025-08-01 01:47-0400\n"
-"PO-Revision-Date: 2025-08-01 01:47-0400\n"
-"Last-Translator: Thomas Hall <tomhall.main@gmail.com>\n"
+"POT-Creation-Date: 2026-01-29 20:42-0500\n"
+"PO-Revision-Date: 2026-01-29 20:42-0500\n"
+"Last-Translator: Translator Name <translator@example.com>\n"
 "Language-Team: de Team <<EMAIL>>\n"
 "Language: de\n"
 "MIME-Version: 1.0\n"
@@ -12,43 +12,43 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: app.py:33 app.py:162
+#: app.py:35 app.py:181
 msgid "i18n Translation Manager"
 msgstr "i18n Übersetzungsleiter"
 
-#: app.py:68
+#: app.py:70
 msgid "Current Project:"
 msgstr "Aktuelles Projekt:"
 
-#: app.py:70
+#: app.py:72
 msgid "No project selected"
 msgstr "Kein Projekt ausgewählt"
 
-#: app.py:84 ui/recent_projects_dialog.py:68
+#: app.py:91 ui/recent_projects_dialog.py:78
 msgid "Select Project"
 msgstr "Projekt auswählen"
 
-#: app.py:88
+#: app.py:95
 msgid "Modify Project Settings"
 msgstr "Projekteinstellungen ändern"
 
-#: app.py:118
+#: app.py:128
 msgid "Check Status"
 msgstr "Überprüfungsstatus"
 
-#: app.py:119
+#: app.py:130
 msgid "Show All Translations"
 msgstr "Alle Übersetzungen anzeigen"
 
-#: app.py:120
+#: app.py:131
 msgid "Show Outstanding Items"
 msgstr "Offene Posten anzeigen"
 
-#: app.py:121
+#: app.py:132
 msgid "Find Untranslated"
 msgstr "Unübersetztes finden"
 
-#: app.py:122
+#: app.py:149
 msgid "Cross-Project Analysis"
 msgstr "Projektübergreifende Analyse"
 
@@ -56,7 +56,7 @@ msgstr "Projektübergreifende Analyse"
 msgid "Bulk POT Analysis"
 msgstr "Massen-POT-Analyse"
 
-#: app.py:124
+#: app.py:129
 msgid "Write Default Locale"
 msgstr "Standard-Sprachumgebung schreiben"
 
@@ -72,15 +72,15 @@ msgstr "PO-Dateien aktualisieren"
 msgid "Create MO Files"
 msgstr "MO-Dateien erstellen"
 
-#: app.py:152 ui/bulk_pot_analysis_window.py:120
+#: app.py:171 ui/bulk_pot_analysis_window.py:128
 msgid "Status"
 msgstr "Status"
 
-#: app.py:521 app.py:537
+#: app.py:601 app.py:617
 msgid "No Projects to Analyze"
 msgstr "Keine Projekte zu analysieren"
 
-#: app.py:522
+#: app.py:602
 msgid ""
 "You need at least 2 projects in your recent projects list to perform cross-"
 "project analysis."
@@ -88,7 +88,7 @@ msgstr ""
 "Sie benötigen mindestens 2 Projekte in Ihrer Liste der letzten Projekte, um "
 "eine projektübergreifende Analyse durchzuführen."
 
-#: app.py:538
+#: app.py:618
 msgid ""
 "You need at least 1 project in your recent projects list to perform bulk POT"
 " analysis."
@@ -135,38 +135,38 @@ msgstr "Löschen"
 msgid "Filter:"
 msgstr "Filtern:"
 
-#: ui/all_translations_window.py:75 ui/outstanding_items_window.py:116
+#: ui/all_translations_window.py:75 ui/outstanding_items_window.py:133
 msgid "Save Changes"
 msgstr "Änderungen speichern"
 
-#: ui/all_translations_window.py:77 ui/bulk_pot_analysis_window.py:96
-#: ui/cross_project_analysis_window.py:154 ui/outstanding_items_window.py:118
+#: ui/all_translations_window.py:77 ui/bulk_pot_analysis_window.py:104
+#: ui/cross_project_analysis_window.py:154 ui/outstanding_items_window.py:135
 msgid "Close"
 msgstr "Schließen"
 
-#: ui/all_translations_window.py:81 ui/outstanding_items_window.py:122
+#: ui/all_translations_window.py:81 ui/outstanding_items_window.py:139
 msgid "Show Escaped Unicode"
 msgstr "Entkommener Unicode anzeigen"
 
-#: ui/all_translations_window.py:264 ui/cross_project_analysis_window.py:466
-#: ui/cross_project_analysis_window.py:469
-#: ui/cross_project_analysis_window.py:490
+#: ui/all_translations_window.py:266 ui/cross_project_analysis_window.py:467
+#: ui/cross_project_analysis_window.py:470
+#: ui/cross_project_analysis_window.py:491
 msgid "Info"
 msgstr "Info"
 
-#: ui/all_translations_window.py:264
+#: ui/all_translations_window.py:266
 msgid "No changes to save."
 msgstr "Keine Änderungen zum Speichern."
 
-#: ui/all_translations_window.py:272 ui/cross_project_analysis_window.py:543
+#: ui/all_translations_window.py:274 ui/cross_project_analysis_window.py:544
 msgid "Success"
 msgstr "Erfolg"
 
-#: ui/all_translations_window.py:272
+#: ui/all_translations_window.py:274
 msgid "Saved {} changes successfully!"
 msgstr "Erfolgreich {} Änderungen gespeichert!"
 
-#: ui/bulk_pot_analysis_window.py:38
+#: ui/bulk_pot_analysis_window.py:39
 msgid "No projects available for analysis."
 msgstr "Es sind keine Projekte für die Analyse verfügba"
 
@@ -174,44 +174,44 @@ msgstr "Es sind keine Projekte für die Analyse verfügba"
 msgid "Starting bulk POT analysis for {} projects..."
 msgstr "Start der Massen-POT-Analyse für {} Projekte..."
 
-#: ui/bulk_pot_analysis_window.py:46
+#: ui/bulk_pot_analysis_window.py:47
 msgid "Analyzing project {} of {}: {}"
 msgstr "Analyse des Projekts {} von {}: {}"
 
-#: ui/bulk_pot_analysis_window.py:52
+#: ui/bulk_pot_analysis_window.py:53
 msgid "Bulk analysis complete!"
 msgstr "Massenanalyse abgeschlossen!"
 
-#: ui/bulk_pot_analysis_window.py:87
+#: ui/bulk_pot_analysis_window.py:95
 msgid "Analyze All Projects"
 msgstr "Alle Projekte analysieren"
 
-#: ui/bulk_pot_analysis_window.py:91
+#: ui/bulk_pot_analysis_window.py:99
 msgid "Refresh"
 msgstr "Aktualisieren"
 
-#: ui/bulk_pot_analysis_window.py:114
+#: ui/bulk_pot_analysis_window.py:122
 msgid "Project Analysis Results"
 msgstr "Ergebnisse der Projektanalyse"
 
-#: ui/bulk_pot_analysis_window.py:120
+#: ui/bulk_pot_analysis_window.py:128
 msgid "Project"
 msgstr "Projekt"
 
-#: ui/bulk_pot_analysis_window.py:120 utils/globals.py:40 utils/globals.py:63
-#: utils/globals.py:96 utils/globals.py:121
+#: ui/bulk_pot_analysis_window.py:128 utils/globals.py:73 utils/globals.py:96
+#: utils/globals.py:129 utils/globals.py:154
 msgid "Missing"
 msgstr "Fehlende"
 
-#: ui/bulk_pot_analysis_window.py:120
+#: ui/bulk_pot_analysis_window.py:128
 msgid "Total"
 msgstr "Gesamt"
 
-#: ui/bulk_pot_analysis_window.py:121
+#: ui/bulk_pot_analysis_window.py:129
 msgid "Locales"
 msgstr "Lokalisierungen"
 
-#: ui/bulk_pot_analysis_window.py:121
+#: ui/bulk_pot_analysis_window.py:129
 msgid "Git Status"
 msgstr "Git-Status"
 
@@ -219,79 +219,79 @@ msgstr "Git-Status"
 msgid "POT Modified"
 msgstr "POT modifiziert"
 
-#: ui/bulk_pot_analysis_window.py:141
+#: ui/bulk_pot_analysis_window.py:150
 msgid "Project Details"
 msgstr "Projektdetails"
 
-#: ui/bulk_pot_analysis_window.py:160
+#: ui/bulk_pot_analysis_window.py:169
 msgid "No analysis performed yet"
 msgstr "Es wurde noch keine Analyse durchgeführt"
 
-#: ui/bulk_pot_analysis_window.py:178
+#: ui/bulk_pot_analysis_window.py:187
 msgid "Analysis in progress..."
 msgstr "Analyse läuft..."
 
-#: ui/bulk_pot_analysis_window.py:212 ui/bulk_pot_analysis_window.py:240
+#: ui/bulk_pot_analysis_window.py:234 ui/bulk_pot_analysis_window.py:262
 #: ui/cross_project_analysis_window.py:264
-#: ui/cross_project_analysis_window.py:555
-#: ui/setup_translation_project_window.py:153
-#: ui/setup_translation_project_window.py:158
-#: ui/setup_translation_project_window.py:165
-#: ui/setup_translation_project_window.py:176
-#: ui/setup_translation_project_window.py:181
-#: ui/setup_translation_project_window.py:269
+#: ui/cross_project_analysis_window.py:556
+#: ui/setup_translation_project_window.py:221
+#: ui/setup_translation_project_window.py:226
+#: ui/setup_translation_project_window.py:233
+#: ui/setup_translation_project_window.py:244
+#: ui/setup_translation_project_window.py:249
+#: ui/setup_translation_project_window.py:364
 msgid "Error"
 msgstr "Fehler"
 
-#: ui/bulk_pot_analysis_window.py:215
+#: ui/bulk_pot_analysis_window.py:237
 msgid "Missing Translations"
 msgstr "Fehlende Übersetzungen"
 
-#: ui/bulk_pot_analysis_window.py:218
+#: ui/bulk_pot_analysis_window.py:240
 msgid "Complete"
 msgstr "Vollständig"
 
-#: ui/bulk_pot_analysis_window.py:231
+#: ui/bulk_pot_analysis_window.py:253
 msgid "None"
 msgstr "Keine"
 
-#: ui/bulk_pot_analysis_window.py:237
+#: ui/bulk_pot_analysis_window.py:259
 msgid "Clean"
 msgstr "Sauber"
 
-#: ui/bulk_pot_analysis_window.py:238
+#: ui/bulk_pot_analysis_window.py:260
 msgid "Modified"
 msgstr "Geändert"
 
-#: ui/bulk_pot_analysis_window.py:239
+#: ui/bulk_pot_analysis_window.py:261
 msgid "Untracked"
 msgstr "Nicht verfolgt"
 
-#: ui/bulk_pot_analysis_window.py:241
+#: ui/bulk_pot_analysis_window.py:263
 msgid "Unknown"
 msgstr "Unbekannt"
 
-#: ui/bulk_pot_analysis_window.py:247
+#: ui/bulk_pot_analysis_window.py:269
 msgid "Yes"
 msgstr "Ja"
 
-#: ui/bulk_pot_analysis_window.py:247
+#: ui/bulk_pot_analysis_window.py:269
 msgid "No"
 msgstr "Nein"
 
-#: ui/bulk_pot_analysis_window.py:265
+#: ui/bulk_pot_analysis_window.py:287
 msgid "Analysis complete: {} projects analyzed"
 msgstr "Analyse abgeschlossen: {} Projekte analysiert"
 
-#: ui/bulk_pot_analysis_window.py:267
+#: ui/bulk_pot_analysis_window.py:289
 msgid ", {} projects have missing translations ({} total missing)"
 msgstr ", {} Projekte haben fehlende Übersetzungen ({} insgesamt fehlen)"
 
-#: ui/bulk_pot_analysis_window.py:270
+#: ui/bulk_pot_analysis_window.py:292
 msgid ", {} projects had errors"
 msgstr ", {} Projekte wiesen Fehler auf"
 
-#: ui/bulk_pot_analysis_window.py:279 ui/cross_project_analysis_window.py:319
+#: ui/bulk_pot_analysis_window.py:301 ui/cross_project_analysis_window.py:319
 msgid "Analysis Error"
 msgstr "Analysefehler"
 
@@ -319,8 +319,8 @@ msgstr "Zielprojekt:"
 msgid "Locales:"
 msgstr "Sprachumgebungen:"
 
-#: ui/cross_project_analysis_window.py:103 utils/globals.py:94
-#: utils/globals.py:119
+#: ui/cross_project_analysis_window.py:103 utils/globals.py:127
+#: utils/globals.py:152
 msgid "All"
 msgstr "Alle"
 
@@ -371,11 +371,11 @@ msgid "Translation Matches"
 msgstr "Übersetzung Treffer"
 
 #: ui/cross_project_analysis_window.py:252
-#: ui/cross_project_analysis_window.py:453
-#: ui/cross_project_analysis_window.py:483
-#: ui/cross_project_analysis_window.py:549
-#: ui/cross_project_analysis_window.py:551
-#: ui/setup_translation_project_window.py:201
+#: ui/cross_project_analysis_window.py:454
+#: ui/cross_project_analysis_window.py:484
+#: ui/cross_project_analysis_window.py:550
+#: ui/cross_project_analysis_window.py:552
+#: ui/setup_translation_project_window.py:269
 msgid "Warning"
 msgstr "Warnung"
 
@@ -431,31 +431,31 @@ msgstr "  • {} nicht befüllbar"
 msgid "  • Match rate: {:.1f}%"
 msgstr "  • Trefferquote: {:.1f}%"
 
-#: ui/cross_project_analysis_window.py:406
+#: ui/cross_project_analysis_window.py:407
 msgid "... etc."
 msgstr "... usw."
 
-#: ui/cross_project_analysis_window.py:453
+#: ui/cross_project_analysis_window.py:454
 msgid "Please select matches to apply."
 msgstr "Bitte wählen Sie Übereinstimmungen aus, um sich zu bewerben."
 
-#: ui/cross_project_analysis_window.py:466
+#: ui/cross_project_analysis_window.py:467
 msgid "No matches to apply."
 msgstr "Es sind keine Übereinstimmungen zu verzeichnen."
 
-#: ui/cross_project_analysis_window.py:469
+#: ui/cross_project_analysis_window.py:470
 msgid "No missing translations to apply."
 msgstr "Keine fehlenden Übersetzungen anzuwenden."
 
-#: ui/cross_project_analysis_window.py:483
+#: ui/cross_project_analysis_window.py:484
 msgid "Please select a specific source project from the dropdown."
 msgstr "Bitte wählen Sie ein bestimmtes Quellprojekt aus dem Dropdown-Menü."
 
-#: ui/cross_project_analysis_window.py:490
+#: ui/cross_project_analysis_window.py:491
 msgid "No matches found for the selected project."
 msgstr "Keine Treffer für das ausgewählte Projekt gefunden."
 
-#: ui/cross_project_analysis_window.py:512
+#: ui/cross_project_analysis_window.py:513
 msgid ""
 "Apply {0} translation matches (including already filled translations) from "
 "project '{1}' to the target project?"
@@ -463,7 +463,7 @@ msgstr ""
 "{0} Übersetzungsmatches (einschließlich bereits ausgefüllter Übersetzungen) "
 "aus Projekt ‚{1}‘ auf das Zielprojekt anwenden?"
 
-#: ui/cross_project_analysis_window.py:514
+#: ui/cross_project_analysis_window.py:515
 msgid ""
 "Apply {0} missing translation matches from project '{1}' to the target "
 "project?"
@@ -471,7 +471,7 @@ msgstr ""
 "{0} fehlende Übersetzungsmatches aus Projekt ‚{1}‘ auf das Zielprojekt "
 "anwenden?"
 
-#: ui/cross_project_analysis_window.py:517
+#: ui/cross_project_analysis_window.py:518
 msgid ""
 "Apply {0} translation matches (including already filled translations) to the"
 " target project?"
@@ -479,19 +479,19 @@ msgstr ""
 "{0} Übersetzungsmatches (einschließlich bereits ausgefüllter Übersetzungen) "
 "auf das Zielprojekt anwenden?"
 
-#: ui/cross_project_analysis_window.py:519
+#: ui/cross_project_analysis_window.py:520
 msgid "Apply {0} missing translation matches to the target project?"
 msgstr "{0} fehlende Übersetzungsmatches auf das Zielprojekt anwenden?"
 
-#: ui/cross_project_analysis_window.py:521
+#: ui/cross_project_analysis_window.py:522
 msgid "Confirm Application"
 msgstr "Anwendung bestätigen"
 
-#: ui/cross_project_analysis_window.py:540
+#: ui/cross_project_analysis_window.py:541
 msgid "{}: {} translations"
 msgstr "{}: {} Übersetzungen"
 
-#: ui/cross_project_analysis_window.py:542
+#: ui/cross_project_analysis_window.py:543
 msgid ""
 "Successfully applied translations:\n"
 "\n"
@@ -501,160 +501,160 @@ msgstr ""
 "\n"
 "{}"
 
-#: ui/cross_project_analysis_window.py:549
+#: ui/cross_project_analysis_window.py:550
 msgid "No translations were applied (all were already filled)."
 msgstr ""
 "Es wurden keine Übersetzungen vorgenommen (alle waren bereits besetzt)."
 
-#: ui/cross_project_analysis_window.py:551
+#: ui/cross_project_analysis_window.py:552
 msgid "No missing translations were applied."
 msgstr "Es wurden keine fehlenden Übersetzungen vorgenommen."
 
-#: ui/cross_project_analysis_window.py:555
+#: ui/cross_project_analysis_window.py:556
 msgid "Failed to apply translations: {}"
 msgstr "Übersetzungen konnten nicht angewendet werden: {}"
 
-#: ui/outstanding_items_window.py:55
+#: ui/outstanding_items_window.py:59
 msgid "Outstanding Translation Items"
 msgstr "Ausstehende Übersetzungsposten"
 
-#: ui/outstanding_items_window.py:76
+#: ui/outstanding_items_window.py:87
 msgid "Translation in Progress"
 msgstr "Übersetzung läuft"
 
-#: ui/outstanding_items_window.py:77
+#: ui/outstanding_items_window.py:88
 msgid "Translation is in progress. Are you sure you want to close?"
 msgstr ""
 "Die Übersetzung ist in Arbeit. Sind Sie sicher, dass Sie schließen möchten?"
 
-#: ui/outstanding_items_window.py:109
+#: ui/outstanding_items_window.py:126
 msgid "Translate All Missing"
 msgstr "Alles vermissen übersetzen"
 
-#: ui/outstanding_items_window.py:112
+#: ui/outstanding_items_window.py:129
 msgid "Cancel Translation"
 msgstr "Übersetzungsabbruch"
 
-#: ui/outstanding_items_window.py:142 ui/outstanding_items_window.py:178
+#: ui/outstanding_items_window.py:159 ui/outstanding_items_window.py:195
 msgid "Copy Text"
 msgstr "Text kopieren"
 
-#: ui/outstanding_items_window.py:148
+#: ui/outstanding_items_window.py:165
 msgid "Copy Default Translation"
 msgstr "Standardübersetzung kopieren"
 
-#: ui/outstanding_items_window.py:156
+#: ui/outstanding_items_window.py:173
 msgid "Translate with Argos Translate"
 msgstr "Übersetzen mit Argos Translate"
 
-#: ui/outstanding_items_window.py:161
+#: ui/outstanding_items_window.py:178
 msgid "Translate with LLM"
 msgstr "Übersetzen mit LLM"
 
-#: ui/recent_projects_dialog.py:30 ui/recent_projects_dialog.py:93
+#: ui/recent_projects_dialog.py:40 ui/recent_projects_dialog.py:104
 msgid "Select"
 msgstr "Auswählen"
 
-#: ui/recent_projects_dialog.py:76
+#: ui/recent_projects_dialog.py:87
 msgid "Select a Recent Project"
 msgstr "Wählen Sie einen kürzlich genutzten Projekt aus."
 
-#: ui/recent_projects_dialog.py:97
+#: ui/recent_projects_dialog.py:108
 msgid "Browse..."
 msgstr "Durchsuchen..."
 
-#: ui/recent_projects_dialog.py:100 ui/setup_translation_project_window.py:122
+#: ui/recent_projects_dialog.py:111 ui/setup_translation_project_window.py:147
 msgid "Cancel"
 msgstr "Abbrechen"
 
-#: ui/recent_projects_dialog.py:143
+#: ui/recent_projects_dialog.py:155
 msgid "Select Project Directory"
 msgstr "Projektverzeichnis auswählen"
 
-#: ui/setup_translation_project_window.py:24
+#: ui/setup_translation_project_window.py:25
 msgid "Setup Translation Project"
 msgstr "Einrichtung Übersetzungprojekt"
 
-#: ui/setup_translation_project_window.py:57
+#: ui/setup_translation_project_window.py:82
 msgid "Application name"
 msgstr "Bezeichnung der Anmeldung"
 
-#: ui/setup_translation_project_window.py:58
+#: ui/setup_translation_project_window.py:83
 msgid "Application Name:"
 msgstr "Applikationsname:"
 
-#: ui/setup_translation_project_window.py:62
+#: ui/setup_translation_project_window.py:87
 msgid "Version:"
 msgstr "Ausführung:"
 
-#: ui/setup_translation_project_window.py:65
+#: ui/setup_translation_project_window.py:90
 msgid "Author Name <author@example.com>"
 msgstr "Autor Name <autor@beispiel.de>"
 
-#: ui/setup_translation_project_window.py:66
+#: ui/setup_translation_project_window.py:91
 msgid "Author:"
 msgstr "Autor:"
 
-#: ui/setup_translation_project_window.py:69
+#: ui/setup_translation_project_window.py:94
 msgid "Translator Name <translator@example.com>"
 msgstr "Übersetzer Name <translator@example.com>"
 
-#: ui/setup_translation_project_window.py:70
+#: ui/setup_translation_project_window.py:95
 msgid "Default Translator:"
 msgstr "Standard-Übersetzer:"
 
-#: ui/setup_translation_project_window.py:77
+#: ui/setup_translation_project_window.py:102
 msgid "Default Locale:"
 msgstr "Standard-Sprachumgebung:"
 
-#: ui/setup_translation_project_window.py:87
+#: ui/setup_translation_project_window.py:112
 msgid "Project Locales"
 msgstr "Projekt-Lokalitäten"
 
-#: ui/setup_translation_project_window.py:95
+#: ui/setup_translation_project_window.py:120
 msgid "Enter locale code (e.g., fr, de, es)"
 msgstr "Geben Sie den lokalen Code ein (z.B. fr, de, es)"
 
-#: ui/setup_translation_project_window.py:98
+#: ui/setup_translation_project_window.py:123
 msgid "Add Locale"
 msgstr "Lokale hinzufügen"
 
-#: ui/setup_translation_project_window.py:111
+#: ui/setup_translation_project_window.py:136
 msgid "Remove Selected Locale"
 msgstr "Ausgewählte Lokale entfernen"
 
-#: ui/setup_translation_project_window.py:120
+#: ui/setup_translation_project_window.py:145
 msgid "Save Configuration"
 msgstr "Konfiguration speichern"
 
-#: ui/setup_translation_project_window.py:153
+#: ui/setup_translation_project_window.py:221
 msgid "Please enter a locale code."
 msgstr "Bitte geben Sie einen lokalen Code ein."
 
-#: ui/setup_translation_project_window.py:159
+#: ui/setup_translation_project_window.py:227
 msgid ""
 "Invalid locale code. Use format 'xx' or 'xx_YY' (e.g., 'fr' or 'fr_FR')."
 msgstr ""
 "Ungültiger Locale-Code. Verwenden Sie das Format 'xx' oder 'xx_YY' (z.B. "
 "'fr' oder 'fr_FR')"
 
-#: ui/setup_translation_project_window.py:165
+#: ui/setup_translation_project_window.py:233
 msgid "This locale already exists."
 msgstr "Diese Sprachumgebung existiert bereits."
 
-#: ui/setup_translation_project_window.py:176
+#: ui/setup_translation_project_window.py:244
 msgid "Please select a locale to remove."
 msgstr "Bitte wählen Sie einen Ort zum Entfernen aus."
 
-#: ui/setup_translation_project_window.py:181
+#: ui/setup_translation_project_window.py:249
 msgid "Cannot remove the default locale."
 msgstr "Kann den Standard Locale nicht entfernen."
 
-#: ui/setup_translation_project_window.py:184
+#: ui/setup_translation_project_window.py:252
 msgid "Confirm Removal"
 msgstr "Bestätigen Sie die Entfernung"
 
-#: ui/setup_translation_project_window.py:185
+#: ui/setup_translation_project_window.py:253
 msgid ""
 "Are you sure you want to remove locale '{}'? This will delete the locale "
 "directory and all its translations."
@@ -663,7 +663,7 @@ msgstr ""
 "Dies wird das Verzeichnis der Lokalisierungseinheit und alle darin "
 "enthaltenen Übersetzungen löschen."
 
-#: ui/setup_translation_project_window.py:202
+#: ui/setup_translation_project_window.py:270
 msgid ""
 "The default locale '{}' is not in the list of locales. Do you want to add "
 "it?"
@@ -671,11 +671,11 @@ msgstr ""
 "Der Standard locale '{}' ist nicht in der Liste der Einheimischen. Möchten "
 "Sie es hinzufügen?"
 
-#: ui/setup_translation_project_window.py:218
+#: ui/setup_translation_project_window.py:286
 msgid "The following locale codes are invalid:"
 msgstr "Die folgenden Lokalisationsschlüssel sind ungültig:"
 
-#: ui/setup_translation_project_window.py:221
+#: ui/setup_translation_project_window.py:289
 msgid ""
 "Locale codes must follow ISO 639-1 (language) and optionally ISO 3166-1 "
 "(country) standards."
@@ -683,37 +683,37 @@ msgstr ""
 "Lokale Codes müssen nach ISO 639-1 (Sprache) und optional nach ISO 3166-1 "
 "(Länder) Standards folgen."
 
-#: ui/setup_translation_project_window.py:225
+#: ui/setup_translation_project_window.py:293
 msgid "Invalid Locale Codes"
 msgstr "Ungültige Lokalisationscodes"
 
-#: ui/setup_translation_project_window.py:270
+#: ui/setup_translation_project_window.py:365
 msgid "Failed to save configuration: {}"
 msgstr "Fehler beim Speichern der Konfiguration: {}"
 
-#: ui/setup_translation_project_window.py:302
+#: ui/setup_translation_project_window.py:418
 msgid "Language code must be a two-letter ISO 639-1 code"
 msgstr "Sprachcode muss ein Zweibuchstaben ISO 639-1 sein"
 
-#: ui/setup_translation_project_window.py:306
+#: ui/setup_translation_project_window.py:422
 msgid "Invalid language code. Must be a valid ISO 639-1 code"
 msgstr "Ungültiger Sprachcode. Muss ein gültiger ISO 639-1 Code"
 
-#: ui/setup_translation_project_window.py:312
+#: ui/setup_translation_project_window.py:428
 msgid "Country code must be a two-letter uppercase ISO 3166-1 code"
 msgstr "Ländercode muss ein Zweibuchstaben-Oberteil ISO 3166-1 sein"
 
-#: ui/setup_translation_project_window.py:316
+#: ui/setup_translation_project_window.py:432
 msgid "Invalid country code. Must be a valid ISO 3166-1 code"
 msgstr "Invalider Ländercode. Muss ein gültiger ISO 3166-1 Code"
 
-#: ui/setup_translation_project_window.py:321
+#: ui/setup_translation_project_window.py:437
 msgid "Script code must be a four-letter code with first letter uppercase"
 msgstr ""
 "Skript-Code muss ein Vier-Buchstaben-Code mit ersten Buchstaben "
 "Großbuchstaben sein"
 
-#: ui/setup_translation_project_window.py:325
+#: ui/setup_translation_project_window.py:441
 msgid "Invalid script code. Must be a valid ISO 15924 code"
 msgstr "Ungültiger Skriptcode. Muss ein gültiger ISO 15924-Code"
 
@@ -757,27 +757,99 @@ msgstr "Ungültige Neue Zeile:"
 msgid "Stale Translations:"
 msgstr "Übersetzungen:"
 
-#: utils/globals.py:42 utils/globals.py:65 utils/globals.py:98
-#: utils/globals.py:123
+#: utils/globals.py:75 utils/globals.py:98 utils/globals.py:131
+#: utils/globals.py:156
 msgid "Invalid Unicode"
 msgstr "Invalid Unicode"
 
-#: utils/globals.py:44 utils/globals.py:67 utils/globals.py:100
-#: utils/globals.py:125
+#: utils/globals.py:77 utils/globals.py:100 utils/globals.py:133
+#: utils/globals.py:158
 msgid "Invalid Indices"
 msgstr "Invalide Indizes"
 
-#: utils/globals.py:46 utils/globals.py:69 utils/globals.py:102
-#: utils/globals.py:127
+#: utils/globals.py:79 utils/globals.py:102 utils/globals.py:135
+#: utils/globals.py:160
 msgid "Invalid Braces"
 msgstr "Ungültige Klammern"
 
-#: utils/globals.py:48 utils/globals.py:71 utils/globals.py:104
-#: utils/globals.py:129
+#: utils/globals.py:81 utils/globals.py:104 utils/globals.py:137
+#: utils/globals.py:162
 msgid "Invalid Leading Space"
 msgstr "Ungültige Leerzeichen"
 
-#: utils/globals.py:50 utils/globals.py:73 utils/globals.py:106
-#: utils/globals.py:131
+#: utils/globals.py:83 utils/globals.py:106 utils/globals.py:139
+#: utils/globals.py:164
 msgid "Invalid Newline"
 msgstr "Ungültige Neue Zeile"
+
+#: app.py:148 ui/bulk_pot_analysis_window.py:74
+msgid "Bulk Project Status"
+msgstr "Projektstatus in Massen"
+
+#: app.py:150
+msgid "Generate Base File"
+msgstr "Basisdatei generieren"
+
+#: app.py:151
+msgid "Update Translation Files"
+msgstr "Übersetzungsdateien aktualisieren"
+
+#: app.py:152
+msgid "Compile Translations"
+msgstr "Übersetzungen kompilieren"
+
+#: app.py:296
+msgid ""
+"Translation file compilation is not relevant for {} projects. {} projects "
+"use YAML files directly without a compilation step."
+msgstr ""
+"Die Kompilierung von Übersetzungsdateien ist für {} Projekte nicht relevant."
+" {} Projekte verwenden YAML-Dateien direkt ohne Kompilierungsschritt."
+
+#: app.py:636
+msgid "Compiled Files Need Update"
+msgstr "Zusammengefasste Dateien müssen aktualisiert werden"
+
+#: app.py:637
+msgid "Translation files have been updated for the following locales:"
+msgstr ""
+"Die Übersetzungsdateien wurden für die folgenden Sprachumgebungen "
+"aktualisiert:"
+
+#: app.py:639
+msgid "Remember to run Compile Translations to apply these changes."
+msgstr ""
+"Denken Sie daran, „Übersetzungen kompilieren“ auszuführen, um diese "
+"Änderungen zu übernehmen."
+
+#: ui/bulk_pot_analysis_window.py:42
+msgid "Starting bulk project status check for {} projects..."
+msgstr "Start der Statusprüfung für {} Projekte..."
+
+#: ui/bulk_pot_analysis_window.py:128
+msgid "Type"
+msgstr "Typ"
+
+#: ui/bulk_pot_analysis_window.py:129
+msgid "Base Modified"
+msgstr "Basis modifiziert"
+
+#: ui/outstanding_items_window.py:457
+msgid "Combine Duplicate Translations?"
+msgstr "Doppelte Übersetzungen zusammenführen?"
+
+#: ui/outstanding_items_window.py:585
+msgid "All Translations Resolved"
+msgstr "Alle Übersetzungen geklärt"
+
+#: ui/setup_translation_project_window.py:78
+msgid "Project Type:"
+msgstr "Projektart:"
+
+#: utils/globals.py:36 utils/globals.py:51
+msgid "Python"
+msgstr "Python"
+
+#: utils/globals.py:38 utils/globals.py:53
+msgid "Ruby"
+msgstr "Ruby"
