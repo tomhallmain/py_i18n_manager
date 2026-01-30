@@ -11,6 +11,10 @@ from utils.translations import I18N
 
 _ = I18N._
 
+# Minimum column widths: key column fits keys like "en.views.projects.created_at"; others slightly less
+KEY_COLUMN_MIN_WIDTH = 200
+OTHER_COLUMN_MIN_WIDTH = 140
+
 class AllTranslationsWindow(BaseTranslationWindow):
     translation_updated = pyqtSignal(str, list)  # locale, [(msgid, new_value), ...]
     
@@ -97,6 +101,13 @@ class AllTranslationsWindow(BaseTranslationWindow):
         self.critical_color = QColor(255, 200, 200)   # Light red for critical issues (unicode/indices)
         self.style_color = QColor(255, 220, 180)      # Light orange for style issues
 
+    def set_dynamic_column_widths(self, num_locales: int):
+        """Override: key column and locale columns start at minimum width, resizable to higher."""
+        super().set_dynamic_column_widths(num_locales)
+        self.table.setColumnWidth(0, KEY_COLUMN_MIN_WIDTH)
+        self.table.horizontalHeader().setMinimumSectionSize(OTHER_COLUMN_MIN_WIDTH)
+        self.table.horizontalHeader().setMaximumSectionSize(800)
+
     def load_data(self, translations, locales):
         """Load translation data into the table.
         
@@ -167,8 +178,10 @@ class AllTranslationsWindow(BaseTranslationWindow):
 
                 self.table.setItem(row, col, item)
 
-        # Adjust column widths
-        self.table.resizeColumnsToContents()
+        # Start every column at its minimum width; user can resize to make them wider
+        self.table.setColumnWidth(0, KEY_COLUMN_MIN_WIDTH)
+        for col in range(1, self.table.columnCount()):
+            self.table.setColumnWidth(col, OTHER_COLUMN_MIN_WIDTH)
 
     def filter_table(self):
         """Filter the table based on search text and status filter."""

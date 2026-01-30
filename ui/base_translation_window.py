@@ -1,11 +1,13 @@
 from PyQt6.QtWidgets import QDialog, QTableWidget, QHeaderView
 
+from ui.frozen_table_widget import FrozenTableWidget
+
 class BaseTranslationWindow(QDialog):
     """Base class for translation windows with shared table setup logic."""
     
     def setup_table(self):
-        """Set up the common table configuration."""
-        self.table = QTableWidget()
+        """Set up the common table configuration (first column frozen when scrolling)."""
+        self.table = FrozenTableWidget()
         self.table.setColumnCount(0)  # Will be set when data is loaded
         self.table.setRowCount(0)     # Will be set when data is loaded
         
@@ -40,4 +42,8 @@ class BaseTranslationWindow(QDialog):
         self.table.horizontalHeader().setMaximumSectionSize(max_width)
         
         # Set fixed width for the first column (msgid)
-        self.table.setColumnWidth(0, 100)  # Reduced fixed width for msgid column 
+        self.table.setColumnWidth(0, 100)  # Reduced fixed width for msgid column
+        
+        # Keep frozen first column in sync (width and visibility)
+        if hasattr(self.table, 'updateFrozenColumn'):
+            self.table.updateFrozenColumn()

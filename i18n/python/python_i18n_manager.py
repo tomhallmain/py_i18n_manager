@@ -245,6 +245,10 @@ class PythonI18NManager(I18NManagerBase):
         return os.path.join(self._directory, self._locale_dir, "base.pot")
 
     def gather_files(self):
+        # TODO: gettext supports multiple domains (e.g. base.pot, admin.pot); each domain has its
+        # own POT/PO set. This code currently requires exactly one POT file and fails otherwise.
+        # Change behavior to support multiple POT files consistently (e.g. per-domain handling,
+        # domain selection in UI, or defaulting to first/primary domain).
         POT_files = glob.glob(os.path.join(self._directory, "*.pot"))
         if len(POT_files) != 1:
             locale_dir = os.path.join(self._directory, self._locale_dir)

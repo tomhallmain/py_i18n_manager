@@ -18,6 +18,10 @@ _ = I18N._
 
 logger = get_logger(__name__)
 
+# Minimum column widths: key column fits keys like "en.views.projects.created_at"; others slightly less
+KEY_COLUMN_MIN_WIDTH = 200
+OTHER_COLUMN_MIN_WIDTH = 120
+
 class MultilineItemDelegate(QStyledItemDelegate):
     """A delegate that supports multiline editing in table cells."""
     def createEditor(self, parent, option, index):
@@ -70,8 +74,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.duplicate_value_groups = {}
         # Track which outstanding translation represents a group: {displayed_msgid: [all_matched_msgids]}
         self.outstanding_duplicate_groups = {}
-        # Minimum width for first column (Translation Key); set in load_data after resizeColumnsToContents
-        self._min_key_column_width = None
+        # Minimum width for first column (Translation Key); set in load_data
+        self._min_key_column_width = KEY_COLUMN_MIN_WIDTH
 
         self.setup_properties()
         self.setup_ui()
@@ -208,9 +212,11 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             self.table.setColumnWidth(0, min_w)
 
     def set_dynamic_column_widths(self, num_locales: int):
-        """Override so the first column can be wide (long Ruby YAML keys); base caps all at ~90–160."""
+        """Override: key column has a fixed minimum width and is resizable; other columns slightly less."""
         super().set_dynamic_column_widths(num_locales)
-        # Allow first column to grow; base uses one max for all sections
+        # Key column: minimum width to fit keys like "en.views.projects.created_at", resizable
+        self.table.setColumnWidth(0, KEY_COLUMN_MIN_WIDTH)
+        self.table.horizontalHeader().setMinimumSectionSize(OTHER_COLUMN_MIN_WIDTH)
         self.table.horizontalHeader().setMaximumSectionSize(800)
 
     def copy_cell_text(self, item):
@@ -652,10 +658,11 @@ class OutstandingItemsWindow(BaseTranslationWindow):
 
                 self.table.setItem(row, col, item)
 
-        self.table.resizeColumnsToContents()
-        
-        # Store first column (Translation Key) width as minimum so user can only widen it
-        self._min_key_column_width = self.table.columnWidth(0)
+        # Start every column at its minimum width; user can resize to make them wider
+        self.table.setColumnWidth(0, KEY_COLUMN_MIN_WIDTH)
+        for col in range(1, self.table.columnCount()):
+            self.table.setColumnWidth(col, OTHER_COLUMN_MIN_WIDTH)
+        self._min_key_column_width = KEY_COLUMN_MIN_WIDTH
         
         # Return True to indicate there are items to display
         return True
