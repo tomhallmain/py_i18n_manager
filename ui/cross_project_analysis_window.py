@@ -365,16 +365,17 @@ class CrossProjectAnalysisWindow(QDialog):
         for analysis in self.analyses:
             all_groups.extend(analysis.msgid_groups)
             
-        # Sort by source project and msgid
-        all_groups.sort(key=lambda g: (os.path.basename(g.source_project), g.target_msgid))
+        # Sort by source project and translation key
+        all_groups.sort(key=lambda g: (os.path.basename(g.source_project), str(g.target_key)))
         
         # Add to list
         for group in all_groups:
             source_project = os.path.basename(group.source_project)
             
-            # Create display text
-            msgid_display = group.target_msgid[:60]
-            if len(group.target_msgid) > 60:
+            # Create display text (key may include context)
+            key_str = str(group.target_key)
+            msgid_display = key_str[:60]
+            if len(key_str) > 60:
                 msgid_display += "..."
                 
             item_text = f"[{source_project}] {msgid_display}"
@@ -392,7 +393,7 @@ class CrossProjectAnalysisWindow(QDialog):
             
             # Add tooltip with full details
             tooltip = f"Source Project: {source_project}\n"
-            tooltip += f"Target MsgID: {group.target_msgid}\n"
+            tooltip += f"Target Key: {group.target_key}\n"
             tooltip += f"Filled Locales: {group.filled_locales_count}\n"
             tooltip += f"Fillable Locales: {group.fillable_locales_count}\n"
             if group.unfillable_locales_count > 0:
@@ -405,7 +406,7 @@ class CrossProjectAnalysisWindow(QDialog):
                 if count > 5:
                     tooltip += "\n" + _("... etc.")
                     break
-                tooltip += f"\n  Match {count}: {match.source_msgid}"
+                tooltip += f"\n  Match {count}: {match.source_key}"
                 tooltip += f"\n    Source Translation: {match.source_translation}"
             item.setToolTip(tooltip)
             

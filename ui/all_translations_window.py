@@ -120,10 +120,10 @@ class AllTranslationsWindow(BaseTranslationWindow):
         # Set up rows
         self.table.setRowCount(len(translations))
         
-        # Fill in data
-        for row, (msgid, group) in enumerate(translations.items()):
-            # Add msgid
-            msgid_item = QTableWidgetItem(msgid)
+        # Fill in data (key is always TranslationKey)
+        for row, (key, group) in enumerate(translations.items()):
+            msgid_item = QTableWidgetItem(group.key.msgid)
+            msgid_item.setData(Qt.ItemDataRole.UserRole, key)
             msgid_item.setFlags(msgid_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(row, 0, msgid_item)
 
@@ -238,9 +238,11 @@ class AllTranslationsWindow(BaseTranslationWindow):
         for row in range(self.table.rowCount()):
             if self.table.isRowHidden(row):
                 continue
-                
-            msgid = self.table.item(row, 0).text()
-            group = self.all_translations.get(msgid)
+            item = self.table.item(row, 0)
+            key = item.data(Qt.ItemDataRole.UserRole) if item else None
+            if key is None:
+                key = item.text() if item else ""
+            group = self.all_translations.get(key)
             if not group:
                 continue
                 
@@ -258,7 +260,7 @@ class AllTranslationsWindow(BaseTranslationWindow):
                 if new_value != original_value and len(new_value) > 0:
                     if locale not in changes_by_locale:
                         changes_by_locale[locale] = []
-                    changes_by_locale[locale].append((msgid, new_value))
+                    changes_by_locale[locale].append((key, new_value))
         
         if not changes_by_locale:
             QMessageBox.information(self, _("Info"), _("No changes to save."))
@@ -279,9 +281,11 @@ class AllTranslationsWindow(BaseTranslationWindow):
         for row in range(self.table.rowCount()):
             if self.table.isRowHidden(row):
                 continue
-                
-            msgid = self.table.item(row, 0).text()
-            group = self.all_translations.get(msgid)
+            item = self.table.item(row, 0)
+            key = item.data(Qt.ItemDataRole.UserRole) if item else None
+            if key is None:
+                key = item.text() if item else ""
+            group = self.all_translations.get(key)
             if not group:
                 continue
                 

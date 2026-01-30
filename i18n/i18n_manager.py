@@ -1,11 +1,12 @@
 import os
-from typing import Optional
+from typing import Dict, Optional, Set
 
 from utils.globals import ProjectType
 from utils.project_detector import ProjectDetector
 from utils.logging_setup import get_logger
 
 from .i18n_manager_base import I18NManagerBase
+from .translation_group import TranslationGroup, TranslationKey
 from .python.python_i18n_manager import PythonI18NManager
 from .ruby.ruby_i18n_manager import RubyI18NManager
 
@@ -112,17 +113,17 @@ class I18NManager(I18NManagerBase):
         self._locale_dir = self._manager._locale_dir
     
     @property
-    def locales(self):
+    def locales(self) -> list:
         """Get locales from the underlying manager."""
         return getattr(self._manager, 'locales', [])
     
     @property
-    def translations(self):
+    def translations(self) -> Dict[TranslationKey, TranslationGroup]:
         """Get translations from the underlying manager."""
         return getattr(self._manager, 'translations', {})
     
     @property
-    def written_locales(self):
+    def written_locales(self) -> Set[str]:
         """Get written locales from the underlying manager."""
         return getattr(self._manager, 'written_locales', set())
     

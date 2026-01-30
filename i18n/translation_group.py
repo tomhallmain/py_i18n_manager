@@ -118,16 +118,50 @@ def get_string_format_indices(s):
     return tuple(indices)
 
 
+class TranslationKey:
+    """Immutable key for a translation entry (context + msgid). Used so the same msgid
+    with different context are distinct. Hashable for use as dict key.
+    """
+    __slots__ = ('context', 'msgid')
+
+    def __init__(self, msgid: str, *, context: str = ''):
+        self.msgid = msgid
+        self.context = (context or '').strip()
+
+    def __hash__(self):
+        return hash((self.context, self.msgid))
+
+    def __eq__(self, other):
+        if not isinstance(other, TranslationKey):
+            return NotImplemented
+        return self.context == other.context and self.msgid == other.msgid
+
+    def __str__(self):
+        if self.context:
+            return f"{self.context} | {self.msgid}"
+        return self.msgid
+
+    def copy(self) -> 'TranslationKey':
+        """Return a new TranslationKey with the same msgid and context."""
+        return TranslationKey(self.msgid, context=self.context)
+
+    @classmethod
+    def from_entry(cls, entry: POEntry) -> 'TranslationKey':
+        """Build a TranslationKey from a polib POEntry."""
+        context = (getattr(entry, 'msgctxt', None) or '').strip()
+        return cls(entry.msgid, context=context)
+
+
 class TranslationGroup():
-    def __init__(self, msgid, is_in_base=False, usage_comment=None, tcomment=None):
-        self.key = msgid
+    def __init__(self, msgid, is_in_base=False, usage_comment=None, tcomment=None, context=None):
+        self.key = TranslationKey(msgid, context=context or '')
         self.values = {}
         self.is_in_base = is_in_base
         self.usage_comment = usage_comment
         self.tcomment = tcomment
         self.occurrences = []  # Add occurrences field to store file references
         self.default_locale = config.get('translation.default_locale', 'en')
-    
+
     @classmethod
     def from_polib_entry(cls, entry: POEntry, is_in_base=False):
         """Create a TranslationGroup from a polib.pofile entry.
@@ -139,7 +173,8 @@ class TranslationGroup():
         Returns:
             TranslationGroup: A new TranslationGroup instance
         """
-        group = cls(entry.msgid, is_in_base=is_in_base)
+        context = (entry.msgctxt or '').strip() if getattr(entry, 'msgctxt', None) is not None else ''
+        group = cls(entry.msgid, is_in_base=is_in_base, context=context or None)
         
         # Handle comments
         if entry.comment:
@@ -163,7 +198,7 @@ class TranslationGroup():
             if fail_on_key_error:
                raise e
             if locale == self.default_locale:
-                return self.key
+                return self.key.msgid
             return ""
 
     def get_translation_escaped(self, locale, fail_on_key_error=False):
@@ -368,10 +403,10 @@ class TranslationGroup():
         Returns:
             bool: True if any translation values have changed, False otherwise
         """
-        # Check if the msgid is the same
+        # Check if the key is the same
         if self.key != other.key:
             return True
-        
+
         # Get all unique locales from both groups
         all_locales = set(self.values.keys()) | set(other.values.keys())
         

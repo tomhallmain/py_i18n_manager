@@ -1,16 +1,21 @@
 from dataclasses import dataclass, field
 from typing import List, Tuple, Dict
 
+from .translation_group import TranslationKey
+
+
 @dataclass
 class InvalidTranslationGroups:
-    """Container for all types of invalid translations found in a project."""
-    not_in_base: List[str] = field(default_factory=list)
-    missing_locale_groups: List[Tuple[str, List[str]]] = field(default_factory=list)
-    invalid_unicode_locale_groups: List[Tuple[str, List[str]]] = field(default_factory=list)
-    invalid_index_locale_groups: List[Tuple[str, List[str]]] = field(default_factory=list)
-    invalid_brace_locale_groups: List[Tuple[str, List[str]]] = field(default_factory=list)
-    invalid_leading_space_locale_groups: List[Tuple[str, List[str]]] = field(default_factory=list)
-    invalid_newline_locale_groups: List[Tuple[str, List[str]]] = field(default_factory=list)
+    """Container for all types of invalid translations found in a project.
+    Keys are always TranslationKey (group.key from translations).
+    """
+    not_in_base: List[TranslationKey] = field(default_factory=list)
+    missing_locale_groups: List[Tuple[TranslationKey, List[str]]] = field(default_factory=list)
+    invalid_unicode_locale_groups: List[Tuple[TranslationKey, List[str]]] = field(default_factory=list)
+    invalid_index_locale_groups: List[Tuple[TranslationKey, List[str]]] = field(default_factory=list)
+    invalid_brace_locale_groups: List[Tuple[TranslationKey, List[str]]] = field(default_factory=list)
+    invalid_leading_space_locale_groups: List[Tuple[TranslationKey, List[str]]] = field(default_factory=list)
+    invalid_newline_locale_groups: List[Tuple[TranslationKey, List[str]]] = field(default_factory=list)
     
     @property
     def has_errors(self) -> bool:

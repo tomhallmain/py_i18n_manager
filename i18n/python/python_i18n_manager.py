@@ -10,7 +10,7 @@ from babel.messages.catalog import Catalog
 from babel.messages.extract import extract_from_dir
 from babel.messages.pofile import write_po
 
-from i18n.translation_group import TranslationGroup
+from i18n.translation_group import TranslationGroup, TranslationKey
 from ..translation_manager_results import TranslationManagerResults, TranslationAction, LocaleStatus
 from ..invalid_translation_groups import InvalidTranslationGroups
 from ..i18n_manager_base import I18NManagerBase
@@ -117,7 +117,7 @@ class PythonI18NManager(I18NManagerBase):
         logger.debug(f"Setting new project directory: {directory}")
         self._directory = directory
         # Reset translation state
-        self.translations: dict[str, TranslationGroup] = {}
+        self.translations: dict[TranslationKey, TranslationGroup] = {}
         self.written_locales = set()
         self.locales = []
         self.intro_details = {
@@ -278,7 +278,7 @@ class PythonI18NManager(I18NManagerBase):
         for entry in po:
             if entry.msgid and entry.msgid.strip():
                 group = TranslationGroup.from_polib_entry(entry, is_in_base=True)
-                self.translations[entry.msgid] = group
+                self.translations[group.key] = group
 
     def get_msgid(self, line):
         msgid = line[7:-2]
@@ -341,12 +341,12 @@ class PythonI18NManager(I18NManagerBase):
                     # else:
                         # logger.debug(f"  Contains actual newline: {has_actual}")
                 
-                if entry.msgid in self.translations:
-                    self.translations[entry.msgid].add_translation(locale, entry.msgstr)
+                group = TranslationGroup.from_polib_entry(entry, is_in_base=False)
+                if group.key in self.translations:
+                    self.translations[group.key].add_translation(locale, entry.msgstr)
                 else:
-                    group = TranslationGroup.from_polib_entry(entry, is_in_base=False)
                     group.add_translation(locale, entry.msgstr)
-                    self.translations[entry.msgid] = group
+                    self.translations[group.key] = group
         
         # Log summary statistics
         logger.info(f"PO file {PO} statistics:")
@@ -428,10 +428,11 @@ class PythonI18NManager(I18NManagerBase):
             
             # Add translations
             translation_count = 0
-            for msgid, group in self.translations.items():
+            for key, group in self.translations.items():
                 if not group.is_in_base:
                     continue
-                    
+                msgid = group.key.msgid
+                msgctxt = group.key.context or None
                 # Extract comments
                 comment = None
                 tcomment = None
@@ -439,17 +440,16 @@ class PythonI18NManager(I18NManagerBase):
                     comment = group.usage_comment.strip('#\n')
                 if group.tcomment:
                     tcomment = group.tcomment.strip('#\n')
-                
                 # Get the translation and ensure it's properly encoded
                 msgstr = group.get_translation_unescaped(locale) or ""
-                
                 try:
                     entry = polib.POEntry(
                         msgid=msgid,
                         msgstr=msgstr,
                         comment=comment,
                         tcomment=tcomment,
-                        occurrences=group.occurrences  # Include occurrences
+                        occurrences=group.occurrences,
+                        msgctxt=msgctxt
                     )
                     po.append(entry)
                     translation_count += 1
@@ -491,11 +491,11 @@ class PythonI18NManager(I18NManagerBase):
 
     def _purge_stale_translations(self):
         """Remove translations that are not in base once all locales have been written."""
-        stale_msgids = [msgid for msgid, group in self.translations.items() if not group.is_in_base]
-        for msgid in stale_msgids:
-            del self.translations[msgid]
-        if stale_msgids:
-            logger.debug(f"Purged {len(stale_msgids)} stale translations")
+        stale_keys = [key for key, group in self.translations.items() if not group.is_in_base]
+        for key in stale_keys:
+            del self.translations[key]
+        if stale_keys:
+            logger.debug(f"Purged {len(stale_keys)} stale translations")
 
     def get_POT_intro_details(self, locale="en", first_author="THOMAS HALL", year=None, application_name="APPLICATION", version="1.0", last_translator=""):
         timestamp = time.strftime('%Y-%m-%d %H:%M%z')
@@ -696,7 +696,10 @@ msgstr ""
             for filename, lineno, message, comments, context in extract_from_dir(
                 project_dir,
                 method_map=method_map,
-                keywords={'_': None, 'gettext': None, 'ngettext': (1, 2)},
+                keywords={
+                    '_': None, 'gettext': None, 'ngettext': (1, 2),
+                    'pgettext': (1, 2), 'npgettext': (1, 2, 3)  # context, (singular, plural), count
+                },
                 comment_tags=('TRANSLATORS:',),
                 strip_comment_tags=True
             ):
@@ -730,7 +733,10 @@ msgstr ""
             for filename, lineno, message, comments, context in extract_from_dir(
                 project_dir,
                 method_map=[('**.py', 'python')],
-                keywords={'_': None, 'gettext': None, 'ngettext': (1, 2)},
+                keywords={
+                    '_': None, 'gettext': None, 'ngettext': (1, 2),
+                    'pgettext': (1, 2), 'npgettext': (1, 2, 3)  # context, (singular, plural), count
+                },
                 comment_tags=('TRANSLATORS:',),
                 strip_comment_tags=True,
                 # NOTE the below doesn't actually work, it was an attempt to preserve the location
@@ -877,33 +883,33 @@ msgstr ""
                 return True
             
             new_translations = self.translations
-            
-            # Compare the translation sets
-            new_msgids = set(new_translations.keys())
-            current_msgids = set(current_translations.keys())
-            
+
+            # Compare the translation sets (keys are (context, msgid) for Python)
+            new_keys = set(new_translations.keys())
+            current_keys = set(current_translations.keys())
+
             # Check for new translations (in new but not in current)
-            new_translations_only = new_msgids - current_msgids
+            new_translations_only = new_keys - current_keys
             if new_translations_only:
                 logger.debug(f"Found {len(new_translations_only)} new translations")
                 return True
-            
+
             # Check for stale translations (in current but not in new) if requested
             if include_stale_translations:
-                stale_translations = current_msgids - new_msgids
+                stale_translations = current_keys - new_keys
                 if stale_translations:
                     logger.debug(f"Found {len(stale_translations)} stale translations")
                     return True
-            
+
             # Check if any existing translations have changed their content
-            for msgid in current_msgids:
-                if msgid in new_msgids:
-                    new_group = new_translations[msgid]
-                    current_group = current_translations[msgid]
-                    
+            for key in current_keys:
+                if key in new_keys:
+                    new_group = new_translations[key]
+                    current_group = current_translations[key]
+
                     # Compare actual translation values (not metadata)
                     if current_group.has_translation_changes(new_group):
-                        logger.debug(f"Translation values changed for msgid '{msgid}'")
+                        logger.debug(f"Translation values changed for key '{key}'")
                         return True
             
             logger.debug("No actual translation content changes detected")

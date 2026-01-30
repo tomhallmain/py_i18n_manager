@@ -284,7 +284,7 @@ class BulkPotAnalyzer:
             
             for locale in manager.locales:
                 locale_missing_count = 0
-                for msgid, group in manager.translations.items():
+                for key, group in manager.translations.items():
                     if group.is_in_base:  # Only check base translations
                         translation = group.get_translation(locale)
                         if not translation or not translation.strip():

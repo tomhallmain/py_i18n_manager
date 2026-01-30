@@ -427,19 +427,19 @@ class MainWindow(QMainWindow):
         
         Args:
             locale (str): The locale code
-            changes (list): List of (msgid, new_value) tuples for this locale
+            changes (list): List of (key, new_value) tuples for this locale (key is TranslationKey)
         """
         logger.debug(f"Handling translation updates for locale {locale} - {len(changes)} changes")
         
         # Update the translations in memory
         missing_keys = []
-        for msgid, new_value in changes:
-            if msgid in self.i18n_manager.translations:
-                logger.debug(f"Updating translation in memory for {msgid} in {locale}")
-                self.i18n_manager.translations[msgid].add_translation(locale, new_value)
+        for key, new_value in changes:
+            if key in self.i18n_manager.translations:
+                logger.debug(f"Updating translation in memory for {key} in {locale}")
+                self.i18n_manager.translations[key].add_translation(locale, new_value)
             else:
-                missing_keys.append(msgid)
-                logger.warning(f"Translation key {msgid} not found in translations dict")
+                missing_keys.append(key)
+                logger.warning(f"Translation key {key} not found in translations dict")
         
         if missing_keys:
             logger.warning(f"Total {len(missing_keys)} keys were missing from translations dict: {missing_keys[:10]}{'...' if len(missing_keys) > 10 else ''}")

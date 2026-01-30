@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .i18n_manager import I18NManager
-from .translation_group import TranslationGroup
+from .translation_group import TranslationGroup, TranslationKey
 from .translation_manager_results import TranslationAction
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
@@ -16,21 +16,21 @@ logger = get_logger("cross_project_analyzer")
 class TranslationMatch:
     """Represents a translation match found across projects."""
     source_project: str
-    source_msgid: str
+    source_key: TranslationKey  # Translation key (context + msgid) in source
     source_translation: str
     target_project: str
-    target_msgid: str
+    target_key: TranslationKey  # Translation key (context + msgid) in target
     target_locale: str
     confidence: float = 1.0  # 1.0 for exact matches, lower for fuzzy matches
-    
+
     def __str__(self):
-        return f"Match: '{self.source_msgid}' ({self.source_translation}) -> '{self.target_msgid}' ({self.target_locale}) from {self.source_project}"
+        return f"Match: '{self.source_key}' ({self.source_translation}) -> '{self.target_key}' ({self.target_locale}) from {self.source_project}"
 
 @dataclass
 class MsgIdMatchGroup:
     """Represents a group of translation matches for a single msgid."""
     source_project: str
-    target_msgid: str
+    target_key: TranslationKey  # Translation key (context + msgid) in target
     filled_locales_count: int = 0
     fillable_locales_count: int = 0
     unfillable_locales_count: int = 0
@@ -211,19 +211,19 @@ class CrossProjectAnalyzer:
         missing_matches = []
         msgid_groups = {}  # Group matches by msgid
         
-        for msgid, target_group in target_manager.translations.items():
+        for key, target_group in target_manager.translations.items():
             if not target_group.is_in_base:
                 continue  # Skip stale translations
-                
-            # Initialize group for this msgid
-            if msgid not in msgid_groups:
-                msgid_groups[msgid] = MsgIdMatchGroup(
+
+            # Initialize group for this key (store a copy of the key)
+            if key not in msgid_groups:
+                msgid_groups[key] = MsgIdMatchGroup(
                     source_project=source_project,
-                    target_msgid=msgid,
+                    target_key=key.copy(),
                     total_target_locales=len(target_locales)
                 )
-            
-            group = msgid_groups[msgid]
+
+            group = msgid_groups[key]
             filled_count = 0
             fillable_count = 0
             unfillable_count = 0
@@ -240,8 +240,8 @@ class CrossProjectAnalyzer:
                 
                 # Look for exact match in source project
                 match = self._find_exact_match(
-                    source_manager, target_manager, 
-                    msgid, locale, source_default
+                    source_manager, target_manager,
+                    key, locale, source_default
                 )
                 
                 # Check current target translation status
@@ -285,25 +285,26 @@ class CrossProjectAnalyzer:
         return analysis
     
     def _find_exact_match(self, source_manager: I18NManager, target_manager: I18NManager,
-                         target_msgid: str, target_locale: str, default_locale: str) -> Optional[TranslationMatch]:
+                         target_key: TranslationKey, target_locale: str, default_locale: str) -> Optional[TranslationMatch]:
         """Find an exact translation match in the source project.
-        
+
+        Strategy 1 matches by full key (context + msgid); Strategy 2 matches by
+        default-locale value only, so matches can cross context (e.g. same text,
+        different context).
+
         Args:
-            source_manager (I18NManager): Manager for source project
-            target_manager (I18NManager): Manager for target project
-            target_msgid (str): The msgid to find a translation for
-            target_locale (str): The locale needing translation
-            default_locale (str): The default locale (usually 'en')
-            
+            source_manager: Manager for source project
+            target_manager: Manager for target project
+            target_key: The translation key to find a translation for
+            target_locale: The locale needing translation
+            default_locale: The default locale (usually 'en')
+
         Returns:
-            Optional[TranslationMatch]: Match if found, None otherwise
+            TranslationMatch if found, None otherwise
         """
-        # logger.debug(f"Finding match for msgid '{target_msgid}' in locale '{target_locale}'")
-        
-        # Strategy 1: Look for exact msgid match in source project
-        if target_msgid in source_manager.translations:
-            # logger.debug(f"Found exact msgid match in source project")
-            source_group = source_manager.translations[target_msgid]
+        # Strategy 1: Look for exact key match in source (same context + msgid)
+        if target_key in source_manager.translations:
+            source_group = source_manager.translations[target_key]
             
             # Check if source has translation for target locale
             if target_locale in source_group.values:
@@ -313,10 +314,10 @@ class CrossProjectAnalyzer:
                     # logger.debug(f"Found translation for target locale '{target_locale}': '{source_translation}'")
                     return TranslationMatch(
                         source_project=source_manager._directory,
-                        source_msgid=target_msgid,
+                        source_key=target_key.copy(),
                         source_translation=source_translation,
                         target_project=target_manager._directory,
-                        target_msgid=target_msgid,
+                        target_key=target_key.copy(),
                         target_locale=target_locale
                     )
             #     else:
@@ -330,19 +331,19 @@ class CrossProjectAnalyzer:
         # else:
         #     logger.debug(f"No exact msgid match found in source project")
         
-        # Strategy 2: Look for exact default locale translation match
-        # This handles cases where the msgid is different but the English text is the same
-        target_default_translation = target_manager.translations[target_msgid].get_translation(default_locale)
+        # Strategy 2: Match by default-locale value only (context not considered for finding;
+        # we still store the full key copy in the match)
+        target_default_translation = target_manager.translations[target_key].get_translation(default_locale)
         if target_default_translation and target_default_translation.strip():
             # logger.debug(f"Looking for default locale match: '{target_default_translation}'")
             match_count = 0
-            for source_msgid, source_group in source_manager.translations.items():
+            for source_key, source_group in source_manager.translations.items():
                 source_default = source_group.get_translation(default_locale)
                 if (source_default and source_default.strip() and 
                     source_default == target_default_translation):
                     
                     match_count += 1
-                    # logger.debug(f"Found matching default translation in source msgid '{source_msgid}' (match #{match_count})")
+                    # logger.debug(f"Found matching default translation in source key '{source_key}' (match #{match_count})")
                     # Check if source has translation for target locale
                     if target_locale in source_group.values:
                         source_translation = source_group.values[target_locale]
@@ -351,10 +352,10 @@ class CrossProjectAnalyzer:
                             # logger.debug(f"Found translation for target locale '{target_locale}': '{source_translation}'")
                             return TranslationMatch(
                                 source_project=source_manager._directory,
-                                source_msgid=source_msgid,
+                                source_key=source_key.copy(),
                                 source_translation=source_translation,
                                 target_project=target_manager._directory,
-                                target_msgid=target_msgid,
+                                target_key=target_key.copy(),
                                 target_locale=target_locale
                             )
                     #     else:
@@ -369,7 +370,7 @@ class CrossProjectAnalyzer:
         # else:
         #     logger.debug(f"No default locale translation available for target msgid")
         
-        # logger.debug(f"No match found for msgid '{target_msgid}' in locale '{target_locale}'")
+        # logger.debug(f"No match found for key '{target_key}' in locale '{target_locale}'")
         return None
     
     def apply_matches_to_target(self,
@@ -411,8 +412,8 @@ class CrossProjectAnalyzer:
         applied_changes = {}
         
         for match in matches_to_apply:
-            if match.target_msgid in target_manager.translations:
-                target_group = target_manager.translations[match.target_msgid]
+            if match.target_key in target_manager.translations:
+                target_group = target_manager.translations[match.target_key]
                 
                 # Check if translation is already filled (for missing matches only)
                 if not apply_all_matches:
@@ -433,7 +434,7 @@ class CrossProjectAnalyzer:
                     applied_changes[match.target_locale] = 0
                 applied_changes[match.target_locale] += 1
             else:
-                logger.error(f"Could not find target msgid {match.target_msgid} in target project {target_manager._directory}")
+                logger.error(f"Could not find target key {match.target_key} in target project {target_manager._directory}")
         
         if not dry_run and applied_changes:
             # Write PO files for affected locales
@@ -517,7 +518,7 @@ class CrossProjectAnalyzer:
         for analysis in analyses:
             for match in analysis.matches_found:
                 # Create a unique key for each target msgid + locale combination
-                key = (match.target_msgid, match.target_locale)
+                key = (match.target_key, match.target_locale)
                 
                 # Keep the match with highest confidence (or first one if equal)
                 if key not in consolidated or match.confidence > consolidated[key].confidence:
