@@ -75,12 +75,11 @@ class BulkPotAnalysisWindow(SmartDialog):
             parent=parent,
             position_parent=parent,
             title=_("Bulk Project Status"),
-            geometry="1200x800",
+            geometry="900x800",
             offset_x=50,
             offset_y=50,
         )
         self.setModal(True)
-        self.resize(1200, 800)
         self.settings_manager = SettingsManager()
         self.analyzer = BulkPotAnalyzer(self.settings_manager)
         self.results: List[ProjectAnalysisResult] = []
@@ -159,7 +158,7 @@ class BulkPotAnalysisWindow(SmartDialog):
         content_splitter.addWidget(details_group)
         
         # Set splitter proportions
-        content_splitter.setSizes([800, 400])
+        content_splitter.setSizes([700, 400])
         
         layout.addWidget(content_splitter)
         

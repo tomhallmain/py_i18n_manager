@@ -1,7 +1,7 @@
 
 import os
 from typing import List, Optional
-from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, 
+from PyQt6.QtWidgets import (QApplication, QVBoxLayout, QHBoxLayout, QPushButton, 
                             QLabel, QComboBox, QTextEdit, QProgressBar, 
                             QCheckBox, QGroupBox, QListWidget, QListWidgetItem,
                             QMessageBox, QFrame, QSplitter)
@@ -72,12 +72,11 @@ class CrossProjectAnalysisWindow(SmartDialog):
             parent=parent,
             position_parent=parent,
             title=_("Cross-Project Translation Analysis"),
-            geometry="1000x700",
+            geometry="800x700",
             offset_x=50,
             offset_y=50,
         )
         self.setModal(True)
-        self.resize(1000, 700)
         
         # Initialize components
         self.settings_manager = SettingsManager()
@@ -99,7 +98,7 @@ class CrossProjectAnalysisWindow(SmartDialog):
         project_layout = QHBoxLayout()
         project_layout.addWidget(QLabel(_("Target Project:")))
         self.target_project_combo = QComboBox()
-        self.target_project_combo.setMinimumWidth(250)
+        self.target_project_combo.setMinimumWidth(150)
         self.target_project_combo.currentIndexChanged.connect(self.on_target_project_changed)
         project_layout.addWidget(self.target_project_combo)
         
@@ -122,7 +121,7 @@ class CrossProjectAnalysisWindow(SmartDialog):
         source_layout = QHBoxLayout()
         source_layout.addWidget(QLabel(_("Source Project:")))
         self.source_project_combo = QComboBox()
-        self.source_project_combo.setMinimumWidth(250)
+        self.source_project_combo.setMinimumWidth(150)
         self.source_project_combo.addItem(_("All Projects"), None)  # Default option
         source_layout.addWidget(self.source_project_combo)
         
@@ -179,7 +178,7 @@ class CrossProjectAnalysisWindow(SmartDialog):
         
         self.summary_text = QTextEdit()
         self.summary_text.setReadOnly(True)
-        self.summary_text.setMaximumWidth(250)
+        self.summary_text.setMaximumWidth(200)
         summary_layout.addWidget(self.summary_text)
         
         results_splitter.addWidget(summary_group)
@@ -194,8 +193,8 @@ class CrossProjectAnalysisWindow(SmartDialog):
         
         results_splitter.addWidget(matches_group)
         
-        # Set splitter proportions to give more space to matches
-        results_splitter.setSizes([250, 750])
+        # Set splitter proportions (sum must fit within window max width)
+        results_splitter.setSizes([200, 500])
         
         layout.addWidget(results_splitter)
         
