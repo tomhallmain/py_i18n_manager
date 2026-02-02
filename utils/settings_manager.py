@@ -16,25 +16,7 @@ class SettingsManager:
     def __init__(self):
         self.settings_file = Path.home() / '.i18n_manager' / 'settings.json'
         self.settings_file.parent.mkdir(parents=True, exist_ok=True)
-        self.default_config_path = Path(__file__).parent.parent / 'configs' / 'default_config.json'
-        
-    def load_config(self) -> dict:
-        """Load configuration from default config file.
-        
-        Returns:
-            dict: Configuration dictionary
-        """
-        try:
-            if self.default_config_path.exists():
-                with open(self.default_config_path, 'r') as f:
-                    return json.load(f)
-            else:
-                logger.warning(f"Default config file not found at {self.default_config_path}")
-                return {}
-        except Exception as e:
-            logger.error(f"Error loading config: {e}")
-            return {}
-            
+
     def load_last_project(self) -> Optional[str]:
         """Load the last selected project path from settings.
         
@@ -230,12 +212,9 @@ class SettingsManager:
         if project_default:
             return project_default
             
-        # Fall back to global default
-        try:
-            config = self.load_config()
-            return config.get('translation', {}).get('default_locale', 'en')
-        except Exception:
-            return 'en'
+        # Fall back to global default from config_manager
+        from utils.config import config_manager
+        return config_manager.get('translation.default_locale', 'en')
             
     def save_project_default_locale(self, project_path: str, default_locale: str) -> bool:
         """Save the default locale for a specific project.
@@ -315,7 +294,7 @@ class SettingsManager:
         return self.save_project_setting(project_path, 'project_type', project_type)
 
     def get_intro_details(self) -> dict[str, str]:
-        """Get the intro details from the config.
+        """Get the intro details from config_manager (default config).
         
         Returns:
             dict: Dictionary containing intro details with keys:
@@ -324,24 +303,19 @@ class SettingsManager:
                 - application_name
                 - version
         """
-        try:
-            config = self.load_config()
-            intro_details = config.get("intro_details", {})
-            return {
-                "first_author": intro_details.get("default_first_author", "THOMAS HALL <tomhall.main@gmail.com>"),
-                "last_translator": intro_details.get("default_last_translator", "Thomas Hall <tomhall.main@gmail.com>"),
-                "application_name": intro_details.get("default_application_name", "APPLICATION"),
-                "version": intro_details.get("default_version", "1.0")
-            }
-        except Exception as e:
-            logger.error(f"Error getting intro details from config: {e}")
-            # Return default values if there's an error
-            return {
-                "first_author": "THOMAS HALL <tomhall.main@gmail.com>",
-                "last_translator": "Thomas Hall <tomhall.main@gmail.com>",
-                "application_name": "APPLICATION",
-                "version": "1.0"
-            }
+        from utils.config import config_manager
+        defaults = (
+            "THOMAS HALL <tomhall.main@gmail.com>",
+            "Thomas Hall <tomhall.main@gmail.com>",
+            "APPLICATION",
+            "1.0",
+        )
+        return {
+            "first_author": config_manager.get("intro_details.default_first_author", defaults[0]),
+            "last_translator": config_manager.get("intro_details.default_last_translator", defaults[1]),
+            "application_name": config_manager.get("intro_details.default_application_name", defaults[2]),
+            "version": config_manager.get("intro_details.default_version", defaults[3]),
+        }
 
     def save_intro_details(self, intro_details: dict[str, str]):
         """Save intro details to settings.

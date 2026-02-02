@@ -4,8 +4,50 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Settings
-.i18n_manager/
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
 
+# App cache (app_info_cache.json and backups)
+app_info_cache.json
+app_info_cache.json.bak*
+*.enc
+
+# IDE / editor
+.idea/
+.vscode/
+*.sublime-*
+
+# Testing / coverage
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.tox/
+.nox/
+
+# Misc
 temp*
+*.log
+.env
+.env.local

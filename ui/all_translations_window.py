@@ -17,15 +17,13 @@ OTHER_COLUMN_MIN_WIDTH = 140
 
 class AllTranslationsWindow(BaseTranslationWindow):
     translation_updated = pyqtSignal(str, list)  # locale, [(msgid, new_value), ...]
-    
+
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(_("All Translations"))
-        
-        # Get screen dimensions and set window size
+        super().__init__(parent, title=_("All Translations"), geometry="1200x800")
+        # Screen-relative min size; position already set by SmartDialog on parent's display
         screen = QApplication.primaryScreen().geometry()
-        self.setMinimumSize(int(screen.width() * 0.8), int(screen.height() * 0.8))  # 80% of screen size
-        self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))  # 90% of screen size
+        self.setMinimumSize(int(screen.width() * 0.8), int(screen.height() * 0.8))
+        self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))
         
         self.show_escaped = False  # By default it should be encoded, not escaped
         self.setup_ui()

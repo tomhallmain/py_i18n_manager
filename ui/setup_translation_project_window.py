@@ -1,9 +1,10 @@
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, 
                             QLabel, QLineEdit, QFormLayout, QListWidget, QListWidgetItem,
                             QMessageBox, QFrame, QComboBox)
 from PyQt6.QtCore import Qt, pyqtSignal
 import os
 
+from lib.multi_display import SmartDialog
 from utils.globals import valid_language_codes, valid_country_codes, valid_script_codes, ProjectType
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
@@ -14,15 +15,21 @@ _ = I18N._
 
 logger = get_logger("setup_translation_project_window")
 
-class SetupTranslationProjectWindow(QDialog):
+class SetupTranslationProjectWindow(SmartDialog):
     project_configured = pyqtSignal()  # Emitted when project setup is complete
-    
+
     def __init__(self, project_dir, parent=None):
-        super().__init__(parent)
+        super().__init__(
+            parent=parent,
+            position_parent=parent,
+            title=_("Setup Translation Project"),
+            geometry="600x500",
+            offset_x=50,
+            offset_y=50,
+        )
         self.project_dir = project_dir
         self.settings_manager = SettingsManager()
         self.intro_details = self.settings_manager.get_intro_details()
-        self.setWindowTitle(_("Setup Translation Project"))
         self.setMinimumSize(600, 500)
         self.load_project_settings()
         self.setup_ui()

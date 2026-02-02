@@ -1,12 +1,16 @@
 from enum import Enum
 import os
 
-from utils.config import ConfigManager
+from utils.config import config_manager
 from utils.translations import I18N
 
 _ = I18N._
 
-config_manager = ConfigManager()
+
+class AppInfo(Enum):
+    SERVICE_NAME = "MyPersonalApplicationsService"
+    APP_IDENTIFIER = "py_i18n_manager"
+
 
 class Globals:
     HOME = os.path.expanduser("~")

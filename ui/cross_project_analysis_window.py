@@ -1,13 +1,14 @@
 
 import os
 from typing import List, Optional
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, 
                             QLabel, QComboBox, QTextEdit, QProgressBar, 
                             QCheckBox, QGroupBox, QListWidget, QListWidgetItem,
                             QMessageBox, QFrame, QSplitter)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 
+from lib.multi_display import SmartDialog
 from i18n.cross_project_analyzer import CrossProjectAnalyzer, CrossProjectAnalysis, MsgIdMatchGroup, TranslationMatch
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
@@ -63,15 +64,19 @@ class AnalysisWorker(QThread):
             logger.error(f"Traceback: {traceback.format_exc()}")
             self.error.emit(str(e))
 
-class CrossProjectAnalysisWindow(QDialog):
+class CrossProjectAnalysisWindow(SmartDialog):
     """Window for cross-project translation analysis."""
-    
+
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(_("Cross-Project Translation Analysis"))
+        super().__init__(
+            parent=parent,
+            position_parent=parent,
+            title=_("Cross-Project Translation Analysis"),
+            geometry="1000x700",
+            offset_x=50,
+            offset_y=50,
+        )
         self.setModal(True)
-        
-        # Set window size
         self.resize(1000, 700)
         
         # Initialize components

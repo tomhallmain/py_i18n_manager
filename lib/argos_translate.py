@@ -7,7 +7,7 @@ import argostranslate.translate
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from ui.download_dialog import DownloadDialog
-from utils.config import ConfigManager
+from utils.config import config_manager
 from utils.logging_setup import get_logger
 
 logger = get_logger("argos_translate")
@@ -22,15 +22,12 @@ class ArgosTranslate(QObject):
         """Initialize Argos Translate with configuration from settings."""
         super().__init__()
         
-        # Get configuration
-        self.config = ConfigManager()
-        
         # Initialize state
         self.is_usable = False
         
-        # Configure model storage path from settings
+        # Configure model storage path from config
         try:
-            models_dir = self.config.get('translation.models_dir', 'models/argos')
+            models_dir = config_manager.get('translation.models_dir', 'models/argos')
             self.models_dir = Path(models_dir)
             
             # Try to create the directory
@@ -177,7 +174,7 @@ class ArgosTranslate(QObject):
             return ""
             
         if source_locale is None:
-            source_locale = self.config.get('translation.default_locale', 'en')
+            source_locale = config_manager.get('translation.default_locale', 'en')
             
         try:
             # Check if language pair is available

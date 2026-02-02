@@ -1,12 +1,13 @@
 import os
 from typing import List, Optional
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, 
                             QLabel, QTextEdit, QProgressBar, QTableWidget,
                             QTableWidgetItem, QHeaderView, QMessageBox, 
                             QFrame, QGroupBox, QSplitter)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QColor
 
+from lib.multi_display import SmartDialog
 from i18n.bulk_pot_analyzer import BulkPotAnalyzer, ProjectAnalysisResult, GitStatus
 from utils.globals import ProjectType
 from utils.logging_setup import get_logger
@@ -59,7 +60,7 @@ class BulkAnalysisWorker(QThread):
             logger.error(f"Traceback: {traceback.format_exc()}")
             self.error.emit(str(e))
 
-class BulkPotAnalysisWindow(QDialog):
+class BulkPotAnalysisWindow(SmartDialog):
     """Window for bulk project status checking and base file generation across all projects.
     
     This window generates/updates base translation files for all projects and reports on:
@@ -68,21 +69,22 @@ class BulkPotAnalysisWindow(QDialog):
     - Base file modification status
     - Overall project health
     """
-    
+
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(_("Bulk Project Status"))
+        super().__init__(
+            parent=parent,
+            position_parent=parent,
+            title=_("Bulk Project Status"),
+            geometry="1200x800",
+            offset_x=50,
+            offset_y=50,
+        )
         self.setModal(True)
-        
-        # Set window size
         self.resize(1200, 800)
-        
-        # Initialize components
         self.settings_manager = SettingsManager()
         self.analyzer = BulkPotAnalyzer(self.settings_manager)
         self.results: List[ProjectAnalysisResult] = []
         self.worker: Optional[BulkAnalysisWorker] = None
-        
         self.setup_ui()
         
     def setup_ui(self):

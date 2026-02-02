@@ -8,7 +8,7 @@ import random
 import string
 
 from lib.translation_service import TranslationService
-from utils.config import ConfigManager
+from utils.globals import config_manager
 from utils.globals import TranslationStatus
 from utils.logging_setup import get_logger
 from utils.translations import I18N
@@ -59,15 +59,11 @@ class OutstandingItemsWindow(BaseTranslationWindow):
     translation_updated = pyqtSignal(str, list)  # locale, [(msgid, new_value), ...]
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(_("Outstanding Translation Items"))
-
-        # Get screen dimensions and set window size
+        super().__init__(parent, title=_("Outstanding Translation Items"), geometry="1200x800")
+        # Screen-relative min size; position already set by SmartDialog on parent's display
         screen = QApplication.primaryScreen().geometry()
-        self.setMinimumSize(int(screen.width() * 0.8), int(screen.height() * 0.8))  # 80% of screen size
-        self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))  # 90% of screen size
-
-        self.config = ConfigManager()
+        self.setMinimumSize(int(screen.width() * 0.8), int(screen.height() * 0.8))
+        self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))
 
         self.show_escaped = False  # By default it should be encoded, not escaped
         # Track duplicate value matches: {default_value: [list of msgids]}
@@ -81,7 +77,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.setup_ui()
 
     def setup_properties(self):
-        self.default_locale = self.config.get('translation.default_locale', 'en')
+        self.default_locale = config_manager.get('translation.default_locale', 'en')
         self.translation_service = TranslationService(default_locale=self.default_locale)
         self.is_translating = False
 
@@ -165,7 +161,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         menu.addAction(copy_text)
         
         # Add Copy Default Translation option
-        default_locale = self.config.get('translation.default_locale', 'en')
+        default_locale = config_manager.get('translation.default_locale', 'en')
         copy_default = QAction(_("Copy Default Translation"), self)
         copy_default.triggered.connect(lambda: self.copy_default_translation(item, default_locale))
         menu.addAction(copy_default)
@@ -289,7 +285,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             use_llm (bool): Whether to use LLM for translation
         """
         # Get the English translation if available, otherwise use default locale
-        default_locale = self.config.get('translation.default_locale', 'en')
+        default_locale = config_manager.get('translation.default_locale', 'en')
         source_text = self.translations[key].get_translation('en') or self.translations[key].get_translation(default_locale)
 
         if not source_text:
@@ -367,7 +363,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 - existing_to_outstanding_matches: dict mapping default_value to list of (existing_msgid, outstanding_msgid) tuples
                 - outstanding_duplicates: dict mapping default_value to list of outstanding msgids
         """
-        default_locale = self.config.get('translation.default_locale', 'en')
+        default_locale = config_manager.get('translation.default_locale', 'en')
         
         # Build map of default locale values to translation keys
         value_to_keys = {}
@@ -497,7 +493,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.outstanding_duplicate_groups = {}  # Reset duplicate groups
 
         # Get default locale and exclude it from the list
-        default_locale = self.config.get('translation.default_locale', 'en')
+        default_locale = config_manager.get('translation.default_locale', 'en')
         display_locales = [loc for loc in locales if loc != default_locale]
 
         # Set up columns (first column is msgid, then one for each non-default locale)
@@ -691,7 +687,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                     
                     # Reinitialize translation service
                     logger.debug("Reinitializing translation service...")
-                    default_locale = self.config.get('translation.default_locale', 'en')
+                    default_locale = config_manager.get('translation.default_locale', 'en')
                     self.translation_service = TranslationService(default_locale=default_locale)
                 except Exception as e:
                     logger.error(f"Error during translation service cleanup/reinitialization: {e}")

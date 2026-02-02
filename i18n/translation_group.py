@@ -4,10 +4,7 @@ from typing import List
 
 from polib import POEntry
 
-from utils.config import ConfigManager
-
-# Initialize config manager
-config = ConfigManager()
+from utils.config import config_manager
 
 @dataclass
 class InvalidTranslationGroupLocales:
@@ -160,7 +157,7 @@ class TranslationGroup():
         self.usage_comment = usage_comment
         self.tcomment = tcomment
         self.occurrences = []  # Add occurrences field to store file references
-        self.default_locale = config.get('translation.default_locale', 'en')
+        self.default_locale = config_manager.get('translation.default_locale', 'en')
 
     @classmethod
     def from_polib_entry(cls, entry: POEntry, is_in_base=False):

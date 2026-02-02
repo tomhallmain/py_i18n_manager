@@ -1,12 +1,22 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QApplication
+from PyQt6.QtWidgets import QVBoxLayout, QLabel, QProgressBar, QApplication
 from PyQt6.QtCore import Qt, QTimer
 
-class DownloadDialog(QDialog):
+from lib.multi_display import SmartDialog
+
+
+class DownloadDialog(SmartDialog):
     """Dialog showing download progress for translation models."""
-    
+
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Downloading Translation Model")
+        super().__init__(
+            parent=parent,
+            position_parent=parent,
+            title="Downloading Translation Model",
+            geometry="300x150",
+            offset_x=50,
+            offset_y=50,
+            center=True,
+        )
         self.setModal(True)
         self.setFixedSize(300, 150)
         

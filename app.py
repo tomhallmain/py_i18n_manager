@@ -2,13 +2,14 @@ from datetime import datetime
 import os
 import sys
 
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
+from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, 
                             QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                             QTextEdit, QTabWidget, QMessageBox, QFrame)
 from PyQt6.QtCore import Qt, QTimer
 
 from i18n.i18n_manager import I18NManager
 from i18n.translation_manager_results import TranslationManagerResults, TranslationAction
+from lib.multi_display import SmartMainWindow
 from ui.all_translations_window import AllTranslationsWindow
 from ui.bulk_pot_analysis_window import BulkPotAnalysisWindow
 from ui.cross_project_analysis_window import CrossProjectAnalysisWindow
@@ -28,13 +29,13 @@ logger = get_logger("main_window")
 # Set up translation
 _ = I18N._
 
-class MainWindow(QMainWindow):
+class MainWindow(SmartMainWindow):
     def __init__(self):
-        super().__init__()
+        super().__init__(restore_geometry=True)
         logger.debug("Initializing MainWindow")
         self.setWindowTitle(_("i18n Translation Manager"))
         
-        # Get screen dimensions and set window size
+        # Default size; restore_window_geometry() may override with cached position/size
         screen = QApplication.primaryScreen().geometry()
         self.setMinimumSize(int(screen.width() * 0.8), int(screen.height() * 0.8))  # 80% of screen size
         self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))  # 90% of screen size
@@ -172,6 +173,9 @@ class MainWindow(QMainWindow):
 
         # Update button states after all buttons are created
         self.update_button_states()
+
+        # Restore main window position/size from app_info_cache (same display as last run)
+        self.restore_window_geometry()
 
         # Load last project if available
         self.load_last_project()
@@ -500,7 +504,7 @@ class MainWindow(QMainWindow):
         # If there's a current project and it failed to load, remove it
         if self.current_project and not self.i18n_manager:
             self.handle_project_removal(self.current_project)
-        event.accept()
+        super().closeEvent(event)
 
     def write_default_locale(self):
         """Write the PO file for the default locale."""

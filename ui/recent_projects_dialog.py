@@ -1,7 +1,9 @@
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, 
                             QLabel, QListWidget, QListWidgetItem, QFileDialog,
                             QWidget)
 from PyQt6.QtCore import Qt, pyqtSignal
+
+from lib.multi_display import SmartDialog
 from utils.translations import I18N
 from utils.settings_manager import SettingsManager
 
@@ -60,7 +62,7 @@ class ProjectListItem(QWidget):
         layout.addWidget(button_container)
         self.project_path = project_path
         
-class RecentProjectsDialog(QDialog):
+class RecentProjectsDialog(SmartDialog):
     """Dialog for selecting from recent projects.
     
     TODO: Add functionality to run check status on the 10 most recent directories and display
@@ -72,10 +74,16 @@ class RecentProjectsDialog(QDialog):
     """
     project_selected = pyqtSignal(str)  # Emitted when a project is selected
     project_removed = pyqtSignal(str)   # Emitted when a project is removed
-    
+
     def __init__(self, recent_projects, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(_("Select Project"))
+        super().__init__(
+            parent=parent,
+            position_parent=parent,
+            title=_("Select Project"),
+            geometry="700x300",
+            offset_x=50,
+            offset_y=50,
+        )
         self.setMinimumSize(700, 300)
         self.settings_manager = SettingsManager()
         self.setup_ui(recent_projects)

@@ -1,10 +1,24 @@
-from PyQt6.QtWidgets import QDialog, QTableWidget, QHeaderView
+from PyQt6.QtWidgets import QTableWidget, QHeaderView
 
+from lib.multi_display import SmartDialog
 from ui.frozen_table_widget import FrozenTableWidget
 
-class BaseTranslationWindow(QDialog):
-    """Base class for translation windows with shared table setup logic."""
-    
+
+class BaseTranslationWindow(SmartDialog):
+    """Base class for translation windows with shared table setup logic.
+    Positions on the same display as the parent via SmartDialog.
+    """
+
+    def __init__(self, parent=None, title=None, geometry="1100x750"):
+        super().__init__(
+            parent=parent,
+            position_parent=parent,
+            title=title,
+            geometry=geometry,
+            offset_x=50,
+            offset_y=50,
+        )
+
     def setup_table(self):
         """Set up the common table configuration (first column frozen when scrolling)."""
         self.table = FrozenTableWidget()
