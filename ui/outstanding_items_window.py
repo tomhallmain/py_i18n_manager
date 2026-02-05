@@ -1,7 +1,8 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                             QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
-                            QMessageBox, QMenu, QCheckBox, QTextEdit, QStyledItemDelegate)
-from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer
+                            QMessageBox, QMenu, QCheckBox, QTextEdit, QStyledItemDelegate,
+                            QProgressBar)
+from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer, QObject
 from PyQt6.QtGui import QColor, QAction, QKeyEvent, QShortcut, QKeySequence
 from PyQt6.QtWidgets import QApplication
 import random
@@ -54,6 +55,163 @@ class MultilineItemDelegate(QStyledItemDelegate):
                     return True
         return super().eventFilter(editor, event)
 
+
+class TranslationWorker(QObject):
+    """Worker for running translation tasks in a separate thread."""
+    progress_updated = pyqtSignal(int, int, str)  # completed, total, current_key
+    translation_completed = pyqtSignal(int, int, str)  # row, col, translated_text
+    finished = pyqtSignal()
+    error = pyqtSignal(str)
+    
+    def __init__(self, translation_service, queue, use_llm=False):
+        super().__init__()
+        self.translation_service = translation_service
+        self.queue = queue
+        self.use_llm = use_llm
+        self._cancelled = False
+        self.total = len(queue)
+        self.completed = 0
+        
+    def cancel(self):
+        """Cancel the translation process."""
+        self._cancelled = True
+        # Also cancel any ongoing LLM generation
+        if self.use_llm and hasattr(self.translation_service, 'llm'):
+            self.translation_service.llm.cancel_generation()
+    
+    def run(self):
+        """Process the translation queue."""
+        try:
+            while self.queue and not self._cancelled:
+                row, col, key, locale, source_text = self.queue.pop(0)
+                
+                # Display key for progress
+                display_key = key if isinstance(key, str) else key[1] if isinstance(key, tuple) else str(key)
+                if len(display_key) > 40:
+                    display_key = display_key[:37] + "..."
+                
+                self.progress_updated.emit(self.completed, self.total, f"{display_key} -> {locale}")
+                
+                if self._cancelled:
+                    break
+                
+                # Perform translation
+                try:
+                    translated = self.translation_service.translate(
+                        text=source_text,
+                        target_locale=locale,
+                        context=f"Translation key: {key}",
+                        use_llm=self.use_llm
+                    )
+                    
+                    if translated and not self._cancelled:
+                        self.translation_completed.emit(row, col, translated)
+                        
+                except Exception as e:
+                    logger.error(f"Translation failed for {key} to {locale}: {e}")
+                
+                self.completed += 1
+                
+            self.progress_updated.emit(self.completed, self.total, "")
+            
+        except Exception as e:
+            self.error.emit(str(e))
+        finally:
+            self.finished.emit()
+
+
+class TranslationProgressDialog(QDialog):
+    """Dialog showing translation progress with cancel option."""
+    
+    cancelled = pyqtSignal()
+    
+    def __init__(self, parent=None, title="Translation Progress", use_llm=False):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setModal(True)
+        self.setMinimumWidth(400)
+        self.use_llm = use_llm
+        
+        # Prevent closing via X button while active
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowCloseButtonHint)
+        
+        self.setup_ui()
+        
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        
+        # Method label
+        method_text = "LLM" if self.use_llm else "Argos Translate"
+        self.method_label = QLabel(f"Translation Method: {method_text}")
+        self.method_label.setStyleSheet("font-weight: bold;")
+        layout.addWidget(self.method_label)
+        
+        # Progress bar
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setMinimum(0)
+        self.progress_bar.setMaximum(100)
+        self.progress_bar.setValue(0)
+        layout.addWidget(self.progress_bar)
+        
+        # Count label
+        self.count_label = QLabel("0 / 0 translations completed")
+        layout.addWidget(self.count_label)
+        
+        # Current item label
+        self.current_label = QLabel("Preparing...")
+        self.current_label.setWordWrap(True)
+        self.current_label.setStyleSheet("color: gray;")
+        layout.addWidget(self.current_label)
+        
+        # Cancel button
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        self.cancel_btn = QPushButton(_("Cancel"))
+        self.cancel_btn.clicked.connect(self.on_cancel)
+        button_layout.addWidget(self.cancel_btn)
+        
+        button_layout.addStretch()
+        layout.addLayout(button_layout)
+        
+    def update_progress(self, completed, total, current_item):
+        """Update the progress display."""
+        if total > 0:
+            percentage = int((completed / total) * 100)
+            self.progress_bar.setValue(percentage)
+        
+        self.count_label.setText(f"{completed} / {total} translations completed")
+        
+        if current_item:
+            self.current_label.setText(f"Translating: {current_item}")
+        else:
+            self.current_label.setText("Finished" if completed >= total else "Preparing...")
+    
+    def on_cancel(self):
+        """Handle cancel button click."""
+        reply = QMessageBox.question(
+            self, 
+            _("Cancel Translation"),
+            _("Are you sure you want to cancel the translation process?\n\nCompleted translations will be kept."),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.cancel_btn.setEnabled(False)
+            self.cancel_btn.setText(_("Cancelling..."))
+            self.current_label.setText("Cancelling translation process...")
+            self.cancelled.emit()
+    
+    def on_finished(self):
+        """Handle when translation is finished."""
+        self.cancel_btn.setText(_("Close"))
+        self.cancel_btn.setEnabled(True)
+        self.cancel_btn.clicked.disconnect()
+        self.cancel_btn.clicked.connect(self.accept)
+        # Re-enable close button
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowCloseButtonHint)
+        self.show()  # Refresh window flags
+
+
 class OutstandingItemsWindow(BaseTranslationWindow):
     # Signal now takes a list of (msgid, new_value) tuples for each locale
     translation_updated = pyqtSignal(str, list)  # locale, [(msgid, new_value), ...]
@@ -80,6 +238,9 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.default_locale = config_manager.get('translation.default_locale', 'en')
         self.translation_service = TranslationService(default_locale=self.default_locale)
         self.is_translating = False
+        self._translation_worker = None
+        self._translation_thread = None
+        self._progress_dialog = None
 
     def closeEvent(self, event):
         """Handle cleanup when the window is closed."""
@@ -90,6 +251,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             if reply == QMessageBox.StandardButton.No:
                 event.ignore()
                 return
+            # Cancel ongoing translation
+            self._cancel_translation_worker()
         if hasattr(self, 'translation_service'):
             del self.translation_service
         super().closeEvent(event)
@@ -123,12 +286,13 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         button_layout = QHBoxLayout()
         
         # Translation buttons
-        self.translate_all_btn = QPushButton(_("Translate All Missing"))
-        self.translate_all_btn.clicked.connect(self.translate_all_missing)
+        self.translate_all_argos_btn = QPushButton(_("Translate All (Argos)"))
+        self.translate_all_argos_btn.clicked.connect(lambda: self.translate_all_missing(use_llm=False))
+        self.translate_all_argos_btn.setToolTip(_("Translate all missing items using Argos Translate (fast, offline)"))
         
-        self.cancel_btn = QPushButton(_("Cancel Translation"))
-        self.cancel_btn.clicked.connect(self.cancel_translation)
-        self.cancel_btn.setEnabled(False)
+        self.translate_all_llm_btn = QPushButton(_("Translate All (LLM)"))
+        self.translate_all_llm_btn.clicked.connect(lambda: self.translate_all_missing(use_llm=True))
+        self.translate_all_llm_btn.setToolTip(_("Translate all missing items using LLM (slower, higher quality)"))
         
         save_btn = QPushButton(_("Save Changes"))
         save_btn.clicked.connect(self.save_changes)
@@ -140,8 +304,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.unicode_toggle.setChecked(self.show_escaped)
         self.unicode_toggle.stateChanged.connect(self.toggle_unicode_display)
         
-        button_layout.addWidget(self.translate_all_btn)
-        button_layout.addWidget(self.cancel_btn)
+        button_layout.addWidget(self.translate_all_argos_btn)
+        button_layout.addWidget(self.translate_all_llm_btn)
         button_layout.addWidget(save_btn)
         button_layout.addWidget(close_btn)
         button_layout.addWidget(self.unicode_toggle)
@@ -311,16 +475,27 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                     continue
                 logger.error(f"Translation failed for {key} to {locale}: {e}")
 
-    def translate_all_missing(self):
-        """Translate all missing items."""
-        self.is_translating = True
-        self.translate_all_btn.setEnabled(False)
-        self.cancel_btn.setEnabled(True)
+    def translate_all_missing(self, use_llm=False):
+        """Translate all missing items using the specified method.
         
-        # Create a list of items to translate
-        self.translation_queue = []
+        Args:
+            use_llm (bool): If True, use LLM for translation; otherwise use Argos Translate.
+        """
+        # Create a list of items to translate with source text
+        translation_queue = []
+        default_locale = config_manager.get('translation.default_locale', 'en')
+        
         for row in range(self.table.rowCount()):
             key = self._get_key_from_row(row)
+            
+            # Get source text for this key
+            source_text = None
+            if key in self.translations:
+                source_text = self.translations[key].get_translation('en') or self.translations[key].get_translation(default_locale)
+            
+            if not source_text:
+                continue
+                
             for col in range(1, self.table.columnCount()):
                 locale = self.table.horizontalHeaderItem(col).text()
                 item = self.table.item(row, col)
@@ -329,31 +504,99 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 if item and item.text().strip():
                     continue
                     
-                self.translation_queue.append((row, col, key, locale))
+                translation_queue.append((row, col, key, locale, source_text))
         
-        # Start processing the queue
-        self.process_translation_queue()
-        
-    def process_translation_queue(self):
-        """Process the next item in the translation queue."""
-        if not self.is_translating or not self.translation_queue:
-            self.is_translating = False
-            self.translate_all_btn.setEnabled(True)
-            self.cancel_btn.setEnabled(False)
+        if not translation_queue:
+            QMessageBox.information(self, _("No Items"), _("No missing translations found."))
             return
-            
-        row, col, key, locale = self.translation_queue.pop(0)
-        self.translate_item(row, col, key, locale)
         
-        # Schedule the next item to be processed
-        QTimer.singleShot(100, self.process_translation_queue)
+        # Show confirmation
+        method_name = "LLM" if use_llm else "Argos Translate"
+        reply = QMessageBox.question(
+            self,
+            _("Confirm Translation"),
+            _("This will translate {count} missing items using {method}.\n\n"
+              "LLM translations are higher quality but slower.\n"
+              "Argos translations are faster but may be less accurate.\n\n"
+              "Continue?").format(count=len(translation_queue), method=method_name),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
         
-    def cancel_translation(self):
-        """Cancel the ongoing translation process."""
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        
+        self.is_translating = True
+        self.translate_all_argos_btn.setEnabled(False)
+        self.translate_all_llm_btn.setEnabled(False)
+        
+        # Create and show progress dialog
+        self._progress_dialog = TranslationProgressDialog(
+            self, 
+            title=_("Translation Progress"), 
+            use_llm=use_llm
+        )
+        self._progress_dialog.cancelled.connect(self._cancel_translation_worker)
+        
+        # Create worker and thread
+        self._translation_thread = QThread()
+        self._translation_worker = TranslationWorker(
+            self.translation_service, 
+            translation_queue, 
+            use_llm=use_llm
+        )
+        self._translation_worker.moveToThread(self._translation_thread)
+        
+        # Connect signals
+        self._translation_thread.started.connect(self._translation_worker.run)
+        self._translation_worker.progress_updated.connect(self._on_translation_progress)
+        self._translation_worker.translation_completed.connect(self._on_translation_completed)
+        self._translation_worker.finished.connect(self._on_translation_finished)
+        self._translation_worker.error.connect(self._on_translation_error)
+        
+        # Start the thread
+        self._translation_thread.start()
+        self._progress_dialog.show()
+    
+    def _on_translation_progress(self, completed, total, current_item):
+        """Handle progress updates from the worker."""
+        if self._progress_dialog:
+            self._progress_dialog.update_progress(completed, total, current_item)
+    
+    def _on_translation_completed(self, row, col, translated_text):
+        """Handle a completed translation."""
+        item = QTableWidgetItem(translated_text)
+        self.table.setItem(row, col, item)
+        # Force UI update
+        QTimer.singleShot(0, lambda: self.table.viewport().update())
+    
+    def _on_translation_finished(self):
+        """Handle when translation process is finished."""
         self.is_translating = False
-        self.translation_queue.clear()
-        self.translate_all_btn.setEnabled(True)
-        self.cancel_btn.setEnabled(False)
+        self.translate_all_argos_btn.setEnabled(True)
+        self.translate_all_llm_btn.setEnabled(True)
+        
+        if self._progress_dialog:
+            self._progress_dialog.on_finished()
+        
+        # Clean up thread
+        if self._translation_thread:
+            self._translation_thread.quit()
+            self._translation_thread.wait()
+            self._translation_thread = None
+        
+        self._translation_worker = None
+    
+    def _on_translation_error(self, error_msg):
+        """Handle translation errors."""
+        logger.error(f"Translation error: {error_msg}")
+        QMessageBox.warning(self, _("Translation Error"), 
+                          _("An error occurred during translation:\n{error}").format(error=error_msg))
+    
+    def _cancel_translation_worker(self):
+        """Cancel the ongoing translation process."""
+        if self._translation_worker:
+            self._translation_worker.cancel()
+            logger.info("Translation cancellation requested")
         
     def _detect_duplicate_values(self, translations, locales):
         """Detect duplicate translation values in the default locale.
