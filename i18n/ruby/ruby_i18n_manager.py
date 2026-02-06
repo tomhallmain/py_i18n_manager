@@ -1142,6 +1142,9 @@ msgstr ""
                     skipped_not_in_base += 1
                     continue
                 
+                # Extract string key from TranslationKey object for file lookups
+                key_str = key.msgid if hasattr(key, 'msgid') else str(key)
+                
                 # Get translation value for this locale
                 # If no translation exists, use empty string (will be written as "")
                 value = group.get_translation_unescaped(locale)
@@ -1151,11 +1154,11 @@ msgstr ""
                     value = ""
                     skipped_no_value += 1
                     # Log if this key was expected to have a value (for debugging duplicate issues)
-                    if self._file_structure_manager.get_default_source_file(key):
-                        logger.debug(f"Writing empty value for {key} in {locale} (no translation found)")
+                    if self._file_structure_manager.get_default_source_file(key_str):
+                        logger.debug(f"Writing empty value for {key_str} in {locale} (no translation found)")
                 
                 # Determine target file - prefer source file if available
-                source_file = self._file_structure_manager.get_source_file(key, locale)
+                source_file = self._file_structure_manager.get_source_file(key_str, locale)
                 if source_file and os.path.exists(source_file):
                     # Use existing source file for this locale
                     file_path = source_file
@@ -1163,7 +1166,7 @@ msgstr ""
                     is_flat = self._file_structure_manager.is_flat_file(source_file)
                 else:
                     # No source file for this locale - try to use default locale's source file and convert path
-                    default_source_file = self._file_structure_manager.get_default_source_file(key)
+                    default_source_file = self._file_structure_manager.get_default_source_file(key_str)
                     if default_source_file:
                         # Convert default locale file path to target locale file path
                         target_file = self._file_structure_manager.translate_file_path(default_source_file, locale)
@@ -1176,7 +1179,7 @@ msgstr ""
                                 file_path = flat_file
                                 is_flat = True
                             else:
-                                file_path = self._determine_yaml_file_path(key, locale_dir)
+                                file_path = self._determine_yaml_file_path(key_str, locale_dir)
                                 is_flat = False
                     else:
                         # No source file at all - determine new file path using heuristics
@@ -1185,7 +1188,7 @@ msgstr ""
                             file_path = flat_file
                             is_flat = True
                         else:
-                            file_path = self._determine_yaml_file_path(key, locale_dir)
+                            file_path = self._determine_yaml_file_path(key_str, locale_dir)
                             is_flat = False
                 
                 # Load existing file content if it exists (to preserve structure and comments)
@@ -1228,7 +1231,7 @@ msgstr ""
                 # Add/update translation in nested structure
                 # The key format is like "views.tasks.index.select_project"
                 # _add_to_nested_dict will overwrite if the key already exists, preventing duplicates
-                self._add_to_nested_dict(translations_by_file[file_path], key, value)
+                self._add_to_nested_dict(translations_by_file[file_path], key_str, value)
             
             # For non-default locales, ensure all files from default locale are created/updated
             # This ensures file structure parity: all locales have the same files as the default locale
@@ -1279,8 +1282,11 @@ msgstr ""
                             if not group.is_in_base:
                                 continue
                             
+                            # Extract string key from TranslationKey object
+                            key_str = key.msgid if hasattr(key, 'msgid') else str(key)
+                            
                             # Check if this key's default locale source file matches default_file
-                            default_source = self._file_structure_manager.get_default_source_file(key)
+                            default_source = self._file_structure_manager.get_default_source_file(key_str)
                             if default_source == default_file:
                                 # Get translation value (use empty string if missing)
                                 value = group.get_translation_unescaped(locale)
@@ -1288,7 +1294,7 @@ msgstr ""
                                     value = ""  # Use empty string instead of skipping
                                 
                                 # Add/update this key in the file (will overwrite existing if present)
-                                self._add_to_nested_dict(translations_by_file[target_file], key, value)
+                                self._add_to_nested_dict(translations_by_file[target_file], key_str, value)
                         
                         files_created_for_parity.append(target_file)
                 
