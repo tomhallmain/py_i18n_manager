@@ -413,10 +413,11 @@ class MainWindow(SmartMainWindow):
             return
 
         if not self.outstanding_window:
-            self.outstanding_window = OutstandingItemsWindow(self)
+            self.outstanding_window = OutstandingItemsWindow(self, project_path=self.current_project)
             self.outstanding_window.translation_updated.connect(self.handle_translation_update)
 
-        # Ensure properties (like translation_service) are up to date before loading data
+        # Update project path and properties before loading data
+        self.outstanding_window.project_path = self.current_project
         self.outstanding_window.setup_properties()
         has_items = self.outstanding_window.load_data(self.i18n_manager.translations, self.locales)
         

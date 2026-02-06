@@ -334,4 +334,119 @@ class SettingsManager:
             with open(self.settings_file, 'w') as f:
                 json.dump(settings, f, indent=4)
         except Exception as e:
-            logger.error(f"Error saving intro details: {e}") 
+            logger.error(f"Error saving intro details: {e}")
+
+    def get_llm_prompt_template(self, project_path: Optional[str] = None) -> str:
+        """Get the LLM prompt template, with project override if available.
+        
+        Args:
+            project_path (str, optional): Path to the project for project-specific override
+            
+        Returns:
+            str: The prompt template (project-specific if set, otherwise global default)
+        """
+        # Try project-specific override first
+        if project_path:
+            project_template = self.get_project_setting(project_path, 'llm_prompt_template')
+            if project_template:
+                return project_template
+        
+        # Fall back to global default from config_manager
+        from utils.config import config_manager
+        return config_manager.get('translation.llm_prompt_template', self.get_default_llm_prompt_template())
+    
+    def save_llm_prompt_template(self, template: str, project_path: Optional[str] = None) -> bool:
+        """Save the LLM prompt template.
+        
+        Args:
+            template (str): The prompt template to save
+            project_path (str, optional): If provided, saves as project-specific override
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if project_path:
+            return self.save_project_setting(project_path, 'llm_prompt_template', template)
+        else:
+            # Save to global config
+            from utils.config import config_manager
+            return config_manager.set('translation.llm_prompt_template', template)
+    
+    def clear_project_llm_prompt_template(self, project_path: str) -> bool:
+        """Clear the project-specific LLM prompt template (revert to global default).
+        
+        Args:
+            project_path (str): Path to the project
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            if not self.settings_file.exists():
+                return True
+                
+            with open(self.settings_file, 'r') as f:
+                settings = json.load(f)
+            
+            project_settings = settings.get('project_settings', {})
+            project_config = project_settings.get(project_path, {})
+            
+            if 'llm_prompt_template' in project_config:
+                del project_config['llm_prompt_template']
+                settings['project_settings'][project_path] = project_config
+                
+                with open(self.settings_file, 'w') as f:
+                    json.dump(settings, f, indent=4)
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error clearing project LLM prompt template for {project_path}: {e}")
+            return False
+    
+    def has_project_llm_prompt_template(self, project_path: str) -> bool:
+        """Check if a project has a custom LLM prompt template override.
+        
+        Args:
+            project_path (str): Path to the project
+            
+        Returns:
+            bool: True if project has a custom template, False otherwise
+        """
+        return self.get_project_setting(project_path, 'llm_prompt_template') is not None
+    
+    @staticmethod
+    def get_default_llm_prompt_template() -> str:
+        """Get the hardcoded default LLM prompt template.
+        
+        Returns:
+            str: The default prompt template
+        """
+        return """Translate the following text from {source_locale} to {target_locale}.
+Return the response as a JSON object with a single key "translation" containing the translated text.
+
+Source text: {source_text}
+
+{context}
+
+Rules:
+1. Maintain any placeholders like {{0}}, {{1}}, %s, %d, etc.
+2. Preserve any special characters or formatting
+3. Keep the same tone and style as the original
+4. If the text contains technical terms, translate them appropriately for the target language
+
+Return only the JSON object, no additional text."""
+    
+    @staticmethod
+    def get_llm_prompt_variables() -> list[dict[str, str]]:
+        """Get the list of available variables for LLM prompt templates.
+        
+        Returns:
+            list[dict]: List of variable definitions with 'name' and 'description'
+        """
+        return [
+            {"name": "{source_locale}", "description": "Source language code (e.g., 'en')"},
+            {"name": "{target_locale}", "description": "Target language code (e.g., 'es', 'fr')"},
+            {"name": "{source_text}", "description": "The text to be translated"},
+            {"name": "{context}", "description": "Optional context about the translation (key info when different from text)"},
+        ] 

@@ -12,8 +12,10 @@ from lib.translation_service import TranslationService
 from utils.globals import config_manager
 from utils.globals import TranslationStatus
 from utils.logging_setup import get_logger
+from utils.settings_manager import SettingsManager
 from utils.translations import I18N
 from ui.base_translation_window import BaseTranslationWindow
+from ui.llm_settings_dialog import LLMSettingsDialog
 
 _ = I18N._
 
@@ -95,12 +97,19 @@ class TranslationWorker(QObject):
                 if self._cancelled:
                     break
                 
+                # Build smart context - only include key if it differs from source text
+                key_str = key if isinstance(key, str) else key[1] if isinstance(key, tuple) else str(key)
+                if key_str != source_text:
+                    context = f"Translation key: {key_str}"
+                else:
+                    context = None  # Key is same as source, no extra context needed
+                
                 # Perform translation
                 try:
                     translated = self.translation_service.translate(
                         text=source_text,
                         target_locale=locale,
-                        context=f"Translation key: {key}",
+                        context=context,
                         use_llm=self.use_llm
                     )
                     
@@ -216,13 +225,14 @@ class OutstandingItemsWindow(BaseTranslationWindow):
     # Signal now takes a list of (msgid, new_value) tuples for each locale
     translation_updated = pyqtSignal(str, list)  # locale, [(msgid, new_value), ...]
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, project_path=None):
         super().__init__(parent, title=_("Outstanding Translation Items"), geometry="1200x800")
         # Screen-relative min size; position already set by SmartDialog on parent's display
         screen = QApplication.primaryScreen().geometry()
         self.setMinimumSize(int(screen.width() * 0.8), int(screen.height() * 0.8))
         self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))
 
+        self.project_path = project_path
         self.show_escaped = False  # By default it should be encoded, not escaped
         # Track duplicate value matches: {default_value: [list of msgids]}
         self.duplicate_value_groups = {}
@@ -236,7 +246,15 @@ class OutstandingItemsWindow(BaseTranslationWindow):
 
     def setup_properties(self):
         self.default_locale = config_manager.get('translation.default_locale', 'en')
-        self.translation_service = TranslationService(default_locale=self.default_locale)
+        self.settings_manager = SettingsManager()
+        
+        # Load prompt template (project-specific or global)
+        prompt_template = self.settings_manager.get_llm_prompt_template(self.project_path)
+        self.translation_service = TranslationService(
+            default_locale=self.default_locale,
+            prompt_template=prompt_template
+        )
+        
         self.is_translating = False
         self._translation_worker = None
         self._translation_thread = None
@@ -294,6 +312,10 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.translate_all_llm_btn.clicked.connect(lambda: self.translate_all_missing(use_llm=True))
         self.translate_all_llm_btn.setToolTip(_("Translate all missing items using LLM (slower, higher quality)"))
         
+        self.llm_settings_btn = QPushButton(_("LLM Settings"))
+        self.llm_settings_btn.clicked.connect(self.open_llm_settings)
+        self.llm_settings_btn.setToolTip(_("Configure LLM translation prompt template"))
+        
         save_btn = QPushButton(_("Save Changes"))
         save_btn.clicked.connect(self.save_changes)
         close_btn = QPushButton(_("Close"))
@@ -306,6 +328,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         
         button_layout.addWidget(self.translate_all_argos_btn)
         button_layout.addWidget(self.translate_all_llm_btn)
+        button_layout.addWidget(self.llm_settings_btn)
         button_layout.addWidget(save_btn)
         button_layout.addWidget(close_btn)
         button_layout.addWidget(self.unicode_toggle)
@@ -455,13 +478,20 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         if not source_text:
             return
 
+        # Build smart context - only include key if it differs from source text
+        key_str = key if isinstance(key, str) else key[1] if isinstance(key, tuple) else str(key)
+        if key_str != source_text:
+            context = f"Translation key: {key_str}"
+        else:
+            context = None  # Key is same as source, no extra context needed
+
         # Try translation once, retry once if it fails
         for attempt in range(2):
             try:
                 translated = self.translation_service.translate(
                     text=source_text,
                     target_locale=locale,
-                    context=f"Translation key: {key}",
+                    context=context,
                     use_llm=use_llm
                 )
                 if translated:
@@ -597,6 +627,18 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         if self._translation_worker:
             self._translation_worker.cancel()
             logger.info("Translation cancellation requested")
+    
+    def open_llm_settings(self):
+        """Open the LLM settings dialog."""
+        dialog = LLMSettingsDialog(project_path=self.project_path, parent=self)
+        dialog.settings_saved.connect(self._reload_prompt_template)
+        dialog.exec()
+    
+    def _reload_prompt_template(self):
+        """Reload the prompt template after settings change."""
+        prompt_template = self.settings_manager.get_llm_prompt_template(self.project_path)
+        self.translation_service.set_prompt_template(prompt_template)
+        logger.info("LLM prompt template reloaded")
         
     def _detect_duplicate_values(self, translations, locales):
         """Detect duplicate translation values in the default locale.
