@@ -65,6 +65,11 @@ class AllTranslationsWindow(BaseTranslationWindow):
         filter_layout.addWidget(self.status_filter)
         controls_layout.addLayout(filter_layout)
         
+        # Unicode display toggle
+        self.unicode_toggle = QCheckBox("Show Escaped Unicode")
+        self.unicode_toggle.stateChanged.connect(self.toggle_unicode_display)
+        controls_layout.addWidget(self.unicode_toggle)
+        
         layout.addLayout(controls_layout)
         
         # Table for translations
@@ -107,12 +112,7 @@ class AllTranslationsWindow(BaseTranslationWindow):
         self.table.horizontalHeader().setMaximumSectionSize(800)
 
     def load_data(self, translations, locales):
-        """Load translation data into the table.
-        
-        Args:
-            translations: Dict of msgid -> TranslationGroup
-            locales: List of locale codes
-        """
+        """Load translation data into the table."""
         # Store original data for filtering
         self.all_translations = translations
         self.all_locales = locales

@@ -278,29 +278,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
     def setup_ui(self):
         layout = QVBoxLayout(self)
         
-        # Table for translations
-        self.table = self.setup_table()
-        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.table.customContextMenuRequested.connect(self.show_context_menu)
-        # Enable context menu for header
-        self.table.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.table.horizontalHeader().customContextMenuRequested.connect(self.show_header_context_menu)
-        # Enforce minimum width on first column when user resizes (set in load_data)
-        self.table.horizontalHeader().sectionResized.connect(self._clamp_key_column_width)
-        
-        # Set row height to accommodate multiple lines
-        self.table.verticalHeader().setDefaultSectionSize(100)
-        
-        # Set the delegate for multiline editing
-        self.table.setItemDelegate(MultilineItemDelegate())
-        
-        # Add keyboard shortcut for testing: F5 to fill all cells with random strings
-        fill_shortcut = QShortcut(QKeySequence(Qt.Key.Key_F5), self)
-        fill_shortcut.activated.connect(self.fill_all_cells_with_random_strings)
-        
-        layout.addWidget(self.table)
-        
-        # Buttons
+        # Button layout
         button_layout = QHBoxLayout()
         
         # Translation buttons
@@ -333,6 +311,33 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         button_layout.addWidget(close_btn)
         button_layout.addWidget(self.unicode_toggle)
         layout.addLayout(button_layout)
+        
+        # Table for translations
+        self.table = self.setup_table()
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self.show_context_menu)
+        # Enable context menu for header
+        self.table.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.horizontalHeader().customContextMenuRequested.connect(self.show_header_context_menu)
+        # Enforce minimum width on first column when user resizes (set in load_data)
+        self.table.horizontalHeader().sectionResized.connect(self._clamp_key_column_width)
+        
+        # Set row height to accommodate multiple lines
+        self.table.verticalHeader().setDefaultSectionSize(100)
+        
+        # Set the delegate for multiline editing
+        self.table.setItemDelegate(MultilineItemDelegate())
+        
+        # Add keyboard shortcut for testing: F5 to fill all cells with random strings
+        fill_shortcut = QShortcut(QKeySequence(Qt.Key.Key_F5), self)
+        fill_shortcut.activated.connect(self.fill_all_cells_with_random_strings)
+        
+        layout.addWidget(self.table)
+
+    def toggle_unicode_display(self, state):
+        """Toggle between escaped and unescaped Unicode display."""
+        self.show_escaped = state == Qt.CheckState.Checked.value
+        self.update_table_display()
 
     def show_context_menu(self, position):
         """Show context menu for translation options."""
