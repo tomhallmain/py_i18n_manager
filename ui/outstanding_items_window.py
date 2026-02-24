@@ -3,12 +3,13 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QMessageBox, QMenu, QCheckBox, QTextEdit, QStyledItemDelegate,
                             QProgressBar)
 from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer, QObject
-from PyQt6.QtGui import QColor, QAction, QKeyEvent, QShortcut, QKeySequence
+from PyQt6.QtGui import QAction, QKeyEvent, QShortcut, QKeySequence
 from PyQt6.QtWidgets import QApplication
 import random
 import string
 
 from lib.translation_service import TranslationService
+from ui.app_style import AppStyle
 from utils.globals import config_manager
 from utils.globals import TranslationStatus
 from utils.logging_setup import get_logger
@@ -886,10 +887,11 @@ class OutstandingItemsWindow(BaseTranslationWindow):
 
         self.table.setRowCount(len(all_invalid_groups))
         
-        # Define custom colors
-        missing_color = QColor(255, 255, 200)    # Light yellow for missing translations
-        critical_color = QColor(255, 200, 200)   # Light red for critical issues (unicode/indices)
-        style_color = QColor(255, 220, 180)      # Light orange for style issues
+        AppStyle.sync_theme_from_widget(self)
+        highlight_colors = AppStyle.get_translation_highlight_colors()
+        missing_color = highlight_colors["missing"]
+        critical_color = highlight_colors["critical"]
+        style_color = highlight_colors["style"]
 
         for row, (key, (invalid_locales, group)) in enumerate(all_invalid_groups.items()):
             display_text = group.key.msgid

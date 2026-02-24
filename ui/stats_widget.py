@@ -1,9 +1,8 @@
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
 
 from i18n.translation_manager_results import TranslationManagerResults
+from ui.app_style import AppStyle
 from utils.logging_setup import get_logger
 from utils.translations import I18N
 
@@ -14,14 +13,29 @@ _ = I18N._
 class StatsWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        AppStyle.sync_theme_from_widget(self)
+        self.colors = AppStyle.get_stats_widget_colors()
         self.setup_ui()
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #f0f0f0;
-                border: 1px solid #cccccc;
+        self._apply_default_style()
+
+    def _apply_default_style(self):
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {self.colors["default_bg"]};
+                border: 1px solid {self.colors["default_border"]};
                 border-radius: 4px;
                 padding: 10px;
-            }
+            }}
+        """)
+
+    def _apply_success_style(self):
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {self.colors["success_bg"]};
+                border: 1px solid {self.colors["success_border"]};
+                border-radius: 4px;
+                padding: 10px;
+            }}
         """)
         
     def setup_ui(self):
@@ -62,7 +76,9 @@ class StatsWidget(QWidget):
         missing_translations_layout = QVBoxLayout()
         self.missing_translations_label = QLabel(_("Missing Translations:"))
         self.missing_translations_value = QLabel("0")
-        self.missing_translations_value.setStyleSheet("font-size: 16px; font-weight: bold; color: red;")
+        self.missing_translations_value.setStyleSheet(
+            f"font-size: 16px; font-weight: bold; color: {self.colors['error']};"
+        )
         missing_translations_layout.addWidget(self.missing_translations_label)
         missing_translations_layout.addWidget(self.missing_translations_value)
         stats_layout.addLayout(missing_translations_layout)
@@ -71,7 +87,9 @@ class StatsWidget(QWidget):
         invalid_unicode_layout = QVBoxLayout()
         self.invalid_unicode_label = QLabel(_("Invalid Unicode:"))
         self.invalid_unicode_value = QLabel("0")
-        self.invalid_unicode_value.setStyleSheet("font-size: 16px; font-weight: bold; color: red;")
+        self.invalid_unicode_value.setStyleSheet(
+            f"font-size: 16px; font-weight: bold; color: {self.colors['error']};"
+        )
         invalid_unicode_layout.addWidget(self.invalid_unicode_label)
         invalid_unicode_layout.addWidget(self.invalid_unicode_value)
         stats_layout.addLayout(invalid_unicode_layout)
@@ -80,7 +98,9 @@ class StatsWidget(QWidget):
         invalid_indices_layout = QVBoxLayout()
         self.invalid_indices_label = QLabel(_("Invalid Indices:"))
         self.invalid_indices_value = QLabel("0")
-        self.invalid_indices_value.setStyleSheet("font-size: 16px; font-weight: bold; color: red;")
+        self.invalid_indices_value.setStyleSheet(
+            f"font-size: 16px; font-weight: bold; color: {self.colors['error']};"
+        )
         invalid_indices_layout.addWidget(self.invalid_indices_label)
         invalid_indices_layout.addWidget(self.invalid_indices_value)
         stats_layout.addLayout(invalid_indices_layout)
@@ -89,7 +109,9 @@ class StatsWidget(QWidget):
         invalid_braces_layout = QVBoxLayout()
         self.invalid_braces_label = QLabel(_("Invalid Braces:"))
         self.invalid_braces_value = QLabel("0")
-        self.invalid_braces_value.setStyleSheet("font-size: 16px; font-weight: bold; color: orange;")
+        self.invalid_braces_value.setStyleSheet(
+            f"font-size: 16px; font-weight: bold; color: {self.colors['warning']};"
+        )
         invalid_braces_layout.addWidget(self.invalid_braces_label)
         invalid_braces_layout.addWidget(self.invalid_braces_value)
         stats_layout.addLayout(invalid_braces_layout)
@@ -98,7 +120,9 @@ class StatsWidget(QWidget):
         invalid_leading_space_layout = QVBoxLayout()
         self.invalid_leading_space_label = QLabel(_("Invalid Leading Space:"))
         self.invalid_leading_space_value = QLabel("0")
-        self.invalid_leading_space_value.setStyleSheet("font-size: 16px; font-weight: bold; color: orange;")
+        self.invalid_leading_space_value.setStyleSheet(
+            f"font-size: 16px; font-weight: bold; color: {self.colors['warning']};"
+        )
         invalid_leading_space_layout.addWidget(self.invalid_leading_space_label)
         invalid_leading_space_layout.addWidget(self.invalid_leading_space_value)
         stats_layout.addLayout(invalid_leading_space_layout)
@@ -107,7 +131,9 @@ class StatsWidget(QWidget):
         invalid_newline_layout = QVBoxLayout()
         self.invalid_newline_label = QLabel(_("Invalid Newline:"))
         self.invalid_newline_value = QLabel("0")
-        self.invalid_newline_value.setStyleSheet("font-size: 16px; font-weight: bold; color: orange;")
+        self.invalid_newline_value.setStyleSheet(
+            f"font-size: 16px; font-weight: bold; color: {self.colors['warning']};"
+        )
         invalid_newline_layout.addWidget(self.invalid_newline_label)
         invalid_newline_layout.addWidget(self.invalid_newline_value)
         stats_layout.addLayout(invalid_newline_layout)
@@ -161,60 +187,60 @@ class StatsWidget(QWidget):
 
         # Update missing translations with color
         if missing_count == 0:
-            self.missing_translations_value.setText(f'<span style="color: #2ecc71;">{missing_count}</span>')
-            # Set light green background for the entire widget
-            self.setStyleSheet("""
-                QWidget {
-                    background-color: #e8f5e9;
-                    border: 1px solid #a5d6a7;
-                    border-radius: 4px;
-                    padding: 10px;
-                }
-            """)
+            self.missing_translations_value.setText(
+                f'<span style="color: {self.colors["success"]};">{missing_count}</span>'
+            )
+            self._apply_success_style()
         else:
             self.missing_translations_value.setText(f"{missing_count}")
-            # Reset to default style
-            self.setStyleSheet("""
-                QWidget {
-                    background-color: #f0f0f0;
-                    border: 1px solid #cccccc;
-                    border-radius: 4px;
-                    padding: 10px;
-                }
-            """)
+            self._apply_default_style()
             
         # Update invalid Unicode with color
         if invalid_unicode_count == 0:
-            self.invalid_unicode_value.setText(f'<span style="color: #2ecc71;">{invalid_unicode_count}</span>')
+            self.invalid_unicode_value.setText(
+                f'<span style="color: {self.colors["success"]};">{invalid_unicode_count}</span>'
+            )
         else:
             self.invalid_unicode_value.setText(f"{invalid_unicode_count}")
             
         # Update invalid indices with color
         if invalid_indices_count == 0:
-            self.invalid_indices_value.setText(f'<span style="color: #2ecc71;">{invalid_indices_count}</span>')
+            self.invalid_indices_value.setText(
+                f'<span style="color: {self.colors["success"]};">{invalid_indices_count}</span>'
+            )
         else:
             self.invalid_indices_value.setText(f"{invalid_indices_count}")
             
         # Update invalid braces with color
         if invalid_braces_count == 0:
-            self.invalid_braces_value.setText(f'<span style="color: #2ecc71;">{invalid_braces_count}</span>')
+            self.invalid_braces_value.setText(
+                f'<span style="color: {self.colors["success"]};">{invalid_braces_count}</span>'
+            )
         else:
             self.invalid_braces_value.setText(f"{invalid_braces_count}")
             
         # Update invalid leading space with color
         if invalid_leading_space_count == 0:
-            self.invalid_leading_space_value.setText(f'<span style="color: #2ecc71;">{invalid_leading_space_count}</span>')
+            self.invalid_leading_space_value.setText(
+                f'<span style="color: {self.colors["success"]};">{invalid_leading_space_count}</span>'
+            )
         else:
             self.invalid_leading_space_value.setText(f"{invalid_leading_space_count}")
             
         # Update invalid newline with color
         if invalid_newline_count == 0:
-            self.invalid_newline_value.setText(f'<span style="color: #2ecc71;">{invalid_newline_count}</span>')
+            self.invalid_newline_value.setText(
+                f'<span style="color: {self.colors["success"]};">{invalid_newline_count}</span>'
+            )
         else:
             self.invalid_newline_value.setText(f"{invalid_newline_count}")
             
         # Update stale translations with color
         if stale_count == 0:
-            self.stale_translations_value.setText(f'<span style="color: #2ecc71;">{stale_count}</span>')
+            self.stale_translations_value.setText(
+                f'<span style="color: {self.colors["success"]};">{stale_count}</span>'
+            )
         else:
-            self.stale_translations_value.setText(f'<span style="color: #f1c40f;">{stale_count}</span>') 
+            self.stale_translations_value.setText(
+                f'<span style="color: {self.colors["warning"]};">{stale_count}</span>'
+            )

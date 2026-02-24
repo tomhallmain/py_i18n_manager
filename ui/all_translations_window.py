@@ -2,9 +2,9 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
                             QMessageBox, QLineEdit, QComboBox, QCheckBox)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QApplication
 
+from ui.app_style import AppStyle
 from ui.base_translation_window import BaseTranslationWindow
 from utils.globals import TranslationStatus, TranslationFilter
 from utils.translations import I18N
@@ -94,10 +94,11 @@ class AllTranslationsWindow(BaseTranslationWindow):
         self.all_locales = None
         self.status_cache = {}  # (row, col) -> set[TranslationStatus]
 
-        # Define custom colors
-        self.missing_color = QColor(255, 255, 200)    # Light yellow for missing translations
-        self.critical_color = QColor(255, 200, 200)   # Light red for critical issues (unicode/indices)
-        self.style_color = QColor(255, 220, 180)      # Light orange for style issues
+        AppStyle.sync_theme_from_widget(self)
+        highlight_colors = AppStyle.get_translation_highlight_colors()
+        self.missing_color = highlight_colors["missing"]
+        self.critical_color = highlight_colors["critical"]
+        self.style_color = highlight_colors["style"]
 
     def set_dynamic_column_widths(self, num_locales: int):
         """Override: key column and locale columns start at minimum width, resizable to higher."""

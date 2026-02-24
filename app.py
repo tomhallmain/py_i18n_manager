@@ -11,6 +11,7 @@ from i18n.i18n_manager import I18NManager
 from i18n.translation_manager_results import TranslationManagerResults, TranslationAction
 from lib.multi_display import SmartMainWindow
 from ui.all_translations_window import AllTranslationsWindow
+from ui.app_style import AppStyle
 from ui.bulk_pot_analysis_window import BulkPotAnalysisWindow
 from ui.cross_project_analysis_window import CrossProjectAnalysisWindow
 from ui.outstanding_items_window import OutstandingItemsWindow
@@ -646,6 +647,7 @@ class MainWindow(SmartMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    AppStyle.sync_theme_from_application(app)
     window = MainWindow()
     logger.info(f"Application started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     window.show()
