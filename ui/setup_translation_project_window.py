@@ -309,7 +309,8 @@ class SetupTranslationProjectWindow(SmartDialog):
             # Save project-specific settings
             self.settings_manager.save_project_default_locale(self.project_dir, self.default_locale.currentText())
             self.settings_manager.save_project_locales(self.project_dir, locales)
-            self.settings_manager.save_project_type(self.project_dir, self.project_type_combo.currentData())
+            self.project_type = self.project_type_combo.currentData()
+            self.settings_manager.save_project_type(self.project_dir, self.project_type)
             
             # Also save to global intro details for backward compatibility
             self.intro_details.update({
@@ -324,7 +325,7 @@ class SetupTranslationProjectWindow(SmartDialog):
             self.settings_manager.save_intro_details(self.intro_details)
             
             # Create locale directories and files based on project type
-            if self.project_type_combo.currentData() == ProjectType.RUBY.value:
+            if self.project_type == ProjectType.RUBY.value:
                 # Ruby/Rails projects: create config/locales/{locale}/ structure
                 locale_dir = os.path.join(self.project_dir, 'config', 'locales')
                 os.makedirs(locale_dir, exist_ok=True)

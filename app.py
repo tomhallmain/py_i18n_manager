@@ -590,7 +590,16 @@ class MainWindow(SmartMainWindow):
         
     def handle_project_setup_complete(self):
         """Handle completion of project setup."""
-        logger.debug("Project setup completed, running translation task")
+        logger.debug("Project setup completed, refreshing project type and running translation task")
+        # Refresh UI/project-type dependent button state immediately after setup save.
+        self.update_project_type_display()
+        self.update_button_states()
+
+        # Re-read project type from settings and recreate the concrete manager if needed.
+        # This avoids stale in-memory manager type (e.g., Python) after changing setup to Ruby.
+        if self.i18n_manager and self.current_project:
+            self.i18n_manager.set_directory(self.current_project)
+
         self.run_translation_task()
 
     def show_cross_project_analysis(self):
