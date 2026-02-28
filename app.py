@@ -383,6 +383,15 @@ class MainWindow(SmartMainWindow):
         # Handle translation results
         self.handle_translation_results(results)
 
+        # If outstanding window is open, refresh it from the latest validation state.
+        if (self.outstanding_window and self.outstanding_window.isVisible() and
+                self.i18n_manager and self.i18n_manager.translations and self.locales):
+            self.outstanding_window.load_data(
+                self.i18n_manager.translations,
+                self.locales,
+                skip_duplicate_prompt=True,
+            )
+
     def handle_translations_ready(self, translations, locales):
         """Handle when translations are ready to be displayed."""
         logger.debug(f"Translations ready - count: {len(translations)}, locales: {locales}")

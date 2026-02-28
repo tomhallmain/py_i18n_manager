@@ -31,11 +31,12 @@ class MultilineItemDelegate(QStyledItemDelegate):
     def createEditor(self, parent, option, index):
         editor = QTextEdit(parent)
         editor.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        editor.setAcceptRichText(False)
         return editor
         
     def setEditorData(self, editor, index):
         value = index.model().data(index, Qt.ItemDataRole.EditRole)
-        editor.setText(value)
+        editor.setPlainText(value if value is not None else "")
         
     def setModelData(self, editor, model, index):
         value = editor.toPlainText()
@@ -241,6 +242,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.outstanding_duplicate_groups = {}
         # Minimum width for first column (Translation Key); set in load_data
         self._min_key_column_width = KEY_COLUMN_MIN_WIDTH
+        self._last_combine_duplicates_choice = "no"
 
         self.setup_properties()
         self.setup_ui()
@@ -771,7 +773,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         # Cancel, or X, or Escape
         return "cancel"
 
-    def load_data(self, translations, locales):
+    def load_data(self, translations, locales, skip_duplicate_prompt=False):
         """Load translation data into the table.
         
         translations is the manager's in-memory dict (by reference). Choosing "Yes"
@@ -785,6 +787,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                   False if nothing to show (e.g. user chose Cancel, or all resolved).
         """
         self.translations = translations
+        self.locales = locales
         logger.debug("Resetting duplicate groups at start of load_data")
         self.outstanding_duplicate_groups = {}  # Reset duplicate groups
 
@@ -812,15 +815,23 @@ class OutstandingItemsWindow(BaseTranslationWindow):
 
         # Detect duplicate values
         existing_to_outstanding_matches, outstanding_duplicates = self._detect_duplicate_values(translations, locales)
-        
-        # Ask user if they want to combine duplicates
+
+        # Ask user once, then reuse the last choice for silent refreshes.
+        combine_reply = "no"
         if existing_to_outstanding_matches or outstanding_duplicates:
-            combine_reply = self._ask_combine_duplicates(
-                len(existing_to_outstanding_matches), len(outstanding_duplicates)
-            )
-            if combine_reply == "cancel":
-                # User closed dialog (X) or chose Cancel: do not open outstanding window
-                return False
+            if skip_duplicate_prompt:
+                combine_reply = self._last_combine_duplicates_choice or "no"
+                if combine_reply == "cancel":
+                    combine_reply = "no"
+            else:
+                combine_reply = self._ask_combine_duplicates(
+                    len(existing_to_outstanding_matches), len(outstanding_duplicates)
+                )
+                if combine_reply == "cancel":
+                    # User closed dialog (X) or chose Cancel: do not open outstanding window
+                    return False
+                self._last_combine_duplicates_choice = combine_reply
+
             if combine_reply == "yes":
                 # Pre-fill outstanding translations from existing translations
                 pre_filled_keys = set()  # Track which outstanding keys were pre-filled
@@ -1004,7 +1015,6 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             
             # Collect all changes first, grouped by locale
             changes_by_locale = {}
-            has_remaining_empty = False
             rows_to_remove = []
             
             for row in range(self.table.rowCount()):
@@ -1030,7 +1040,6 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                                         changes_by_locale[locale].append((matched_key, new_value))
                         else:
                             row_complete = False
-                            has_remaining_empty = True
                             if len(item.text()) > 0:
                                 logger.warn(f"Empty translation with spaces for {key} in {locale}")
                 
@@ -1049,16 +1058,17 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             # Remove completed rows in reverse order to maintain correct indices
             for row in sorted(rows_to_remove, reverse=True):
                 self.table.removeRow(row)
+
+            # Re-run validation and repopulate table with any still-invalid entries.
+            has_items = self.load_data(self.translations, self.locales, skip_duplicate_prompt=True)
             
             # Restore column widths
             for i, width in enumerate(column_widths):
                 self.table.setColumnWidth(i, width)
             
-            # Only close the dialog if there are no remaining empty translations
-            if has_remaining_empty:
-                logger.warn("There are still empty translations remaining...")
-            else:
-                logger.debug("No remaining empty translations, accepting dialog...")
+            # Close the dialog only when no outstanding items remain after revalidation.
+            if not has_items:
+                logger.debug("No remaining outstanding translations, accepting dialog...")
                 self.accept()
                 
         except Exception as e:
