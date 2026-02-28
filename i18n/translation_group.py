@@ -110,16 +110,6 @@ def unescape_unicode(s):
         return s
 
 
-def get_string_format_indices(s):
-    indices = []
-    for match in re.finditer(r"{[0-9]+}", s):
-        match_text = match.group()
-        idx = int(match_text[1:-1])
-        indices.append(idx)
-    indices.sort()
-    return tuple(indices)
-
-
 class TranslationKey:
     """Immutable key for a translation entry (context + msgid). Used so the same msgid
     with different context are distinct. Hashable for use as dict key.
@@ -152,6 +142,77 @@ class TranslationKey:
         """Build a TranslationKey from a polib POEntry."""
         context = (getattr(entry, 'msgctxt', None) or '').strip()
         return cls(entry.msgid, context=context)
+
+
+@dataclass(frozen=True)
+class PlaceholderSignature:
+    """Normalized interpolation token signature for translation compatibility checks."""
+
+    indexed: tuple[int, ...] = ()
+    brace_named: tuple[str, ...] = ()
+    ruby_named: tuple[str, ...] = ()
+    printf_named: tuple[str, ...] = ()
+    printf_positional_count: int = 0
+    ruby_interpolation: tuple[str, ...] = ()
+    has_malformed_ruby_named: bool = False
+
+    @classmethod
+    def from_text(cls, text: str | None) -> "PlaceholderSignature":
+        """Build a signature from a translation string."""
+        if not text:
+            return cls()
+
+        # Strict `%{name}` tokens for i18n interpolation.
+        ruby_named_matches = re.findall(r"%\{([A-Za-z_][A-Za-z0-9_]*)\}", text)
+        ruby_named = tuple(sorted(ruby_named_matches))
+
+        # Any `%{...}` form; if strict and loose counts differ, syntax is malformed.
+        loose_ruby_named_matches = re.findall(r"%\{([^}]*)\}", text)
+        has_malformed_ruby_named = len(loose_ruby_named_matches) != len(ruby_named_matches)
+
+        # Handle escaped braces so they do not get treated as placeholders.
+        unescaped = text.replace("{{", "").replace("}}", "")
+        indexed = tuple(sorted(int(m) for m in re.findall(r"\{([0-9]+)\}", unescaped)))
+        brace_named = tuple(sorted(re.findall(r"\{([A-Za-z_][A-Za-z0-9_]*)\}", unescaped)))
+
+        # Use real printf conversion letters and ensure the token does not spill
+        # into an adjacent word (e.g. "100% de" must not count as "%d").
+        printf_named_pattern = r"%\(([A-Za-z_][A-Za-z0-9_]*)\)[#0\- +]?(?:\d+)?(?:\.\d+)?[diouxXeEfFgGcrs](?![A-Za-z0-9_])"
+        printf_positional_pattern = r"(?<!%)%(?:[#0\- +]?(?:\d+)?(?:\.\d+)?[diouxXeEfFgGcrs])(?![A-Za-z0-9_])"
+        printf_named = tuple(sorted(re.findall(printf_named_pattern, text)))
+        printf_positional_count = len(re.findall(printf_positional_pattern, text))
+
+        # `#{...}` is Ruby code interpolation (usually invalid for i18n YAML values).
+        ruby_interpolation = tuple(sorted(re.findall(r"#\{([A-Za-z_][A-Za-z0-9_]*)\}", text)))
+
+        return cls(
+            indexed=indexed,
+            brace_named=brace_named,
+            ruby_named=ruby_named,
+            printf_named=printf_named,
+            printf_positional_count=printf_positional_count,
+            ruby_interpolation=ruby_interpolation,
+            has_malformed_ruby_named=has_malformed_ruby_named,
+        )
+
+    def matches(self, reference: "PlaceholderSignature") -> bool:
+        """Check placeholder/token compatibility with a reference signature."""
+        return (
+            self.indexed == reference.indexed and
+            self.ruby_named == reference.ruby_named and
+            self.brace_named == reference.brace_named and
+            self.printf_named == reference.printf_named and
+            self.printf_positional_count == reference.printf_positional_count
+        )
+
+    def is_invalid_for(self, reference: "PlaceholderSignature") -> bool:
+        """Return True when this signature is invalid versus a reference translation."""
+        return (
+            self.has_malformed_ruby_named or
+            bool(self.ruby_interpolation) or
+            not self.matches(reference)
+        )
+
 
 
 class TranslationGroup():
@@ -260,16 +321,23 @@ class TranslationGroup():
         return list(set(self.get_invalid_escaped_unicode_locales()) | set(self.get_invalid_encoded_unicode_locales()))
 
     def get_invalid_index_locales(self):
+        """Check interpolation/token placeholder compatibility against default locale.
+
+        Historically this validated only `{0}` indices, but now also checks named and
+        printf-style placeholders to catch runtime interpolation mismatches.
+        """
         invalid_index_locales = []
         default_translation = self.get_translation(self.default_locale)
-        if "{0}" in default_translation:
-            default_indices = get_string_format_indices(default_translation)
-            for locale, translation in self.values.items():
-                if locale == self.default_locale:
-                    continue
-                this_locale_indices = get_string_format_indices(translation)
-                if default_indices != this_locale_indices:
-                    invalid_index_locales.append(locale)
+        default_signature = PlaceholderSignature.from_text(default_translation)
+
+        for locale, translation in self.values.items():
+            if locale == self.default_locale:
+                continue
+
+            this_signature = PlaceholderSignature.from_text(translation)
+            if this_signature.is_invalid_for(default_signature):
+                invalid_index_locales.append(locale)
+
         return invalid_index_locales
 
     def get_invalid_brace_locales(self):
