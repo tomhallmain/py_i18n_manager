@@ -56,6 +56,7 @@ class MainWindow(SmartMainWindow):
         self.update_timer.setSingleShot(True)
         self.update_timer.timeout.connect(self.process_batched_updates)
         self.pending_updates = {}  # Dictionary to store pending updates by locale
+        self.pending_deletions = set()  # Translation keys deleted from editor windows
 
         # Main widget and layout
         main_widget = QWidget()
@@ -342,6 +343,7 @@ class MainWindow(SmartMainWindow):
             self.current_project, 
             action, 
             pending_updates=self.pending_updates.copy(),
+            pending_deletions=self.pending_deletions.copy(),
             intro_details=intro_details,
             manager=self.i18n_manager
         )
@@ -425,6 +427,7 @@ class MainWindow(SmartMainWindow):
         if not self.outstanding_window:
             self.outstanding_window = OutstandingItemsWindow(self, project_path=self.current_project)
             self.outstanding_window.translation_updated.connect(self.handle_translation_update)
+            self.outstanding_window.translation_group_deleted.connect(self.handle_translation_group_delete)
 
         # Update project path and properties before loading data
         self.outstanding_window.project_path = self.current_project
@@ -467,15 +470,40 @@ class MainWindow(SmartMainWindow):
         
     def process_batched_updates(self):
         """Process all pending translation updates in a single batch."""
-        if not self.pending_updates:
+        if not self.pending_updates and not self.pending_deletions:
             return
-            
+
+        # Deletions affect all locale files, so force all locales into modified set.
+        if self.pending_deletions and self.locales:
+            for locale in self.locales:
+                self.pending_updates.setdefault(locale, [])
+
         logger.debug(f"Processing batched updates for {len(self.pending_updates)} locales")
         logger.debug(f"Starting translation task for locales: {self.pending_updates.keys()}")
         self.run_translation_task(TranslationAction.WRITE_PO_FILES)
             
         # Clear pending updates
         self.pending_updates.clear()
+        self.pending_deletions.clear()
+
+    def handle_translation_group_delete(self, key):
+        """Handle deletion of a translation group from editor windows."""
+        if not self.i18n_manager or not self.i18n_manager.translations:
+            return
+
+        if key in self.i18n_manager.translations:
+            del self.i18n_manager.translations[key]
+            logger.debug(f"Deleted translation key from manager dict: {key}")
+        else:
+            logger.debug(f"Delete signal received for already-removed key: {key}")
+
+        # Queue deletion for persistence, but do not trigger writes yet.
+        # Writes should happen on explicit save/accept flows only.
+        self.pending_deletions.add(key)
+        self.i18n_manager.queue_deleted_keys([key])
+        logger.debug(
+            f"Queued deletion for persistence (waiting for save/accept). Pending deletions: {len(self.pending_deletions)}"
+        )
         
     def show_all_translations(self):
         if not self.i18n_manager or not self.i18n_manager.translations or not self.locales:
@@ -485,6 +513,7 @@ class MainWindow(SmartMainWindow):
         if not self.all_translations_window:
             self.all_translations_window = AllTranslationsWindow(self)
             self.all_translations_window.translation_updated.connect(self.handle_translation_update)
+            self.all_translations_window.translation_group_deleted.connect(self.handle_translation_group_delete)
             
         self.all_translations_window.load_data(self.i18n_manager.translations, self.locales)
         # NOTE if there are properties that need to be re-initialized, below method will need to be implemented

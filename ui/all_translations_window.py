@@ -1,8 +1,9 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                             QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
-                            QMessageBox, QLineEdit, QComboBox, QCheckBox)
+                            QMessageBox, QLineEdit, QComboBox, QCheckBox, QMenu)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtGui import QAction
 
 from ui.app_style import AppStyle
 from ui.base_translation_window import BaseTranslationWindow
@@ -17,6 +18,7 @@ OTHER_COLUMN_MIN_WIDTH = 140
 
 class AllTranslationsWindow(BaseTranslationWindow):
     translation_updated = pyqtSignal(str, list)  # locale, [(msgid, new_value), ...]
+    translation_group_deleted = pyqtSignal(object)  # key object (TranslationKey or str)
 
     def __init__(self, parent=None):
         super().__init__(parent, title=_("All Translations"), geometry="1200x800")
@@ -69,6 +71,16 @@ class AllTranslationsWindow(BaseTranslationWindow):
         
         # Table for translations
         self.table = self.setup_table()
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self.show_context_menu)
+        if hasattr(self.table, "_frozen_table"):
+            self.table._frozen_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            self.table._frozen_table.customContextMenuRequested.connect(self.show_frozen_context_menu)
+        self.table.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.horizontalHeader().customContextMenuRequested.connect(self.show_header_context_menu)
+        if hasattr(self.table, "_frozen_table"):
+            self.table._frozen_table.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            self.table._frozen_table.horizontalHeader().customContextMenuRequested.connect(self.show_frozen_header_context_menu)
         layout.addWidget(self.table)
         
         # Buttons
@@ -237,6 +249,77 @@ class AllTranslationsWindow(BaseTranslationWindow):
             if row not in [r for _, r in visible_rows]:
                 self.table.setRowHidden(row, True)
 
+    def show_context_menu(self, position):
+        """Show context menu for copy/delete actions."""
+        item = self.table.itemAt(position)
+        if not item:
+            return
+        self._show_context_menu_for_item(item, self.table.mapToGlobal(position))
+
+    def show_frozen_context_menu(self, position):
+        """Show context menu for first-column cells in frozen view."""
+        frozen = self.table._frozen_table
+        index = frozen.indexAt(position)
+        if not index.isValid():
+            return
+        item = self.table.item(index.row(), index.column())
+        if not item:
+            return
+        self._show_context_menu_for_item(item, frozen.viewport().mapToGlobal(position))
+
+    def _show_context_menu_for_item(self, item, global_position):
+        """Build and show context menu for a specific table item."""
+        menu = QMenu()
+        copy_action = QAction(_("Copy Text"), self)
+        copy_action.triggered.connect(lambda: QApplication.clipboard().setText(item.text()))
+        menu.addAction(copy_action)
+
+        menu.addSeparator()
+        delete_action = QAction(_("Delete Translation Key"), self)
+        delete_action.triggered.connect(lambda: self.delete_translation_group_for_row(item.row()))
+        menu.addAction(delete_action)
+
+        menu.exec(global_position)
+
+    def show_header_context_menu(self, position):
+        """Show context menu for header cells."""
+        column = self.table.horizontalHeader().logicalIndexAt(position)
+        if column < 0:
+            return
+
+        menu = QMenu()
+        copy_action = QAction(_("Copy Text"), self)
+        header_item = self.table.horizontalHeaderItem(column)
+        header_text = header_item.text() if header_item else ""
+        copy_action.triggered.connect(lambda: QApplication.clipboard().setText(header_text))
+        menu.addAction(copy_action)
+        menu.exec(self.table.horizontalHeader().mapToGlobal(position))
+
+    def show_frozen_header_context_menu(self, position):
+        """Show context menu for frozen first-column header."""
+        header = self.table._frozen_table.horizontalHeader()
+        menu = QMenu()
+        copy_action = QAction(_("Copy Text"), self)
+        header_item = self.table.horizontalHeaderItem(0)
+        header_text = header_item.text() if header_item else ""
+        copy_action.triggered.connect(lambda: QApplication.clipboard().setText(header_text))
+        menu.addAction(copy_action)
+        menu.exec(header.mapToGlobal(position))
+
+    def delete_translation_group_for_row(self, row: int):
+        """Delete translation group represented by a table row."""
+        key = self.get_key_from_row(row)
+        item = self.table.item(row, 0)
+        key_display = item.text() if item else str(key)
+
+        if not self.confirm_delete_translation_group(key_display):
+            return
+
+        if key in self.all_translations:
+            del self.all_translations[key]
+            self.translation_group_deleted.emit(key)
+            self.load_data(self.all_translations, self.all_locales)
+
     def save_changes(self):
         """Save all changes made in the table."""
         if not self.all_translations or not self.all_locales:
@@ -272,6 +355,17 @@ class AllTranslationsWindow(BaseTranslationWindow):
                     changes_by_locale[locale].append((key, new_value))
         
         if not changes_by_locale:
+            parent = self.parent()
+            if (
+                parent
+                and hasattr(parent, "pending_deletions")
+                and parent.pending_deletions
+                and hasattr(parent, "process_batched_updates")
+            ):
+                parent.process_batched_updates()
+                QMessageBox.information(self, _("Success"), _("Saved key deletions successfully!"))
+                return
+
             QMessageBox.information(self, _("Info"), _("No changes to save."))
             return
         

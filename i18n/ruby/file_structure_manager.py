@@ -142,15 +142,38 @@ class FileStructureManager:
         Returns:
             Translated file path, or None if translation is not possible
         """
-        if not default_file_path.startswith(self._base_locale_dir):
+        # Use normalized absolute paths for robust cross-platform comparison
+        # (handles path-case differences like C:\ vs c:\ on Windows).
+        base_dir_abs = os.path.abspath(self._base_locale_dir)
+        default_file_abs = os.path.abspath(default_file_path)
+        try:
+            if os.path.commonpath([
+                os.path.normcase(default_file_abs),
+                os.path.normcase(base_dir_abs)
+            ]) != os.path.normcase(base_dir_abs):
+                return None
+        except ValueError:
+            # Different drives or invalid path combination
             return None
-        
-        rel_path = os.path.relpath(default_file_path, self._base_locale_dir)
+
+        rel_path = os.path.relpath(default_file_abs, base_dir_abs)
         target_file = None
         
         # Pattern 1: Directory structure (en/application.yml -> de/application.yml)
         if rel_path.startswith(self._default_locale + os.sep):
+            # Replace locale directory and localize filename when needed:
+            # - en/en.yml -> de/de.yml
+            # - en/javascript.en.yml -> de/javascript.de.yml
             target_rel_path = rel_path.replace(self._default_locale + os.sep, target_locale + os.sep, 1)
+            target_dir = os.path.dirname(target_rel_path)
+            base_name = os.path.basename(target_rel_path)
+            if base_name == f"{self._default_locale}.yml":
+                base_name = f"{target_locale}.yml"
+            elif f".{self._default_locale}." in base_name:
+                base_name = base_name.replace(f".{self._default_locale}.", f".{target_locale}.")
+            elif base_name.startswith(f"{self._default_locale}."):
+                base_name = base_name.replace(f"{self._default_locale}.", f"{target_locale}.", 1)
+            target_rel_path = os.path.join(target_dir, base_name) if target_dir else base_name
             target_file = os.path.join(self._base_locale_dir, target_rel_path)
         # Pattern 2: Simple flat file (en.yml -> de.yml)
         elif rel_path == f"{self._default_locale}.yml":

@@ -226,6 +226,7 @@ class TranslationProgressDialog(QDialog):
 class OutstandingItemsWindow(BaseTranslationWindow):
     # Signal now takes a list of (msgid, new_value) tuples for each locale
     translation_updated = pyqtSignal(str, list)  # locale, [(msgid, new_value), ...]
+    translation_group_deleted = pyqtSignal(object)  # key object (TranslationKey or str)
 
     def __init__(self, parent=None, project_path=None):
         super().__init__(parent, title=_("Outstanding Translation Items"), geometry="1200x800")
@@ -322,9 +323,15 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.table = self.setup_table()
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.show_context_menu)
+        if hasattr(self.table, "_frozen_table"):
+            self.table._frozen_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            self.table._frozen_table.customContextMenuRequested.connect(self.show_frozen_context_menu)
         # Enable context menu for header
         self.table.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.horizontalHeader().customContextMenuRequested.connect(self.show_header_context_menu)
+        if hasattr(self.table, "_frozen_table"):
+            self.table._frozen_table.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            self.table._frozen_table.horizontalHeader().customContextMenuRequested.connect(self.show_frozen_header_context_menu)
         # Enforce minimum width on first column when user resizes (set in load_data)
         self.table.horizontalHeader().sectionResized.connect(self._clamp_key_column_width)
         
@@ -350,6 +357,21 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         item = self.table.itemAt(position)
         if not item:
             return
+        self._show_context_menu_for_item(item, self.table.mapToGlobal(position))
+
+    def show_frozen_context_menu(self, position):
+        """Show context menu for first-column cells in frozen view."""
+        frozen = self.table._frozen_table
+        index = frozen.indexAt(position)
+        if not index.isValid():
+            return
+        item = self.table.item(index.row(), index.column())
+        if not item:
+            return
+        self._show_context_menu_for_item(item, frozen.viewport().mapToGlobal(position))
+
+    def _show_context_menu_for_item(self, item, global_position):
+        """Build and show context menu for a specific table item."""
             
         menu = QMenu()
         
@@ -363,6 +385,11 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         copy_default = QAction(_("Copy Default Translation"), self)
         copy_default.triggered.connect(lambda: self.copy_default_translation(item, default_locale))
         menu.addAction(copy_default)
+
+        menu.addSeparator()
+        delete_key = QAction(_("Delete Translation Key"), self)
+        delete_key.triggered.connect(lambda: self.delete_translation_group_for_row(item.row()))
+        menu.addAction(delete_key)
         
         # Only show translation options for non-key column cells
         if item.column() > 0:
@@ -377,7 +404,37 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             translate_with_llm.triggered.connect(lambda: self.translate_selected_item(item, use_llm=True))
             menu.addAction(translate_with_llm)
         
-        menu.exec(self.table.mapToGlobal(position))
+        menu.exec(global_position)
+
+    def delete_translation_group_for_row(self, row: int):
+        """Delete translation group represented by a table row."""
+        key = self._get_key_from_row(row)
+        item = self.table.item(row, 0)
+        key_display = item.text() if item else str(key)
+
+        keys_to_delete = self.outstanding_duplicate_groups.get(key, [key])
+        if len(keys_to_delete) > 1:
+            key_display = f"{key_display} (+{len(keys_to_delete) - 1} duplicate keys)"
+
+        if not self.confirm_delete_translation_group(key_display):
+            return
+
+        deleted_any = False
+        for del_key in keys_to_delete:
+            if del_key in self.translations:
+                del self.translations[del_key]
+                self.translation_group_deleted.emit(del_key)
+                deleted_any = True
+
+        if deleted_any:
+            has_items = self.load_data(self.translations, self.locales, skip_duplicate_prompt=True)
+            if not has_items:
+                # Special case: only deletions remained. Force immediate persistence.
+                parent = self.parent()
+                if parent and hasattr(parent, "process_batched_updates"):
+                    logger.debug("Outstanding list exhausted after delete; triggering immediate batched update")
+                    QTimer.singleShot(0, parent.process_batched_updates)
+                self.accept()
 
     def show_header_context_menu(self, position):
         """Show context menu for header items."""
@@ -396,6 +453,17 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         menu.addAction(copy_text)
         
         menu.exec(self.table.horizontalHeader().mapToGlobal(position))
+
+    def show_frozen_header_context_menu(self, position):
+        """Show context menu for frozen first-column header."""
+        header = self.table._frozen_table.horizontalHeader()
+        menu = QMenu()
+        copy_text = QAction(_("Copy Text"), self)
+        header_item = self.table.horizontalHeaderItem(0)
+        header_text = header_item.text() if header_item else ""
+        copy_text.triggered.connect(lambda: self.copy_text_to_clipboard(header_text))
+        menu.addAction(copy_text)
+        menu.exec(header.mapToGlobal(position))
 
     def _clamp_key_column_width(self, logical_index: int, _old_size: int, new_size: int):
         """Keep the first column (Translation Key) at or above its content-based minimum."""
@@ -971,8 +1039,11 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             self.table.setColumnWidth(col, OTHER_COLUMN_MIN_WIDTH)
         self._min_key_column_width = KEY_COLUMN_MIN_WIDTH
         
-        # Return True to indicate there are items to display
-        return True
+        # Return True only when there are rows to display.
+        has_items = len(all_invalid_groups) > 0
+        if not has_items:
+            logger.debug("No outstanding items found after load_data")
+        return has_items
 
     def save_changes(self):
         """Save changes to the translations."""
@@ -1054,6 +1125,18 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 self.translation_updated.emit(locale, changes)
                 if i < len(changes_by_locale) - 1:  # Don't sleep after the last one
                     QThread.msleep(100)  # 100ms delay between locales
+
+            # If this save contains only key deletions (no text edits), flush queued deletions now.
+            parent = self.parent()
+            if (
+                not changes_by_locale
+                and parent
+                and hasattr(parent, "pending_deletions")
+                and parent.pending_deletions
+                and hasattr(parent, "process_batched_updates")
+            ):
+                logger.debug("Save triggered with pending deletions only; processing batched updates now.")
+                parent.process_batched_updates()
             
             # Remove completed rows in reverse order to maintain correct indices
             for row in sorted(rows_to_remove, reverse=True):

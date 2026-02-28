@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Set
+from typing import Dict, Iterable, List, Optional, Set
 
 from .translation_group import TranslationGroup, TranslationKey
 from .translation_manager_results import TranslationManagerResults, TranslationAction
@@ -26,6 +26,7 @@ class I18NManagerBase(ABC):
         self.locales = locales[:] if locales else []
         self.translations: Dict[TranslationKey, TranslationGroup] = {}
         self.written_locales: Set[str] = set()
+        self.pending_deleted_keys: Set[str] = set()
         self.intro_details = intro_details or {
             "first_author": "AUTHOR NAME <author@example.com>",
             "last_translator": "Translator Name <translator@example.com>",
@@ -34,6 +35,17 @@ class I18NManagerBase(ABC):
         }
         self.settings_manager = settings_manager
         self._locale_dir = self._detect_locale_directory()
+
+    def queue_deleted_keys(self, keys: Iterable[TranslationKey | str]) -> None:
+        """Queue translation keys that should be physically removed on write."""
+        for key in keys:
+            key_str = key.msgid if hasattr(key, "msgid") else str(key)
+            if key_str:
+                self.pending_deleted_keys.add(key_str)
+
+    def clear_queued_deleted_keys(self) -> None:
+        """Clear queued translation-key deletions after successful persistence."""
+        self.pending_deleted_keys.clear()
     
     @property
     @abstractmethod

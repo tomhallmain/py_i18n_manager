@@ -28,14 +28,18 @@ class TranslationWorker(QThread):
     translations_ready = pyqtSignal(dict, list)  # translations, locales
 
     def __init__(self, directory, action: TranslationAction = TranslationAction.CHECK_STATUS, 
-                 pending_updates=None, intro_details=None, manager=None):
+                 pending_updates=None, pending_deletions=None, intro_details=None, manager=None):
         super().__init__()
         self.directory = directory
         self.action = action
         self.pending_updates = pending_updates or {}
+        self.pending_deletions = pending_deletions or set()
         self.intro_details = intro_details
         self.manager = manager
-        logger.debug(f"Initialized TranslationWorker with directory: {directory}, action: {action.name}, pending_updates: {pending_updates}")
+        logger.debug(
+            f"Initialized TranslationWorker with directory: {directory}, action: {action.name}, "
+            f"pending_updates: {pending_updates}, pending_deletions: {len(self.pending_deletions)}"
+        )
 
     def run(self):
         try:
@@ -60,6 +64,10 @@ class TranslationWorker(QThread):
                         if key in self.manager.translations:
                             logger.debug(f"Updating translation in memory for {key} in {locale}")
                             self.manager.translations[key].add_translation(locale, new_value)
+
+            # Forward queued deletions to the manager so writes can remove them from files.
+            if self.pending_deletions:
+                self.manager.queue_deleted_keys(self.pending_deletions)
 
             # Run the translation management task with the specified action
             result = self.manager.manage_translations(self.action, set(self.pending_updates.keys()))

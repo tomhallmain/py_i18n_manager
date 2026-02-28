@@ -1,7 +1,11 @@
-from PyQt6.QtWidgets import QTableWidget, QHeaderView
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QTableWidget, QHeaderView, QMessageBox
 
 from lib.multi_display import SmartDialog
 from ui.frozen_table_widget import FrozenTableWidget
+from utils.translations import I18N
+
+_ = I18N._
 
 
 class BaseTranslationWindow(SmartDialog):
@@ -61,3 +65,25 @@ class BaseTranslationWindow(SmartDialog):
         # Keep frozen first column in sync (width and visibility)
         if hasattr(self.table, 'updateFrozenColumn'):
             self.table.updateFrozenColumn()
+
+    def get_key_from_row(self, row):
+        """Get translation key object from first-column UserRole (fallback to text)."""
+        item = self.table.item(row, 0)
+        key = item.data(Qt.ItemDataRole.UserRole) if item else None
+        if key is not None:
+            return key
+        return item.text() if item else ""
+
+    def confirm_delete_translation_group(self, key_display: str) -> bool:
+        """Show confirmation dialog before deleting a translation group."""
+        reply = QMessageBox.warning(
+            self,
+            _("Delete Translation Key"),
+            _("Delete translation key \"{key_display}\" from all locales?\n\n"
+              "This will remove the key from written translation files on save/update.").format(
+                key_display=key_display
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return reply == QMessageBox.StandardButton.Yes

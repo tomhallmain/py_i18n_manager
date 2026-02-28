@@ -51,6 +51,20 @@ from utils.logging_setup import get_logger
 
 logger = get_logger("ruby_i18n_manager")
 
+# PyYAML (YAML 1.1) can coerce unquoted keys like "yes"/"no" into bools.
+# For i18n keys this is undesirable, so disable implicit bool resolution.
+class I18NStringKeyLoader(yaml.SafeLoader):
+    pass
+
+I18NStringKeyLoader.yaml_implicit_resolvers = {
+    first_char: [
+        (tag, pattern)
+        for tag, pattern in resolvers
+        if tag != "tag:yaml.org,2002:bool"
+    ]
+    for first_char, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+}
+
 class RubyI18NManager(I18NManagerBase):
     """Manages the Ruby/Rails internationalization (i18n) workflow for YAML translation files.
     
@@ -97,6 +111,10 @@ class RubyI18NManager(I18NManagerBase):
         # Initialize file structure manager (after _locale_dir is set by parent __init__)
         base_locale_dir = os.path.join(self._directory, self._locale_dir)
         self._file_structure_manager = FileStructureManager(base_locale_dir, self.default_locale)
+
+    def _safe_yaml_load(self, stream):
+        """Load YAML while preserving string-like i18n keys (no implicit bool coercion)."""
+        return yaml.load(stream, Loader=I18NStringKeyLoader)
         
     @property
     def default_locale(self) -> str:
@@ -237,6 +255,8 @@ class RubyI18NManager(I18NManagerBase):
                 if len(data) == 1:
                     locale_key = list(data.keys())[0]
                     if locale_key in original_data:
+                        # Remove explicitly deleted keys from original locale tree before merge.
+                        self._apply_pending_deletions_to_locale_data(original_data[locale_key], locale_key)
                         # Merge the locale's data, not the whole structure
                         # This ensures we merge at the correct nesting level
                         # Ensure new values are quoted
@@ -250,6 +270,8 @@ class RubyI18NManager(I18NManagerBase):
                     # Multiple locales - merge each
                     for key, value in data.items():
                         if key in original_data:
+                            # Remove explicitly deleted keys from original locale tree before merge.
+                            self._apply_pending_deletions_to_locale_data(original_data[key], key)
                             quoted_value = self._quote_string_values(value)
                             self._merge_ruamel_data(original_data[key], quoted_value)
                         else:
@@ -373,6 +395,24 @@ class RubyI18NManager(I18NManagerBase):
                     data[i] = DoubleQuotedScalarString(item)
                 elif isinstance(item, (dict, CommentedMap, list, CommentedSeq)):
                     self._quote_string_values_in_place(item)
+
+    def _apply_pending_deletions_to_locale_data(self, locale_data, locale_key) -> None:
+        """Apply queued deleted keys to an in-memory locale tree before merge."""
+        if not self.pending_deleted_keys:
+            return
+        if not isinstance(locale_data, dict):
+            logger.debug(f"Locale {locale_key}: cannot apply pending deletions, locale data is not a mapping")
+            return
+
+        removed_count = 0
+        for deleted_key in self.pending_deleted_keys:
+            if self._remove_from_nested_dict(locale_data, deleted_key):
+                removed_count += 1
+
+        if removed_count:
+            logger.debug(
+                f"Locale {locale_key}: pruned {removed_count} queued deleted keys from original content before merge"
+            )
     
     def _pyyaml_dump(self, data, stream, **kwargs):
         """Dump YAML using PyYAML with custom dumper that quotes values but not keys."""
@@ -705,7 +745,7 @@ class RubyI18NManager(I18NManagerBase):
                     
                     # Parse YAML data
                     with open(yaml_file, 'r', encoding='utf-8') as f:
-                        data = yaml.safe_load(f)
+                        data = self._safe_yaml_load(f)
                     
                     # Track this file as a default locale file (for replicating structure)
                     self._file_structure_manager.add_default_locale_file(yaml_file)
@@ -742,7 +782,7 @@ class RubyI18NManager(I18NManagerBase):
                     
                     # Parse YAML data
                     with open(yaml_file, 'r', encoding='utf-8') as f:
-                        data = yaml.safe_load(f)
+                        data = self._safe_yaml_load(f)
                     
                     if data and locale in data:
                         keys = self._extract_translation_keys(data[locale], prefix="")
@@ -945,6 +985,10 @@ class RubyI18NManager(I18NManagerBase):
             results.po_files_updated = True
             results.updated_locales = successful_updates
             logger.info(f"Successfully updated YAML files for {len(successful_updates)} locales: {successful_updates}")
+
+        # Clear deletion queue only when all requested locales succeeded.
+        if successful_updates and not results.failed_locales:
+            self.clear_queued_deleted_keys()
 
     def write_po_file(self, po_file, locale):
         """Write translations to a PO file for a specific locale using polib.
@@ -1211,7 +1255,7 @@ msgstr ""
                             
                             # Parse YAML data
                             with open(file_path, 'r', encoding='utf-8') as f:
-                                existing_data = yaml.safe_load(f) or {}
+                                existing_data = self._safe_yaml_load(f) or {}
                                 file_metadata[file_path]['original_data'] = existing_data
                                 # Extract existing translations for this locale
                                 # IMPORTANT: Preserve ALL existing keys, not just ones we're updating
@@ -1266,7 +1310,7 @@ msgstr ""
                                     file_metadata[target_file]['preserve_comments'] = True
                                 
                                 with open(target_file, 'r', encoding='utf-8') as f:
-                                    existing_data = yaml.safe_load(f) or {}
+                                    existing_data = self._safe_yaml_load(f) or {}
                                     if locale in existing_data and isinstance(existing_data[locale], dict):
                                         import copy
                                         translations_by_file[target_file] = copy.deepcopy(existing_data[locale])
@@ -1304,6 +1348,20 @@ msgstr ""
             if not translations_by_file:
                 logger.warning(f"No translations to write for locale {locale} (skipped {skipped_no_value} with no value, {skipped_not_in_base} not in base)")
                 return True
+
+            # Apply explicit key deletions to each file payload before writing.
+            if self.pending_deleted_keys:
+                deleted_count = 0
+                for file_path, data in translations_by_file.items():
+                    for deleted_key in self.pending_deleted_keys:
+                        if self._remove_from_nested_dict(data, deleted_key):
+                            deleted_count += 1
+                if deleted_count:
+                    logger.info(
+                        f"Applied {deleted_count} queued key deletions while writing locale {locale}"
+                    )
+                else:
+                    logger.debug(f"No queued key deletions matched while writing locale {locale}")
             
             # Write each YAML file
             for file_path, data in translations_by_file.items():
@@ -1433,6 +1491,76 @@ msgstr ""
         
         # Set the final value (this will update existing or create new)
         current[parts[-1]] = value
+
+    def _resolve_nested_dict_key(self, mapping: dict, part: str):
+        """Resolve a nested mapping key, handling YAML bool key variants.
+
+        Supports matching keys that may appear as:
+        - "True"/"False" strings
+        - "true"/"false" strings
+        - bool True/False (from YAML coercion)
+        """
+        if part in mapping:
+            return part
+
+        wanted = str(part)
+        wanted_lower = wanted.lower()
+        bool_like = wanted_lower in {"true", "false"}
+
+        # Exact string repr match first
+        for existing_key in mapping.keys():
+            if str(existing_key) == wanted:
+                return existing_key
+
+        # For bool-like tokens, accept case/typing variants.
+        if bool_like:
+            for existing_key in mapping.keys():
+                if str(existing_key).lower() == wanted_lower:
+                    return existing_key
+                if isinstance(existing_key, bool):
+                    if existing_key and wanted_lower == "true":
+                        return existing_key
+                    if (not existing_key) and wanted_lower == "false":
+                        return existing_key
+
+        return None
+
+    def _remove_from_nested_dict(self, data: dict, key: str) -> bool:
+        """Remove a dot-notation key from a nested dictionary in-place.
+
+        Returns:
+            bool: True if a value was removed, False otherwise.
+        """
+        if not isinstance(data, dict):
+            return False
+
+        parts = key.split(".")
+        current = data
+        parents = []
+
+        for part in parts[:-1]:
+            resolved_part = self._resolve_nested_dict_key(current, part)
+            if resolved_part is None or not isinstance(current[resolved_part], dict):
+                return False
+            parents.append((current, resolved_part))
+            current = current[resolved_part]
+
+        leaf = parts[-1]
+        resolved_leaf = self._resolve_nested_dict_key(current, leaf)
+        if resolved_leaf is None:
+            return False
+
+        del current[resolved_leaf]
+
+        # Cleanup empty parent dictionaries bottom-up.
+        for parent, parent_key in reversed(parents):
+            child = parent.get(parent_key)
+            if isinstance(child, dict) and not child:
+                del parent[parent_key]
+            else:
+                break
+
+        return True
     
     def write_locale_po_file(self, locale):
         """Legacy method name - redirects to write_locale_yaml_files().
