@@ -17,6 +17,8 @@ CYAN = "\033[34m"
 
 class Utils:
     sleep_prevented = False
+    CJK_LANGUAGE_CODES = {'zh', 'ja', 'ko'}
+    CJK_SCRIPT_CODES = {'hang', 'hani', 'hans', 'hant', 'hira', 'jpan', 'kana', 'kore'}
 
     @staticmethod
     def extract_substring(text, pattern):
@@ -242,3 +244,97 @@ class Utils:
             out += f"\t{item}\n"
         out += "]"
         return out
+
+    @staticmethod
+    def count_cjk_characters(text):
+        """
+        Count the number of CJK characters in the given text.
+        
+        Args:
+            text: The text to analyze
+            
+        Returns:
+            tuple: (total_cjk_chars, dict) where dict contains counts for each script:
+                  {
+                      'chinese': count,
+                      'japanese': count,
+                      'korean': count
+                  }
+                  
+        Note:
+            CJK characters include:
+            - Chinese (Han): \u4e00-\u9fff
+            - Japanese (Hiragana): \u3040-\u309f
+            - Japanese (Katakana): \u30a0-\u30ff
+            - Korean (Hangul): \uac00-\ud7af
+        """
+        if not text:
+            return 0, {'chinese': 0, 'japanese': 0, 'korean': 0}
+            
+        script_counts = {
+            'chinese': 0,
+            'japanese': 0,
+            'korean': 0
+        }
+        
+        for c in text:
+            if '\u4e00' <= c <= '\u9fff':  # Chinese
+                script_counts['chinese'] += 1
+            elif '\u3040' <= c <= '\u309f' or '\u30a0' <= c <= '\u30ff':  # Japanese
+                script_counts['japanese'] += 1
+            elif '\uac00' <= c <= '\ud7af':  # Korean
+                script_counts['korean'] += 1
+                
+        total_cjk = sum(script_counts.values())
+        return total_cjk, script_counts
+
+    @staticmethod
+    def get_cjk_character_ratio(text, threshold_percentage=None):
+        """
+        Calculate the ratio of CJK characters in the given text.
+        
+        Args:
+            text: The text to analyze
+            threshold_percentage: Optional percentage threshold (0-100). If provided,
+                                returns True if the ratio exceeds this threshold.
+        
+        Returns:
+            If threshold_percentage is None:
+                float: Ratio of CJK characters (0.0 to 1.0)
+            If threshold_percentage is provided:
+                bool: True if ratio exceeds threshold, False otherwise
+                
+        Note:
+            CJK characters include:
+            - Chinese (Han): \u4e00-\u9fff
+            - Japanese (Hiragana): \u3040-\u309f
+            - Japanese (Katakana): \u30a0-\u30ff
+            - Korean (Hangul): \uac00-\ud7af
+        """
+        if not text:
+            return 0.0 if threshold_percentage is None else False
+            
+        cjk_char_count, _ = Utils.count_cjk_characters(text)
+        ratio = cjk_char_count / len(text)
+        
+        if threshold_percentage is not None:
+            return ratio > (threshold_percentage / 100.0)
+            
+        return ratio
+
+    @staticmethod
+    def is_cjk_locale(locale):
+        """Check if locale language/script indicates CJK support."""
+        if not locale:
+            return False
+
+        locale_parts = locale.replace('-', '_').split('_')
+        language_code = locale_parts[0].lower()
+        if language_code in Utils.CJK_LANGUAGE_CODES:
+            return True
+
+        for part in locale_parts[1:]:
+            if part.lower() in Utils.CJK_SCRIPT_CODES:
+                return True
+        return False
+

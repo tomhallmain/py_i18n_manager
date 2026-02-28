@@ -5,6 +5,7 @@ from typing import List
 from polib import POEntry
 
 from utils.config import config_manager
+from utils.utils import Utils
 
 @dataclass
 class InvalidTranslationGroupLocales:
@@ -15,6 +16,7 @@ class InvalidTranslationGroupLocales:
     invalid_brace_locales: List[str] = field(default_factory=list)
     invalid_leading_space_locales: List[str] = field(default_factory=list)
     invalid_newline_locales: List[str] = field(default_factory=list)
+    invalid_cjk_locales: List[str] = field(default_factory=list)
     
     @property
     def has_errors(self) -> bool:
@@ -24,7 +26,8 @@ class InvalidTranslationGroupLocales:
                 len(self.invalid_index_locales) > 0 or
                 len(self.invalid_brace_locales) > 0 or
                 len(self.invalid_leading_space_locales) > 0 or
-                len(self.invalid_newline_locales) > 0)
+                len(self.invalid_newline_locales) > 0 or
+                len(self.invalid_cjk_locales) > 0)
     
     def get_total_errors(self) -> dict[str, int]:
         """Get a count of all error types."""
@@ -34,7 +37,8 @@ class InvalidTranslationGroupLocales:
             'invalid_indices': len(self.invalid_index_locales),
             'invalid_braces': len(self.invalid_brace_locales),
             'invalid_leading_spaces': len(self.invalid_leading_space_locales),
-            'invalid_newlines': len(self.invalid_newline_locales)
+            'invalid_newlines': len(self.invalid_newline_locales),
+            'invalid_cjk': len(self.invalid_cjk_locales)
         }
     
     def get_invalid_locales(self) -> List[str]:
@@ -44,7 +48,8 @@ class InvalidTranslationGroupLocales:
                     set(self.invalid_index_locales) |
                     set(self.invalid_brace_locales) |
                     set(self.invalid_leading_space_locales) |
-                    set(self.invalid_newline_locales))
+                    set(self.invalid_newline_locales) |
+                    set(self.invalid_cjk_locales))
 
 def escape_unicode(s):
     """Convert a string to ASCII-encoded Unicode format for PO files.
@@ -387,6 +392,25 @@ class TranslationGroup():
                 
         return invalid_newline_locales
 
+    def get_invalid_cjk_locales(self, threshold_percentage=0):
+        """Get locales with mostly CJK characters for non-CJK locale codes.
+
+        Args:
+            threshold_percentage (int): Minimum CJK percentage to treat as invalid.
+
+        Returns:
+            list: Locales that exceed the CJK ratio threshold but are not CJK-associated.
+        """
+        invalid_cjk_locales = []
+
+        for locale, translation in self.values.items():
+            if Utils.is_cjk_locale(locale):
+                continue
+            if Utils.get_cjk_character_ratio(translation, threshold_percentage):
+                invalid_cjk_locales.append(locale)
+
+        return invalid_cjk_locales
+
     def has_translation_changes(self, other: 'TranslationGroup') -> bool:
         """Compare this translation group with another to check if translations have changed.
         
@@ -480,4 +504,5 @@ class TranslationGroup():
         invalid_locales.invalid_brace_locales = self.get_invalid_brace_locales()
         invalid_locales.invalid_leading_space_locales = self.get_invalid_leading_space_locales()
         invalid_locales.invalid_newline_locales = self.get_invalid_newline_locales()
+        invalid_locales.invalid_cjk_locales = self.get_invalid_cjk_locales()
         return invalid_locales

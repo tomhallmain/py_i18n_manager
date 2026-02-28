@@ -3,6 +3,8 @@ from typing import Optional
 from lib.llm import LLM
 from lib.argos_translate import ArgosTranslate
 from concurrent.futures import ThreadPoolExecutor
+from utils.settings_manager import SettingsManager
+from utils.utils import Utils
 
 from utils.logging_setup import get_logger
 
@@ -26,16 +28,26 @@ Rules:
 
 Return only the JSON object, no additional text."""
 
-    def __init__(self, default_locale='en', prompt_template: Optional[str] = None):
+    def __init__(self, default_locale='en', prompt_template: Optional[str] = None,
+                 cjk_reject_threshold_percentage: Optional[int] = None, project_path: Optional[str] = None):
         """Initialize the translation service.
         
         Args:
             default_locale (str, optional): Default source locale for translations. Defaults to 'en'.
             prompt_template (str, optional): Custom prompt template for LLM translations.
                                             If None, uses the default template.
+            cjk_reject_threshold_percentage (int, optional): CJK rejection threshold percentage for
+                                                            non-CJK locales.
+            project_path (str, optional): Project path for project-specific LLM settings.
         """
         self.default_locale = default_locale
         self.prompt_template = prompt_template
+        self.project_path = project_path
+        self.settings_manager = SettingsManager()
+        if cjk_reject_threshold_percentage is None:
+            self.cjk_reject_threshold_percentage = self.settings_manager.get_llm_cjk_reject_threshold_percentage(project_path)
+        else:
+            self.cjk_reject_threshold_percentage = int(cjk_reject_threshold_percentage)
         self.llm = LLM()
         self.argos = ArgosTranslate()
         self._executor = ThreadPoolExecutor(max_workers=4)
@@ -47,6 +59,10 @@ Return only the JSON object, no additional text."""
             template (str, optional): The new prompt template, or None to use default
         """
         self.prompt_template = template
+
+    def set_cjk_reject_threshold_percentage(self, threshold_percentage: int):
+        """Update CJK rejection threshold percentage used for non-CJK locales."""
+        self.cjk_reject_threshold_percentage = max(0, min(100, int(threshold_percentage)))
         
     def __del__(self):
         """Cleanup when the service is destroyed."""
@@ -74,10 +90,12 @@ Return only the JSON object, no additional text."""
         
         # Get translation from LLM
         try:
+            cjk_reject_threshold = self._get_cjk_reject_threshold_for_locale(target_locale)
             result = self.llm.generate_json_get_value(
                 query=prompt,
                 json_key="translation",
-                timeout=60  # Shorter timeout for translations
+                timeout=60,  # Shorter timeout for translations
+                cjk_reject_threshold_percentage=cjk_reject_threshold,
             )
             return result.response if result else ""
         except Exception as e:
@@ -159,3 +177,9 @@ Return only the JSON object, no additional text."""
             )
         
         return prompt
+
+    def _get_cjk_reject_threshold_for_locale(self, target_locale: str) -> Optional[int]:
+        """Return CJK reject threshold for non-CJK locales, None for CJK locales."""
+        if Utils.is_cjk_locale(target_locale):
+            return None
+        return self.cjk_reject_threshold_percentage

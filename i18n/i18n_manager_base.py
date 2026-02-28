@@ -194,6 +194,11 @@ class I18NManagerBase(ABC):
                 if invalid_newline_locales:
                     invalid_groups.invalid_newline_locale_groups.append((key, invalid_newline_locales))
 
+                # Check for invalid CJK in non-CJK locales
+                invalid_cjk_locales = group.get_invalid_cjk_locales()
+                if invalid_cjk_locales:
+                    invalid_groups.invalid_cjk_locale_groups.append((key, invalid_cjk_locales))
+
         return invalid_groups
 
     def fix_invalid_translations(self) -> bool:
@@ -258,6 +263,10 @@ class I18NManagerBase(ABC):
             
         for key, invalid_locales in invalid_groups.invalid_newline_locale_groups:
             print(f"Invalid newlines: \"{key}\" in locales: {invalid_locales}")
+            one_invalid_translation_found = True
+
+        for key, invalid_locales in invalid_groups.invalid_cjk_locale_groups:
+            print(f"Invalid CJK content: \"{key}\" in locales: {invalid_locales}")
             one_invalid_translation_found = True
 
         if not one_invalid_translation_found:

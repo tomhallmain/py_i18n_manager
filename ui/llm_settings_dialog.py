@@ -2,7 +2,7 @@
 
 from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, 
                             QLabel, QTextEdit, QFrame, QCheckBox,
-                            QMessageBox, QGroupBox, QScrollArea, QWidget)
+                            QMessageBox, QGroupBox, QScrollArea, QWidget, QSpinBox)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 
@@ -86,6 +86,30 @@ class LLMSettingsDialog(SmartDialog):
         template_layout.addWidget(self.template_editor)
         
         layout.addWidget(template_group)
+
+        # CJK filtering settings
+        cjk_group = QGroupBox(_("CJK Response Filtering"))
+        cjk_layout = QVBoxLayout(cjk_group)
+
+        cjk_info = QLabel(
+            _("Reject LLM responses with high CJK character ratio for non-CJK target locales.\n"
+              "CJK target locales always bypass this filter.")
+        )
+        cjk_info.setWordWrap(True)
+        cjk_layout.addWidget(cjk_info)
+
+        threshold_layout = QHBoxLayout()
+        threshold_layout.addWidget(QLabel(_("Reject threshold:")))
+        self.cjk_threshold_spinbox = QSpinBox()
+        self.cjk_threshold_spinbox.setRange(0, 100)
+        self.cjk_threshold_spinbox.setSuffix("%")
+        self.cjk_threshold_spinbox.setToolTip(
+            _("If CJK characters exceed this percentage, the response is rejected for non-CJK locales.")
+        )
+        threshold_layout.addWidget(self.cjk_threshold_spinbox)
+        threshold_layout.addStretch()
+        cjk_layout.addLayout(threshold_layout)
+        layout.addWidget(cjk_group)
         
         # Preview section
         preview_group = QGroupBox(_("Preview (Example Output)"))
@@ -143,10 +167,15 @@ class LLMSettingsDialog(SmartDialog):
         # Get current template
         template = self.settings_manager.get_llm_prompt_template(self.project_path)
         self.template_editor.setText(template)
+        threshold = self.settings_manager.get_llm_cjk_reject_threshold_percentage(self.project_path)
+        self.cjk_threshold_spinbox.setValue(threshold)
         
         # Set checkbox state if project path is set
         if self.project_path and self.project_override_checkbox:
-            has_override = self.settings_manager.has_project_llm_prompt_template(self.project_path)
+            has_override = (
+                self.settings_manager.has_project_llm_prompt_template(self.project_path) or
+                self.settings_manager.has_project_llm_cjk_reject_threshold(self.project_path)
+            )
             self.project_override_checkbox.setChecked(has_override)
             
             # Update clear override button state
@@ -194,6 +223,7 @@ class LLMSettingsDialog(SmartDialog):
         if reply == QMessageBox.StandardButton.Yes:
             default_template = SettingsManager.get_default_llm_prompt_template()
             self.template_editor.setText(default_template)
+            self.cjk_threshold_spinbox.setValue(SettingsManager.DEFAULT_LLM_CJK_REJECT_THRESHOLD_PERCENTAGE)
     
     def clear_project_override(self):
         """Clear the project-specific template override."""
@@ -209,10 +239,14 @@ class LLMSettingsDialog(SmartDialog):
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            if self.settings_manager.clear_project_llm_prompt_template(self.project_path):
+            clear_template_ok = self.settings_manager.clear_project_llm_prompt_template(self.project_path)
+            clear_threshold_ok = self.settings_manager.clear_project_llm_cjk_reject_threshold(self.project_path)
+            if clear_template_ok and clear_threshold_ok:
                 # Reload with global template
                 global_template = self.settings_manager.get_llm_prompt_template(None)
                 self.template_editor.setText(global_template)
+                global_threshold = self.settings_manager.get_llm_cjk_reject_threshold_percentage(None)
+                self.cjk_threshold_spinbox.setValue(global_threshold)
                 
                 if self.project_override_checkbox:
                     self.project_override_checkbox.setChecked(False)
@@ -235,6 +269,7 @@ class LLMSettingsDialog(SmartDialog):
     def save_settings(self):
         """Save the current settings."""
         template = self.template_editor.toPlainText().strip()
+        cjk_threshold = self.cjk_threshold_spinbox.value()
         
         if not template:
             QMessageBox.warning(
@@ -267,11 +302,14 @@ class LLMSettingsDialog(SmartDialog):
         )
         
         if save_to_project:
-            success = self.settings_manager.save_llm_prompt_template(template, self.project_path)
+            success_template = self.settings_manager.save_llm_prompt_template(template, self.project_path)
+            success_threshold = self.settings_manager.save_llm_cjk_reject_threshold_percentage(cjk_threshold, self.project_path)
             location = _("project")
         else:
-            success = self.settings_manager.save_llm_prompt_template(template, None)
+            success_template = self.settings_manager.save_llm_prompt_template(template, None)
+            success_threshold = self.settings_manager.save_llm_cjk_reject_threshold_percentage(cjk_threshold, None)
             location = _("global")
+        success = success_template and success_threshold
         
         if success:
             logger.info(f"LLM prompt template saved to {location} settings")

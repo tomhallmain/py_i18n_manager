@@ -66,6 +66,7 @@ class TranslationStatus(Enum):
     INVALID_BRACES = "Invalid Braces"
     INVALID_LEADING_SPACE = "Invalid Leading Space"
     INVALID_NEWLINE = "Invalid Newline"
+    INVALID_CJK = "Invalid CJK"
 
     def get_translated_value(self) -> str:
         """Get the translated value for this status.
@@ -85,6 +86,8 @@ class TranslationStatus(Enum):
             return _("Invalid Leading Space")
         elif self == TranslationStatus.INVALID_NEWLINE:
             return _("Invalid Newline")
+        elif self == TranslationStatus.INVALID_CJK:
+            return _("Invalid CJK")
         return self.value
 
     @classmethod
@@ -109,6 +112,8 @@ class TranslationStatus(Enum):
             return cls.INVALID_LEADING_SPACE
         elif translated_value == _("Invalid Newline"):
             return cls.INVALID_NEWLINE
+        elif translated_value == _("Invalid CJK"):
+            return cls.INVALID_CJK
         raise ValueError(f"Unknown translation status: {translated_value}")
 
 class TranslationFilter(Enum):
@@ -120,6 +125,7 @@ class TranslationFilter(Enum):
     INVALID_BRACES = "Invalid Braces"
     INVALID_LEADING_SPACE = "Invalid Leading Space"
     INVALID_NEWLINE = "Invalid Newline"
+    INVALID_CJK = "Invalid CJK"
 
     def get_translated_value(self) -> str:
         """Get the translated value for this filter.
@@ -141,6 +147,8 @@ class TranslationFilter(Enum):
             return _("Invalid Leading Space")
         elif self == TranslationFilter.INVALID_NEWLINE:
             return _("Invalid Newline")
+        elif self == TranslationFilter.INVALID_CJK:
+            return _("Invalid CJK")
         return self.value
 
     @classmethod
@@ -167,6 +175,8 @@ class TranslationFilter(Enum):
             return cls.INVALID_LEADING_SPACE
         elif translated_value == _("Invalid Newline"):
             return cls.INVALID_NEWLINE
+        elif translated_value == _("Invalid CJK"):
+            return cls.INVALID_CJK
         raise ValueError(f"Unknown translation filter: {translated_value}")
 
     def to_status(self) -> TranslationStatus:

@@ -154,6 +154,8 @@ class AllTranslationsWindow(BaseTranslationWindow):
                     cell_statuses.add(TranslationStatus.INVALID_LEADING_SPACE)
                 if locale in invalid_locales.invalid_newline_locales:
                     cell_statuses.add(TranslationStatus.INVALID_NEWLINE)
+                if locale in invalid_locales.invalid_cjk_locales:
+                    cell_statuses.add(TranslationStatus.INVALID_CJK)
 
                 # Store status in cache
                 self.status_cache[(row, col)] = cell_statuses

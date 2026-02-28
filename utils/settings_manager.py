@@ -12,6 +12,7 @@ logger = get_logger("settings_manager")
 
 class SettingsManager:
     MAX_RECENT_PROJECTS = 10
+    DEFAULT_LLM_CJK_REJECT_THRESHOLD_PERCENTAGE = 30
     
     def __init__(self):
         self.settings_file = Path.home() / '.i18n_manager' / 'settings.json'
@@ -414,6 +415,68 @@ class SettingsManager:
             bool: True if project has a custom template, False otherwise
         """
         return self.get_project_setting(project_path, 'llm_prompt_template') is not None
+
+    def get_llm_cjk_reject_threshold_percentage(self, project_path: Optional[str] = None) -> int:
+        """Get the CJK rejection threshold percentage for LLM responses.
+
+        Args:
+            project_path (str, optional): Path to project for project-specific override.
+
+        Returns:
+            int: Threshold percentage (0-100).
+        """
+        default_threshold = self.DEFAULT_LLM_CJK_REJECT_THRESHOLD_PERCENTAGE
+        threshold = None
+
+        if project_path:
+            threshold = self.get_project_setting(project_path, 'llm_cjk_reject_threshold_percentage')
+
+        if threshold is None:
+            from utils.config import config_manager
+            threshold = config_manager.get('translation.llm_cjk_reject_threshold_percentage', default_threshold)
+
+        try:
+            return max(0, min(100, int(threshold)))
+        except (TypeError, ValueError):
+            return default_threshold
+
+    def save_llm_cjk_reject_threshold_percentage(self, threshold_percentage: int,
+                                                 project_path: Optional[str] = None) -> bool:
+        """Save the CJK rejection threshold percentage for LLM responses."""
+        threshold_percentage = max(0, min(100, int(threshold_percentage)))
+        if project_path:
+            return self.save_project_setting(project_path, 'llm_cjk_reject_threshold_percentage', threshold_percentage)
+        from utils.config import config_manager
+        return config_manager.set('translation.llm_cjk_reject_threshold_percentage', threshold_percentage)
+
+    def clear_project_llm_cjk_reject_threshold(self, project_path: str) -> bool:
+        """Clear the project-specific CJK rejection threshold override."""
+        try:
+            if not self.settings_file.exists():
+                return True
+
+            with open(self.settings_file, 'r') as f:
+                settings = json.load(f)
+
+            project_settings = settings.get('project_settings', {})
+            project_config = project_settings.get(project_path, {})
+
+            if 'llm_cjk_reject_threshold_percentage' in project_config:
+                del project_config['llm_cjk_reject_threshold_percentage']
+                settings['project_settings'][project_path] = project_config
+
+                with open(self.settings_file, 'w') as f:
+                    json.dump(settings, f, indent=4)
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error clearing project CJK threshold for {project_path}: {e}")
+            return False
+
+    def has_project_llm_cjk_reject_threshold(self, project_path: str) -> bool:
+        """Check if a project has a CJK rejection threshold override."""
+        return self.get_project_setting(project_path, 'llm_cjk_reject_threshold_percentage') is not None
     
     @staticmethod
     def get_default_llm_prompt_template() -> str:

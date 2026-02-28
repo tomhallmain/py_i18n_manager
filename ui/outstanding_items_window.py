@@ -251,9 +251,12 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         
         # Load prompt template (project-specific or global)
         prompt_template = self.settings_manager.get_llm_prompt_template(self.project_path)
+        cjk_reject_threshold = self.settings_manager.get_llm_cjk_reject_threshold_percentage(self.project_path)
         self.translation_service = TranslationService(
             default_locale=self.default_locale,
-            prompt_template=prompt_template
+            prompt_template=prompt_template,
+            cjk_reject_threshold_percentage=cjk_reject_threshold,
+            project_path=self.project_path,
         )
         
         self.is_translating = False
@@ -643,8 +646,10 @@ class OutstandingItemsWindow(BaseTranslationWindow):
     def _reload_prompt_template(self):
         """Reload the prompt template after settings change."""
         prompt_template = self.settings_manager.get_llm_prompt_template(self.project_path)
+        cjk_reject_threshold = self.settings_manager.get_llm_cjk_reject_threshold_percentage(self.project_path)
         self.translation_service.set_prompt_template(prompt_template)
-        logger.info("LLM prompt template reloaded")
+        self.translation_service.set_cjk_reject_threshold_percentage(cjk_reject_threshold)
+        logger.info("LLM translation settings reloaded")
         
     def _detect_duplicate_values(self, translations, locales):
         """Detect duplicate translation values in the default locale.
@@ -932,7 +937,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
 
                 elif (locale in invalid_locales.invalid_brace_locales or
                       locale in invalid_locales.invalid_leading_space_locales or
-                      locale in invalid_locales.invalid_newline_locales):
+                      locale in invalid_locales.invalid_newline_locales or
+                      locale in invalid_locales.invalid_cjk_locales):
                     item.setBackground(style_color)
                     if locale in invalid_locales.invalid_brace_locales:
                         tooltip_parts.append(TranslationStatus.INVALID_BRACES.get_translated_value())
@@ -940,6 +946,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                         tooltip_parts.append(TranslationStatus.INVALID_LEADING_SPACE.get_translated_value())
                     if locale in invalid_locales.invalid_newline_locales:
                         tooltip_parts.append(TranslationStatus.INVALID_NEWLINE.get_translated_value())
+                    if locale in invalid_locales.invalid_cjk_locales:
+                        tooltip_parts.append(TranslationStatus.INVALID_CJK.get_translated_value())
 
                 if tooltip_parts:
                     item.setToolTip("\n".join(tooltip_parts))
@@ -980,7 +988,14 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                     # Reinitialize translation service
                     logger.debug("Reinitializing translation service...")
                     default_locale = config_manager.get('translation.default_locale', 'en')
-                    self.translation_service = TranslationService(default_locale=default_locale)
+                    prompt_template = self.settings_manager.get_llm_prompt_template(self.project_path)
+                    cjk_reject_threshold = self.settings_manager.get_llm_cjk_reject_threshold_percentage(self.project_path)
+                    self.translation_service = TranslationService(
+                        default_locale=default_locale,
+                        prompt_template=prompt_template,
+                        cjk_reject_threshold_percentage=cjk_reject_threshold,
+                        project_path=self.project_path,
+                    )
                 except Exception as e:
                     logger.error(f"Error during translation service cleanup/reinitialization: {e}")
             

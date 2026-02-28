@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import json
+import math
 import random
 import threading
 import time
@@ -11,7 +12,7 @@ from urllib import request
 from utils.logging_setup import get_logger
 from utils.utils import Utils
 
-logger = get_logger("llm")
+logger = get_logger(__name__)
 
 class LLMResponseException(Exception):
     """Raised when LLM call fails"""
@@ -96,38 +97,102 @@ class LLM:
     DEFAULT_TIMEOUT = 180
     DEFAULT_SYSTEM_PROMPT_DROP_RATE = 0.9  # 90% chance to drop system prompt
     CHECK_INTERVAL = 0.1  # How often to check for cancellation
+    DEFAULT_CJK_REJECT_THRESHOLD_PERCENTAGE = 50
+    FAILURE_THRESHOLD = 3  # Number of consecutive failures before considering LLM unavailable
+    DEFAULT_STATE = "local"  # Default state key for instances without a specific state
+    
+    # Class-level failure tracking: maps state keys to failure counts
+    _failure_counts = {}
 
-    def __init__(self, model_name="deepseek-r1:14b", run_context=None):
+    def __init__(self, model_name="deepseek-r1:14b", run_context=None, state_key=None):
         self.model_name = model_name
         self.run_context = run_context
+        self.state_key = state_key if state_key is not None else LLM.DEFAULT_STATE
         self._cancelled = False
         self._result = None
         self._exception = None
         self._thread = None
-        self.failure_count = 0  # Track consecutive LLM failures
-        logger.info(f"Using LLM model: {self.model_name}")
+        logger.info(f"Using LLM model: {self.model_name} (state: {self.state_key})")
+
+    @classmethod
+    def _get_failure_count_for_state(cls, state_key):
+        """Get the failure count for a specific state."""
+        return cls._failure_counts.get(state_key, 0)
+
+    @classmethod
+    def _increment_failure_count_for_state(cls, state_key):
+        """Increment the failure count for a specific state."""
+        if state_key not in cls._failure_counts:
+            cls._failure_counts[state_key] = 0
+        cls._failure_counts[state_key] += 1
+        logger.warning(f"LLM failure count increased to {cls._failure_counts[state_key]} for state '{state_key}'")
+
+    @classmethod
+    def _reset_failure_count_for_state(cls, state_key):
+        """Reset the failure count for a specific state."""
+        if state_key in cls._failure_counts and cls._failure_counts[state_key] > 0:
+            logger.info(f"Resetting LLM failure count from {cls._failure_counts[state_key]} to 0 for state '{state_key}'")
+        cls._failure_counts[state_key] = 0
+
+    @classmethod
+    def _is_failing_for_state(cls, state_key):
+        """Check if the LLM is in a failing state for a specific state key."""
+        return cls._get_failure_count_for_state(state_key) >= cls.FAILURE_THRESHOLD
 
     def get_failure_count(self):
-        return self.failure_count
+        """Get the failure count for this instance's state."""
+        return self._get_failure_count_for_state(self.state_key)
 
     def increment_failure_count(self):
-        self.failure_count += 1
+        """Increment the failure count for this instance's state."""
+        self._increment_failure_count_for_state(self.state_key)
 
     def reset_failure_count(self):
-        self.failure_count = 0
+        """Reset the failure count for this instance's state."""
+        self._reset_failure_count_for_state(self.state_key)
+
+    def is_failing(self):
+        """Check if the LLM is in a failing state for this instance's state."""
+        return self._is_failing_for_state(self.state_key)
+
+    @classmethod
+    def is_failing_for_state(cls, state_key=None):
+        """Check if the LLM is in a failing state for a specific state (or default)."""
+        if state_key is None:
+            state_key = cls.DEFAULT_STATE
+        return cls._is_failing_for_state(state_key)
 
     def get_llm_penalty(self):
-        import math
-        return 1.0 / (1.0 + math.log2(1.0 + self.failure_count))
+        """Get penalty value based on failure count for this instance's state."""
+        return 1.0 / (1.0 + math.log2(1.0 + self.get_failure_count()))
 
-    def ask(self, query, json_key=None, timeout=DEFAULT_TIMEOUT, context=None, system_prompt=None, system_prompt_drop_rate=DEFAULT_SYSTEM_PROMPT_DROP_RATE):
+    def ask(self, query, json_key=None, timeout=DEFAULT_TIMEOUT, context=None, system_prompt=None,
+            system_prompt_drop_rate=DEFAULT_SYSTEM_PROMPT_DROP_RATE,
+            cjk_reject_threshold_percentage=DEFAULT_CJK_REJECT_THRESHOLD_PERCENTAGE):
         """Ask the LLM a question and optionally extract a JSON value."""
         logger.debug(f"LLM.ask called with query length: {len(query)}, json_key: {json_key}")
         if json_key is not None:
-            return self.generate_json_get_value(query, json_key, timeout=timeout, context=context, system_prompt=system_prompt, system_prompt_drop_rate=system_prompt_drop_rate)
-        return self.generate_response_async(query, timeout=timeout, context=context, system_prompt=system_prompt, system_prompt_drop_rate=system_prompt_drop_rate)
+            return self.generate_json_get_value(
+                query,
+                json_key,
+                timeout=timeout,
+                context=context,
+                system_prompt=system_prompt,
+                system_prompt_drop_rate=system_prompt_drop_rate,
+                cjk_reject_threshold_percentage=cjk_reject_threshold_percentage,
+            )
+        return self.generate_response_async(
+            query,
+            timeout=timeout,
+            context=context,
+            system_prompt=system_prompt,
+            system_prompt_drop_rate=system_prompt_drop_rate,
+            cjk_reject_threshold_percentage=cjk_reject_threshold_percentage,
+        )
 
-    def generate_response(self, query, timeout=DEFAULT_TIMEOUT, context=None, system_prompt=None, system_prompt_drop_rate=DEFAULT_SYSTEM_PROMPT_DROP_RATE):
+    def generate_response(self, query, timeout=DEFAULT_TIMEOUT, context=None, system_prompt=None,
+                          system_prompt_drop_rate=DEFAULT_SYSTEM_PROMPT_DROP_RATE,
+                          cjk_reject_threshold_percentage=DEFAULT_CJK_REJECT_THRESHOLD_PERCENTAGE):
         """Generate a response from the LLM."""
         logger.debug(f"LLM.generate_response called with query length: {len(query)}")
         query = self._sanitize_query(query)
@@ -168,7 +233,10 @@ class LLM:
             response = request.urlopen(req, timeout=timeout).read().decode("utf-8")
             resp_json = json.loads(response)
             result = LLMResult.from_json(resp_json, context_provided=context is not None)
-            result.response = self._clean_response_for_models(result.response)
+            result.response = self._clean_response_for_models(
+                result.response,
+                cjk_reject_threshold_percentage=cjk_reject_threshold_percentage,
+            )
             logger.debug(f"LLM response received, length: {len(result.response)}")
             if result.validate():
                 # Reset LLM failure count on success
@@ -181,7 +249,9 @@ class LLM:
             self.increment_failure_count()  # Increment on LLM failure
             raise LLMResponseException(f"Failed to generate LLM response: {e}")
 
-    def generate_response_async(self, query, timeout=DEFAULT_TIMEOUT, context=None, system_prompt=None, system_prompt_drop_rate=DEFAULT_SYSTEM_PROMPT_DROP_RATE):
+    def generate_response_async(self, query, timeout=DEFAULT_TIMEOUT, context=None, system_prompt=None,
+                                system_prompt_drop_rate=DEFAULT_SYSTEM_PROMPT_DROP_RATE,
+                                cjk_reject_threshold_percentage=DEFAULT_CJK_REJECT_THRESHOLD_PERCENTAGE):
         """Generate a response from the LLM in a separate thread with cancellation support."""
         logger.debug(f"LLM.generate_response_async called with query length: {len(query)}")
         self._cancelled = False
@@ -192,7 +262,14 @@ class LLM:
         def run_generation():
             try:
                 logger.debug("Starting LLM generation in thread")
-                result = self.generate_response(query, timeout, context, system_prompt, system_prompt_drop_rate)
+                result = self.generate_response(
+                    query,
+                    timeout,
+                    context,
+                    system_prompt,
+                    system_prompt_drop_rate,
+                    cjk_reject_threshold_percentage,
+                )
                 if not self._cancelled:
                     self._result = result
                     logger.debug("LLM generation completed successfully")
@@ -234,26 +311,43 @@ class LLM:
         
         return self._result
 
-    def generate_json_get_value(self, query, json_key, timeout=DEFAULT_TIMEOUT, context=None, system_prompt=None, system_prompt_drop_rate=DEFAULT_SYSTEM_PROMPT_DROP_RATE):
+    def generate_json_get_value(self, query, json_key, timeout=DEFAULT_TIMEOUT, context=None, system_prompt=None,
+                                system_prompt_drop_rate=DEFAULT_SYSTEM_PROMPT_DROP_RATE,
+                                cjk_reject_threshold_percentage=DEFAULT_CJK_REJECT_THRESHOLD_PERCENTAGE):
         """Generate a response and extract a specific JSON value."""
-        self.generate_response_async(query, timeout=timeout, context=context, system_prompt=system_prompt, system_prompt_drop_rate=system_prompt_drop_rate)
-        if self._result is None:
+        result = self.generate_response_async(
+            query,
+            timeout=timeout,
+            context=context,
+            system_prompt=system_prompt,
+            system_prompt_drop_rate=system_prompt_drop_rate,
+            cjk_reject_threshold_percentage=cjk_reject_threshold_percentage,
+        )
+        if result is None:
             raise LLMResponseException("Failed to generate LLM response - Result is None")
-        return self._result._get_json_attr(json_key)
+        return result._get_json_attr(json_key)
 
     def _is_thinking_model(self) -> bool:
         """Check if the current model is a thinking model that uses internal prompts."""
         return self.model_name.startswith("deepseek-r1")
 
-    def _clean_response_for_models(self, response_text):
+    def _clean_response_for_models(self, response_text,
+                                   cjk_reject_threshold_percentage=DEFAULT_CJK_REJECT_THRESHOLD_PERCENTAGE):
         """
         Clean and validate model responses, handling model-specific patterns and invalid outputs.
         
         Args:
             response_text: The raw response text from the model
+            cjk_reject_threshold_percentage: CJK ratio percentage (0-100) above which responses are rejected.
+                                           Use None to disable this check.
         
         Returns:
             str: Cleaned response text, or empty string if the response is invalid
+            
+        Note:
+            CJK-heavy characters are rejected by default because they are not supported by the Coqui TTS model
+            used in this application. This includes Chinese (Han), Japanese (Hiragana, Katakana, Kanji),
+            and Korean (Hangul) characters.
         """
         # First handle thinking model specific cleaning
         if self._is_thinking_model():
@@ -267,6 +361,11 @@ class LLM:
         if response_text.strip().startswith("Final Answer:"):
             response_text = response_text[response_text.find("Final Answer:") + len("Final Answer:"):].strip()
 
+        # Reject mostly CJK responses when threshold checking is enabled.
+        if (cjk_reject_threshold_percentage is not None and
+                Utils.get_cjk_character_ratio(response_text, cjk_reject_threshold_percentage)):
+            return ""
+
         # Check for invalid output pattern (Chinese characters followed by note block)
         invalid_pattern = "---\n\n**Note:** The assistant's response is cut off due to the user stopping the interaction.\n\n---"
         if invalid_pattern in response_text:
@@ -276,7 +375,8 @@ class LLM:
             
             # Check if the text before the invalid pattern is mostly CJK characters
             before_pattern = response_text[:response_text.find(invalid_pattern)].strip()
-            if Utils.get_cjk_character_ratio(before_pattern, 50):
+            if (cjk_reject_threshold_percentage is not None and
+                    Utils.get_cjk_character_ratio(before_pattern, cjk_reject_threshold_percentage)):
                 return ""
             
             # Otherwise, just remove the invalid pattern
