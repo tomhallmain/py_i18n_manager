@@ -6,6 +6,7 @@ from utils.project_detector import ProjectDetector
 from utils.logging_setup import get_logger
 
 from .i18n_manager_base import I18NManagerBase
+from .translation_manager_results import TranslationAction
 from .translation_group import TranslationGroup, TranslationKey
 from .python.python_i18n_manager import PythonI18NManager
 from .ruby.ruby_i18n_manager import RubyI18NManager
@@ -160,8 +161,10 @@ class I18NManager(I18NManagerBase):
         
         self._delegate_attributes()
     
-    def manage_translations(self, action=None, modified_locales=None):
+    def manage_translations(self, action: TranslationAction = TranslationAction.CHECK_STATUS, modified_locales=None):
         """Manage translations based on the specified action."""
+        if action is None:
+            action = TranslationAction.CHECK_STATUS
         result = self._manager.manage_translations(action, modified_locales)
         # Refresh delegated attributes after manage_translations may have updated them
         # (locales, translations, written_locales are now properties, so they're always current)

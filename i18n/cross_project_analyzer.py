@@ -143,7 +143,7 @@ class CrossProjectAnalyzer:
             
             # Run status check to load translations
             logger.debug(f"Running status check for project: {project_path}")
-            results = manager.manage_translations()
+            results = manager.manage_translations(action=TranslationAction.CHECK_STATUS)
             if not results.action_successful:
                 logger.warning(f"Failed to load translations for project {project_path}: {results.error_message}")
                 return None
