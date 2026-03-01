@@ -1,10 +1,12 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                             QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
                             QMessageBox, QMenu, QCheckBox, QTextEdit, QStyledItemDelegate,
+                            QFileDialog,
                             QProgressBar)
 from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer, QObject
 from PyQt6.QtGui import QAction, QKeyEvent, QShortcut, QKeySequence
 from PyQt6.QtWidgets import QApplication
+import os
 import random
 import string
 
@@ -244,6 +246,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         # Minimum width for first column (Translation Key); set in load_data
         self._min_key_column_width = KEY_COLUMN_MIN_WIDTH
         self._last_combine_duplicates_choice = "no"
+        self._current_invalid_groups = {}
 
         self.setup_properties()
         self.setup_ui()
@@ -300,6 +303,10 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.llm_settings_btn = QPushButton(_("LLM Settings"))
         self.llm_settings_btn.clicked.connect(self.open_llm_settings)
         self.llm_settings_btn.setToolTip(_("Configure LLM translation prompt template"))
+
+        self.export_tsv_btn = QPushButton(_("Export Outstanding TSV"))
+        self.export_tsv_btn.clicked.connect(self.export_outstanding_to_tsv)
+        self.export_tsv_btn.setToolTip(_("Export outstanding keys and invalid locale buckets to TSV"))
         
         save_btn = QPushButton(_("Save Changes"))
         save_btn.clicked.connect(self.save_changes)
@@ -314,6 +321,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         button_layout.addWidget(self.translate_all_argos_btn)
         button_layout.addWidget(self.translate_all_llm_btn)
         button_layout.addWidget(self.llm_settings_btn)
+        button_layout.addWidget(self.export_tsv_btn)
         button_layout.addWidget(save_btn)
         button_layout.addWidget(close_btn)
         button_layout.addWidget(self.unicode_toggle)
@@ -841,6 +849,108 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         # Cancel, or X, or Escape
         return "cancel"
 
+    def _format_locale_list(self, locales_set):
+        """Format locale sets in the current locale order."""
+        if not locales_set:
+            return ""
+        ordered = [loc for loc in self.locales if loc in locales_set]
+        # Include any unexpected locales not present in self.locales
+        extras = sorted([loc for loc in locales_set if loc not in self.locales])
+        return ", ".join(ordered + extras)
+
+    def export_outstanding_to_tsv(self):
+        """Export current outstanding rows and invalid locale buckets to a TSV file."""
+        if not self._current_invalid_groups:
+            QMessageBox.information(self, _("No Data"), _("There are no outstanding rows to export."))
+            return
+
+        default_locale = config_manager.get('translation.default_locale', 'en')
+        headers = [
+            "Translation Key",
+            "Defined without Error",
+            "Missing",
+            "Invalid Unicode",
+            "Invalid Braces",
+            "Invalid Leading Space",
+            "Invalid Newline",
+            "Invalid CJK",
+        ]
+
+        lines = ["\t".join(headers)]
+
+        for _key, (invalid_locales, group) in self._current_invalid_groups.items():
+            # Keep Invalid Unicode aligned with current outstanding UI behavior
+            # where invalid indices are grouped as critical with unicode.
+            invalid_unicode = set(invalid_locales.invalid_unicode_locales) | set(invalid_locales.invalid_index_locales)
+            missing = set(invalid_locales.missing_locales)
+            invalid_braces = set(invalid_locales.invalid_brace_locales)
+            invalid_leading_space = set(invalid_locales.invalid_leading_space_locales)
+            invalid_newline = set(invalid_locales.invalid_newline_locales)
+            invalid_cjk = set(invalid_locales.invalid_cjk_locales)
+
+            all_error_locales = (
+                missing
+                | invalid_unicode
+                | invalid_braces
+                | invalid_leading_space
+                | invalid_newline
+                | invalid_cjk
+            )
+
+            defined_without_error = set()
+            for locale in self.locales:
+                value = group.get_translation(locale)
+                if value and value.strip() and locale not in all_error_locales:
+                    defined_without_error.add(locale)
+            # Default locale is often not in self.locales list from header filtering in this window.
+            default_value = group.get_translation(default_locale)
+            if default_value and default_value.strip() and default_locale not in all_error_locales:
+                defined_without_error.add(default_locale)
+
+            row_values = [
+                group.key.msgid,
+                self._format_locale_list(defined_without_error),
+                self._format_locale_list(missing),
+                self._format_locale_list(invalid_unicode),
+                self._format_locale_list(invalid_braces),
+                self._format_locale_list(invalid_leading_space),
+                self._format_locale_list(invalid_newline),
+                self._format_locale_list(invalid_cjk),
+            ]
+            # Keep TSV shape stable (no tabs/newlines in cell content)
+            safe_values = [str(v).replace("\t", " ").replace("\r", " ").replace("\n", " ") for v in row_values]
+            lines.append("\t".join(safe_values))
+
+        default_name = os.path.join(self.project_path or "", "outstanding_translation_keys.tsv")
+        dialog_result = QFileDialog.getSaveFileName(
+            self,
+            _("Export Outstanding TSV"),
+            default_name,
+            _("TSV Files (*.tsv);;All Files (*)"),
+        )
+        file_path = dialog_result[0]
+        if not file_path:
+            return
+
+        try:
+            with open(file_path, 'w', encoding='utf-8', newline='\n') as f:
+                f.write("\n".join(lines) + "\n")
+            QMessageBox.information(
+                self,
+                _("Export Complete"),
+                _("Exported {count} outstanding key(s) to:\n{path}").format(
+                    count=len(self._current_invalid_groups),
+                    path=file_path
+                ),
+            )
+        except Exception as e:
+            logger.error(f"Failed to export outstanding TSV: {e}")
+            QMessageBox.critical(
+                self,
+                _("Export Failed"),
+                _("Could not export TSV file:\n{error}").format(error=str(e)),
+            )
+
     def load_data(self, translations, locales, skip_duplicate_prompt=False):
         """Load translation data into the table.
         
@@ -969,6 +1079,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                     return False
             # combine_reply == "no": fall through and open window with all items (no combining)
 
+        self._current_invalid_groups = all_invalid_groups
         self.table.setRowCount(len(all_invalid_groups))
         
         AppStyle.sync_theme_from_widget(self)
