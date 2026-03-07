@@ -166,6 +166,14 @@ class SetupTranslationProjectWindow(SmartDialog):
         if self.project_type == ProjectType.RUBY.value:
             # Ruby/Rails projects use config/locales/
             locale_dir = os.path.join(self.project_dir, 'config', 'locales')
+        elif self.project_type == ProjectType.JAVA.value:
+            # Java projects use ResourceBundle properties in src/main/resources
+            locale_dir = os.path.join(self.project_dir, 'src', 'main', 'resources')
+        elif self.project_type == ProjectType.JAVASCRIPT.value:
+            # JavaScript projects commonly use src/locales/
+            locale_dir = os.path.join(self.project_dir, 'src', 'locales')
+            if not os.path.exists(locale_dir):
+                locale_dir = os.path.join(self.project_dir, 'locales')
         else:
             # Python projects use locale/ or locales/
             locale_dir = os.path.join(self.project_dir, 'locale')
@@ -185,10 +193,38 @@ class SetupTranslationProjectWindow(SmartDialog):
                         if yaml_files:
                             self.locales_list.addItem(item)
                             temp_locales.add(item)
+                    elif self.project_type == ProjectType.JAVASCRIPT.value:
+                        # JS nested structure: locales/en/translation.json
+                        import glob
+                        locale_files = []
+                        locale_files.extend(glob.glob(os.path.join(full_path, '**', '*.json'), recursive=True))
+                        locale_files.extend(glob.glob(os.path.join(full_path, '**', '*.js'), recursive=True))
+                        locale_files.extend(glob.glob(os.path.join(full_path, '**', '*.ts'), recursive=True))
+                        if locale_files:
+                            self.locales_list.addItem(item)
+                            temp_locales.add(item)
                     else:
                         # For Python, just check if it's a directory
                         self.locales_list.addItem(item)
                         temp_locales.add(item)
+                elif self.project_type == ProjectType.JAVA.value and os.path.isfile(full_path):
+                    # Java ResourceBundle files: messages.properties or messages_<locale>.properties
+                    if item == "messages.properties":
+                        default_locale = self.intro_details.get("translation.default_locale", "en")
+                        self.locales_list.addItem(default_locale)
+                        temp_locales.add(default_locale)
+                    elif item.startswith("messages_") and item.endswith(".properties"):
+                        locale_code = item[len("messages_"):-len(".properties")]
+                        if locale_code and locale_code not in temp_locales:
+                            self.locales_list.addItem(locale_code)
+                            temp_locales.add(locale_code)
+                elif self.project_type == ProjectType.JAVASCRIPT.value and os.path.isfile(full_path):
+                    # JS flat structure: src/locales/en.json or src/locales/en.js
+                    base_name, ext = os.path.splitext(item)
+                    if ext.lower() in ['.json', '.js', '.ts'] and self.is_valid_locale_code(base_name) is None:
+                        if base_name not in temp_locales:
+                            self.locales_list.addItem(base_name)
+                            temp_locales.add(base_name)
         
         # Also load from saved project locales if they exist
         if self.project_locales:
@@ -203,6 +239,15 @@ class SetupTranslationProjectWindow(SmartDialog):
             # Check if default locale exists in filesystem
             if self.project_type == ProjectType.RUBY.value:
                 default_locale_path = os.path.join(self.project_dir, 'config', 'locales', default_locale)
+            elif self.project_type == ProjectType.JAVA.value:
+                if default_locale == "en":
+                    default_locale_path = os.path.join(self.project_dir, 'src', 'main', 'resources', 'messages.properties')
+                else:
+                    default_locale_path = os.path.join(self.project_dir, 'src', 'main', 'resources', f'messages_{default_locale}.properties')
+            elif self.project_type == ProjectType.JAVASCRIPT.value:
+                default_locale_path = os.path.join(self.project_dir, 'src', 'locales', f'{default_locale}.json')
+                if not os.path.exists(default_locale_path):
+                    default_locale_path = os.path.join(self.project_dir, 'src', 'locales', default_locale, 'translation.json')
             else:
                 default_locale_path = os.path.join(self.project_dir, 'locale', default_locale)
             
@@ -349,6 +394,42 @@ class SetupTranslationProjectWindow(SmartDialog):
                         with open(application_yml, 'w', encoding='utf-8') as f:
                             yaml.dump(yaml_data, f, default_flow_style=False, allow_unicode=True)
                         logger.info(f"Created application.yml for locale {locale_code}")
+            elif self.project_type == ProjectType.JAVA.value:
+                # Java projects: create ResourceBundle properties files in src/main/resources
+                resources_dir = os.path.join(self.project_dir, 'src', 'main', 'resources')
+                os.makedirs(resources_dir, exist_ok=True)
+
+                for i in range(self.locales_list.count()):
+                    locale_code = self.locales_list.item(i).text().strip()
+                    if locale_code == self.default_locale.currentText():
+                        file_name = 'messages.properties'
+                    else:
+                        file_name = f'messages_{locale_code}.properties'
+                    file_path = os.path.join(resources_dir, file_name)
+                    if not os.path.exists(file_path):
+                        with open(file_path, 'w', encoding='utf-8') as f:
+                            f.write(f"# {locale_code} translations\n")
+                            f.write(f"application.name={self.app_name.text() or 'Application Name'}\n")
+                        logger.info(f"Created {file_name} for locale {locale_code}")
+            elif self.project_type == ProjectType.JAVASCRIPT.value:
+                # JavaScript projects: create JSON locale files in src/locales
+                locale_dir = os.path.join(self.project_dir, 'src', 'locales')
+                os.makedirs(locale_dir, exist_ok=True)
+
+                import json
+                for i in range(self.locales_list.count()):
+                    locale_code = self.locales_list.item(i).text().strip()
+                    locale_file = os.path.join(locale_dir, f'{locale_code}.json')
+                    if not os.path.exists(locale_file):
+                        payload = {
+                            "application": {
+                                "name": self.app_name.text() or "Application Name"
+                            }
+                        }
+                        with open(locale_file, 'w', encoding='utf-8') as f:
+                            json.dump(payload, f, indent=2, ensure_ascii=False)
+                            f.write('\n')
+                        logger.info(f"Created {locale_code}.json")
             else:
                 # Python projects: create locale/{locale}/LC_MESSAGES/ structure
                 locale_dir = os.path.join(self.project_dir, 'locale')
@@ -402,7 +483,7 @@ msgstr ""
 "Last-Translator: {self.translator.text()}\\n"
 '''
 
-        # Ruby projects don't use PO headers - YAML files may have comments
+        # Ruby/Java/JavaScript projects don't use PO headers directly
         # but those are handled separately. Return empty string for now.
         return ""
     

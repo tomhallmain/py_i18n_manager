@@ -33,6 +33,16 @@ class ProjectDetector:
         if ProjectDetector._is_ruby_project(project_path):
             logger.info(f"Detected Ruby project: {project_path}")
             return ProjectType.RUBY
+
+        # Check for Java project indicators
+        if ProjectDetector._is_java_project(project_path):
+            logger.info(f"Detected Java project: {project_path}")
+            return ProjectType.JAVA
+
+        # Check for JavaScript project indicators
+        if ProjectDetector._is_javascript_project(project_path):
+            logger.info(f"Detected JavaScript project: {project_path}")
+            return ProjectType.JAVASCRIPT
             
         logger.warning(f"Could not determine project type for: {project_path}")
         return None
@@ -159,4 +169,82 @@ class ProjectDetector:
             logger.debug(f"Detected Rails project with {found_indicators} indicators")
             return True
             
+        return False
+
+    @staticmethod
+    def _is_java_project(project_path: str) -> bool:
+        """Check if the project is a Java project."""
+        java_indicators = [
+            "pom.xml",
+            "build.gradle",
+            "build.gradle.kts",
+            "settings.gradle",
+            "settings.gradle.kts",
+            "src/main/java",
+            "src/main/resources",
+        ]
+
+        java_files = glob.glob(os.path.join(project_path, "**/*.java"), recursive=True)
+        properties_files = glob.glob(
+            os.path.join(project_path, "**/messages*.properties"),
+            recursive=True,
+        )
+
+        if java_files:
+            logger.debug(f"Found {len(java_files)} Java files in {project_path}")
+        if properties_files:
+            logger.debug(f"Found {len(properties_files)} properties files in {project_path}")
+
+        for indicator in java_indicators:
+            if os.path.exists(os.path.join(project_path, indicator)):
+                logger.debug(f"Found Java indicator: {indicator}")
+                return True
+
+        if java_files and properties_files:
+            return True
+
+        return False
+
+    @staticmethod
+    def _is_javascript_project(project_path: str) -> bool:
+        """Check if the project is a JavaScript/TypeScript project."""
+        js_indicators = [
+            "package.json",
+            "yarn.lock",
+            "pnpm-lock.yaml",
+            "package-lock.json",
+            "vite.config.js",
+            "vite.config.ts",
+            "webpack.config.js",
+            "next.config.js",
+            "src/locales",
+            "locales",
+        ]
+
+        js_files = glob.glob(os.path.join(project_path, "**/*.js"), recursive=True)
+        ts_files = glob.glob(os.path.join(project_path, "**/*.ts"), recursive=True)
+        translation_candidates = []
+        translation_candidates.extend(glob.glob(os.path.join(project_path, "**/*.json"), recursive=True))
+        translation_candidates.extend(glob.glob(os.path.join(project_path, "**/*.js"), recursive=True))
+        translation_candidates.extend(glob.glob(os.path.join(project_path, "**/*.ts"), recursive=True))
+
+        has_translation_candidate = any(
+            os.path.basename(path).lower().startswith("translation")
+            or os.path.basename(path).lower().split(".")[0] in {"en", "de", "fr", "es", "ja", "ko", "zh"}
+            for path in translation_candidates
+        )
+
+        if js_files or ts_files:
+            logger.debug(
+                f"Found {len(js_files)} JS files and {len(ts_files)} TS files in {project_path}"
+            )
+
+        for indicator in js_indicators:
+            if os.path.exists(os.path.join(project_path, indicator)):
+                logger.debug(f"Found JavaScript indicator: {indicator}")
+                return True
+
+        if (js_files or ts_files) and has_translation_candidate:
+            return True
+
         return False

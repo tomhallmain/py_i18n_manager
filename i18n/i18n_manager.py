@@ -10,6 +10,8 @@ from .translation_manager_results import TranslationAction
 from .translation_group import TranslationGroup, TranslationKey
 from .python.python_i18n_manager import PythonI18NManager
 from .ruby.ruby_i18n_manager import RubyI18NManager
+from .java.java_i18n_manager import JavaI18NManager
+from .javascript.javascript_i18n_manager import JavaScriptI18NManager
 
 logger = get_logger("i18n_manager")
 
@@ -102,6 +104,12 @@ class I18NManager(I18NManagerBase):
         elif project_type == ProjectType.RUBY:
             logger.info(f"Creating Ruby i18n manager for {directory}")
             return RubyI18NManager(directory, locales, intro_details, settings_manager)
+        elif project_type == ProjectType.JAVA:
+            logger.info(f"Creating Java i18n manager for {directory}")
+            return JavaI18NManager(directory, locales, intro_details, settings_manager)
+        elif project_type == ProjectType.JAVASCRIPT:
+            logger.info(f"Creating JavaScript i18n manager for {directory}")
+            return JavaScriptI18NManager(directory, locales, intro_details, settings_manager)
         else:
             raise ValueError(f"Unsupported project type: {project_type}")
     

@@ -5,7 +5,12 @@ A PyQt6-based desktop application for managing internationalization (i18n) trans
 ## Features
 
 - **Project Management**: Select and manage multiple translation projects with automatic state persistence
-- **Multi-Language Support**: Support for Python and Ruby projects with automatic project type detection
+- **Multi-Language Support**:
+  - **Python (gettext / Babel)**: Supported and actively used
+  - **Ruby (Rails YAML)**: Supported and actively used
+  - **Java (ResourceBundle `.properties`)**: Supported, but currently untested
+  - **JavaScript (JSON / module export object)**: Supported, but currently untested
+  - Automatic project type detection across supported project types
 - **Translation Statistics**: Track total translations, locales, missing translations, and various validation metrics
 - **Translation Management**: View/edit translations, update PO files, create MO files
 - **Quality Control**: Real-time validation of translations including Unicode, format strings, braces, spaces, and newlines
@@ -35,6 +40,34 @@ python app.py
 ```
 2. Select a project directory containing a locale directory and translation files (PO files)
 3. Use the interface to check status, update files, and manage translations
+
+## Write Policy by Project Type
+
+The manager writes translation files according to the detected project type. In all cases, it is recommended to keep changes under version control and review diffs after write operations.
+
+- **Python (gettext / Babel)**:
+  - Updates locale PO files for keys present in the base POT.
+  - Supports MO compilation as a separate explicit action.
+  - May remove stale (not-in-base) entries as part of normal synchronization.
+
+- **Ruby (Rails YAML)**:
+  - Preserves Rails-oriented YAML structure and attempts to keep file topology consistent with the default locale.
+  - Writes missing keys as empty strings in target locales to keep translation coverage explicit.
+  - Preserves existing file comments/formatting where possible.
+
+- **Java (ResourceBundle `.properties`)** *(currently untested)*:
+  - Supports multi-bundle writes (for example, separate `messages` / `errors` / client-specific bundles).
+  - Uses default-locale bundle topology as the template for non-default locale writes.
+  - Supports logical-line continuation and standard escape/unicode handling during parse/write.
+
+- **JavaScript (JSON / module export object)** *(currently untested)*:
+  - Supports multi-file locale bundles and writes based on default-locale file topology.
+  - Writes JSON directly and writes JS/TS module files as static `export default` object output.
+  - Includes a conservative parser for JS object exports; advanced module syntax support is planned.
+
+### Current Caveat
+
+For Java and JavaScript, topology is currently projected from the default locale when writing. A future policy option is planned to skip parity enforcement for locales that intentionally use a divergent structure.
 
 ## Requirements
 

@@ -29,6 +29,8 @@ class ProjectType(Enum):
     """Enum for different project types that support internationalization."""
     PYTHON = "python"
     RUBY = "ruby"
+    JAVA = "java"
+    JAVASCRIPT = "javascript"
     
     def get_display_name(self) -> str:
         """Get the display name for this project type.
@@ -40,6 +42,10 @@ class ProjectType(Enum):
             return _("Python")
         elif self == ProjectType.RUBY:
             return _("Ruby")
+        elif self == ProjectType.JAVA:
+            return _("Java")
+        elif self == ProjectType.JAVASCRIPT:
+            return _("JavaScript")
         return self.value
     
     @classmethod
@@ -56,6 +62,10 @@ class ProjectType(Enum):
             return cls.PYTHON
         elif display_name == _("Ruby"):
             return cls.RUBY
+        elif display_name == _("Java"):
+            return cls.JAVA
+        elif display_name == _("JavaScript"):
+            return cls.JAVASCRIPT
         raise ValueError(f"Unknown project type: {display_name}")
 
 class TranslationStatus(Enum):

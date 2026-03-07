@@ -29,6 +29,10 @@ class FileStructureManager:
         _default_locale_files: Set of all YAML file paths in the default locale
         _original_file_content: Maps file paths to their original content (for comment preservation)
     """
+    # TODO(ruby-topology-contract): Introduce a formal shared interface or base
+    # class between this Ruby-specific manager and `i18n.file_topology_manager`
+    # so topology/path translation semantics are contractually aligned across
+    # Ruby/Java/JavaScript managers while preserving Ruby comment-specific logic.
     
     def __init__(self, base_locale_dir: str, default_locale: str):
         """Initialize the file structure manager.

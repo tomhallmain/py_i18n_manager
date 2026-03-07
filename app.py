@@ -300,7 +300,7 @@ class MainWindow(SmartMainWindow):
             project_type_display = project_type.get_display_name()
             self.create_mo_btn.setToolTip(
                 _("Translation file compilation is not relevant for {} projects. "
-                  "{} projects use YAML files directly without a compilation step.").format(
+                  "{} projects use source translation files directly without a compilation step.").format(
                     project_type_display, project_type_display
                 )
             )
