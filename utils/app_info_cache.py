@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import threading
 
 from lib.position_data import PositionData
 from utils.logging_setup import get_logger
@@ -13,73 +14,72 @@ class AppInfoCache:
     # TODO: Move all SettingsManager functionality to this class
     JSON_LOC = os.path.join(os.path.dirname(os.path.abspath(os.path.dirname(__file__))), "app_info_cache.json")
     INFO_KEY = "info"
-    HISTORY_KEY = "history"
-    MAX_HISTORY_ENTRIES = 50
     NUM_BACKUPS = 4  # Number of backup files to maintain
 
     def __init__(self):
-        self._cache = {AppInfoCache.INFO_KEY: {}, AppInfoCache.HISTORY_KEY: []}
+        self._lock = threading.RLock()
+        self._cache = {AppInfoCache.INFO_KEY: {}}
         self.load()
         self.validate()
 
     def wipe_instance(self):
-        self._cache = {AppInfoCache.INFO_KEY: {}, AppInfoCache.HISTORY_KEY: []}
+        self._cache = {AppInfoCache.INFO_KEY: {}}
 
     def store(self):
-        try:
-            with open(AppInfoCache.JSON_LOC, "w", encoding="utf-8") as f:
-                json.dump(self._cache, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            logger.error(f"Error storing cache: {e}")
-            raise e
+        with self._lock:
+            try:
+                with open(AppInfoCache.JSON_LOC, "w", encoding="utf-8") as f:
+                    json.dump(self._cache, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                logger.error(f"Error storing cache: {e}")
+                raise e
 
     def load(self):
-        try:
-            cache_paths = [self.JSON_LOC] + self._get_backup_paths()
-            any_exist = any(os.path.exists(path) for path in cache_paths)
-            if not any_exist:
-                logger.info(f"No cache file found at {AppInfoCache.JSON_LOC}, creating new cache")
-                return
+        with self._lock:
+            try:
+                cache_paths = [self.JSON_LOC] + self._get_backup_paths()
+                any_exist = any(os.path.exists(path) for path in cache_paths)
+                if not any_exist:
+                    logger.info(f"No cache file found at {AppInfoCache.JSON_LOC}, creating new cache")
+                    return
 
-            for path in cache_paths:
-                if os.path.exists(path):
-                    try:
-                        with open(path, "r", encoding="utf-8") as f:
-                            self._cache = json.load(f)
-                        if path == self.JSON_LOC:
-                            message = f"Loaded cache from {self.JSON_LOC}"
-                            rotated_count = self._rotate_backups()
-                            if rotated_count > 0:
-                                message += f", rotated {rotated_count} backups"
-                            logger.info(message)
-                        else:
-                            logger.warning(f"Loaded cache from backup: {path}")
-                        return
-                    except Exception as e:
-                        logger.error(f"Failed to load cache from {path}: {e}")
-                        continue
-            # If we get here, all attempts failed (but at least one file existed)
-            raise Exception(f"Failed to load cache from all locations: {cache_paths}")
-        except FileNotFoundError:
-            pass
+                for path in cache_paths:
+                    if os.path.exists(path):
+                        try:
+                            with open(path, "r", encoding="utf-8") as f:
+                                self._cache = json.load(f)
+                            if path == self.JSON_LOC:
+                                message = f"Loaded cache from {self.JSON_LOC}"
+                                rotated_count = self._rotate_backups()
+                                if rotated_count > 0:
+                                    message += f", rotated {rotated_count} backups"
+                                logger.info(message)
+                            else:
+                                logger.warning(f"Loaded cache from backup: {path}")
+                            return
+                        except Exception as e:
+                            logger.error(f"Failed to load cache from {path}: {e}")
+                            continue
+                # If we get here, all attempts failed (but at least one file existed)
+                raise Exception(f"Failed to load cache from all locations: {cache_paths}")
+            except FileNotFoundError:
+                pass
 
     def validate(self):
-        pass
-
-    def _get_history(self) -> list:
-        if AppInfoCache.HISTORY_KEY not in self._cache:
-            self._cache[AppInfoCache.HISTORY_KEY] = []
-        return self._cache[AppInfoCache.HISTORY_KEY]
+        with self._lock:
+            return True
 
     def set(self, key, value):
-        if AppInfoCache.INFO_KEY not in self._cache:
-            self._cache[AppInfoCache.INFO_KEY] = {}
-        self._cache[AppInfoCache.INFO_KEY][key] = value
+        with self._lock:
+            if AppInfoCache.INFO_KEY not in self._cache:
+                self._cache[AppInfoCache.INFO_KEY] = {}
+            self._cache[AppInfoCache.INFO_KEY][key] = value
 
     def get(self, key, default_val=None):
-        if AppInfoCache.INFO_KEY not in self._cache or key not in self._cache[AppInfoCache.INFO_KEY]:
-            return default_val
-        return self._cache[AppInfoCache.INFO_KEY][key]
+        with self._lock:
+            if AppInfoCache.INFO_KEY not in self._cache or key not in self._cache[AppInfoCache.INFO_KEY]:
+                return default_val
+            return self._cache[AppInfoCache.INFO_KEY][key]
 
     def set_display_position(self, master):
         """Store the main window's display position and size."""
@@ -105,33 +105,6 @@ class AppInfoCache:
         if not position_data:
             return None
         return PositionData.from_dict(position_data)
-
-    def set_history(self, runner_config):
-        history = self._get_history()
-        if len(history) > 0 and runner_config == RunnerAppConfig.from_dict(history[0]):
-            return False
-        config_dict = runner_config.to_dict()
-        history.insert(0, config_dict)
-        # Remove the oldest entry from history if over the limit of entries
-        while len(history) >= AppInfoCache.MAX_HISTORY_ENTRIES:
-            history = history[0:-1]
-        return True
-
-    def get_last_history_index(self):
-        history = self._get_history()
-        return len(history) - 1
-
-    def get_history(self, _idx=0):
-        history = self._get_history()
-        if _idx >= len(history):
-            raise Exception("Invalid history index " + str(_idx))
-        return history[_idx]
-
-    def get_history_latest(self):
-        history = self._get_history()
-        if len(history) == 0:
-            return RunnerAppConfig()
-        return RunnerAppConfig.from_dict(history[0])
 
     def export_as_json(self, json_path=None):
         """Export the current cache as a JSON file (not encrypted)."""
