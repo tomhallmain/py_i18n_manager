@@ -16,6 +16,7 @@ from ..invalid_translation_groups import InvalidTranslationGroups
 from ..i18n_manager_base import I18NManagerBase
 
 from utils.logging_setup import get_logger
+from utils.utils import Utils
 
 logger = get_logger("python_i18n_manager")
 
@@ -90,17 +91,17 @@ class PythonI18NManager(I18NManagerBase):
         locales_dir = os.path.join(self._directory, "locales")
         
         # Check if both directories exist
-        if os.path.exists(locale_dir) and os.path.exists(locales_dir):
+        if os.path.isdir(locale_dir) and os.path.isdir(locales_dir):
             logger.warning("Both 'locale' and 'locales' directories exist. Using 'locale' by default.")
             return "locale"
         
         # Check if locale directory exists
-        if os.path.exists(locale_dir):
+        if os.path.isdir(locale_dir):
             logger.info("Using 'locale' directory structure")
             return "locale"
         
         # Check if locales directory exists
-        if os.path.exists(locales_dir):
+        if os.path.isdir(locales_dir):
             logger.info("Using 'locales' directory structure")
             return "locales"
         
@@ -252,7 +253,7 @@ class PythonI18NManager(I18NManagerBase):
         POT_files = glob.glob(os.path.join(self._directory, "*.pot"))
         if len(POT_files) != 1:
             locale_dir = os.path.join(self._directory, self._locale_dir)
-            if os.path.exists(locale_dir):
+            if os.path.isdir(locale_dir):
                 POT_files = glob.glob(os.path.join(locale_dir, "*.pot"))
             if len(POT_files) != 1:
                 raise Exception("Invalid number of POT files found: " + str(len(POT_files)))
@@ -864,7 +865,7 @@ msgstr ""
             pot_file_path = self.get_pot_file_path()
             
             # Check if POT file exists
-            if not os.path.exists(pot_file_path):
+            if not Utils.exists_with_retry(pot_file_path):
                 # No existing POT file, so any generation would be a change
                 return True
                 
@@ -924,7 +925,7 @@ msgstr ""
             return True  # Assume changed if comparison fails
         finally:
             # Clean up backup file
-            if 'backup_pot_path' in locals() and os.path.exists(backup_pot_path):
+            if 'backup_pot_path' in locals() and Utils.exists_with_retry(backup_pot_path):
                 try:
                     os.remove(backup_pot_path)
                 except Exception as e:

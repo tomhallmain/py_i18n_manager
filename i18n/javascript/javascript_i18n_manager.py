@@ -10,6 +10,7 @@ from ..file_topology_manager import FileTopologyManager
 from ..i18n_manager_base import I18NManagerBase
 from ..translation_manager_results import LocaleStatus, TranslationAction, TranslationManagerResults
 from utils.logging_setup import get_logger
+from utils.utils import Utils
 
 logger = get_logger("javascript_i18n_manager")
 
@@ -134,7 +135,7 @@ class JavaScriptI18NManager(I18NManagerBase):
 
     def _scan_locale_files(self) -> Tuple[Dict[str, Dict[str, dict]], Dict[str, dict]]:
         locale_dir = os.path.join(self._directory, self._locale_dir)
-        if not os.path.isdir(locale_dir):
+        if not Utils.isdir_with_retry(locale_dir):
             return {}, {}
 
         locale_files: Dict[str, Dict[str, dict]] = {}
@@ -387,7 +388,7 @@ class JavaScriptI18NManager(I18NManagerBase):
             self._load_locale_state()
             self._ensure_default_template()
             base_info = self._bundle_file_for_locale(sorted(self._default_bundle_templates.keys())[0], self.default_locale)
-            if os.path.exists(base_info["path"]):
+            if Utils.exists_with_retry(base_info["path"]):
                 return True
             self._write_locale_data(
                 base_info["path"],
@@ -480,7 +481,7 @@ class JavaScriptI18NManager(I18NManagerBase):
         # TODO(js-i18n): Compare all default-locale template files instead of
         # only the primary path returned by get_pot_file_path().
         base_path = self.get_pot_file_path()
-        if not os.path.exists(base_path):
+        if not Utils.exists_with_retry(base_path):
             return True
         try:
             with open(base_path, "r", encoding="utf-8") as f:

@@ -9,6 +9,7 @@ from .translation_group import TranslationGroup, TranslationKey
 from .translation_manager_results import TranslationAction
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
+from utils.utils import Utils
 
 logger = get_logger("cross_project_analyzer")
 
@@ -112,7 +113,7 @@ class CrossProjectAnalyzer:
             
             # Verify the locale directory exists using the manager's detected path
             locale_dir = os.path.join(project_path, manager._locale_dir)
-            if not os.path.exists(locale_dir):
+            if not Utils.exists_with_retry(locale_dir):
                 logger.debug(f"Locale directory does not exist: {locale_dir}")
                 return None
                 

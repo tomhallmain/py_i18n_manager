@@ -1,11 +1,11 @@
 import asyncio
-import glob
 import math
-import random
 import re
 import os
 import sys
+import subprocess
 import threading
+from utils.logging_setup import get_logger
 
 
 RESET = "\033[m"
@@ -14,6 +14,7 @@ WHITE = "\033[37m"
 DARK_RED = "\033[91m"
 DARK_GREEN = "\033[92m"
 CYAN = "\033[34m"
+logger = get_logger("utils")
 
 class Utils:
     sleep_prevented = False
@@ -201,49 +202,158 @@ class Utils:
         winsound.PlaySound(sound, winsound.SND_ASYNC)
 
     @staticmethod
-    def get_files_from_dir(dirpath, recursive=False, random_sort=False):
-        if not os.path.isdir(dirpath):
-            raise Exception(f"Not a directory: {dirpath}")
-        glob_pattern = "**/*" if recursive else "*"
-        files = glob.glob(os.path.join(dirpath, glob_pattern), recursive=recursive)
-        if random_sort:
-            random.shuffle(files)
-        else:
-            files.sort()
-        return files
+    def isdir_with_retry(path, max_retries=3, retry_delay=1.0, wake_drive=True):
+        """
+        Check if a path is a directory, with retry logic for sleeping external drives.
+        
+        On Windows, external drives may be in a sleep/standby state and report paths
+        as invalid before they have time to spin up. This function retries the check
+        with delays to allow the drive to wake.
+        
+        Args:
+            path: The path to check
+            max_retries: Maximum number of retry attempts (default: 3)
+            retry_delay: Seconds to wait between retries (default: 1.0)
+            wake_drive: If True, attempt to wake the drive by accessing its root first
+            
+        Returns:
+            bool: True if the path is a valid directory, False otherwise
+        """
+        import time
+        external_drive_root = Utils._get_external_drive_root(path)
+        drive_root = external_drive_root if wake_drive else None
+        retries = max_retries if external_drive_root else 0
+
+        for attempt in range(retries + 1):
+            # On first attempt, probe external drive root to help wake sleeping drives.
+            if wake_drive and drive_root and attempt == 0:
+                try:
+                    os.path.exists(drive_root)
+                except OSError:
+                    pass  # Drive may not be accessible yet
+            
+            if os.path.isdir(path):
+                return True
+            
+            if attempt < retries:
+                logger.debug(f"Directory check failed for '{path}', retrying in {retry_delay}s (attempt {attempt + 1}/{retries})")
+                time.sleep(retry_delay)
+        
+        return False
 
     @staticmethod
-    def get_random_file_from_dir(dirpath, recursive=False, allowed_ext=[]):
-        files = Utils.get_files_from_dir(dirpath, recursive, random_sort=True)
-        random.shuffle(allowed_ext)
-        for f in files:
-            for ext in allowed_ext:
-                if f.endswith(ext):
-                    return f
+    def isfile_with_retry(path, max_retries=3, retry_delay=1.0, wake_drive=True):
+        """
+        Check if a path is a file, with retry logic for sleeping external drives.
+        
+        On Windows, external drives may be in a sleep/standby state and report paths
+        as invalid before they have time to spin up. This function retries the check
+        with delays to allow the drive to wake.
+        
+        Args:
+            path: The path to check
+            max_retries: Maximum number of retry attempts (default: 3)
+            retry_delay: Seconds to wait between retries (default: 1.0)
+            wake_drive: If True, attempt to wake the drive by accessing its root first
+            
+        Returns:
+            bool: True if the path is a valid file, False otherwise
+        """
+        import time
+        external_drive_root = Utils._get_external_drive_root(path)
+        drive_root = external_drive_root if wake_drive else None
+        retries = max_retries if external_drive_root else 0
+
+        for attempt in range(retries + 1):
+            if wake_drive and drive_root and attempt == 0:
+                try:
+                    os.path.exists(drive_root)
+                except OSError:
+                    pass
+            
+            if os.path.isfile(path):
+                return True
+            
+            if attempt < retries:
+                logger.debug(f"File check failed for '{path}', retrying in {retry_delay}s (attempt {attempt + 1}/{retries})")
+                time.sleep(retry_delay)
+        
+        return False
 
     @staticmethod
-    def format_red(s):
-        return f"{DARK_RED}{s}{RESET}"
+    def exists_with_retry(path, max_retries=3, retry_delay=1.0, wake_drive=True):
+        """
+        Check if a path exists, with retry logic for sleeping external drives.
+
+        On Windows, external drives may be in a sleep/standby state and report paths
+        as invalid before they have time to spin up. This function retries the check
+        with delays to allow the drive to wake.
+
+        Args:
+            path: The path to check
+            max_retries: Maximum number of retry attempts (default: 3)
+            retry_delay: Seconds to wait between retries (default: 1.0)
+            wake_drive: If True, attempt to wake the drive by accessing its root first
+
+        Returns:
+            bool: True if the path exists, False otherwise
+        """
+        import time
+        external_drive_root = Utils._get_external_drive_root(path)
+        drive_root = external_drive_root if wake_drive else None
+        retries = max_retries if external_drive_root else 0
+
+        for attempt in range(retries + 1):
+            if wake_drive and drive_root and attempt == 0:
+                try:
+                    os.path.exists(drive_root)
+                except OSError:
+                    pass
+
+            if os.path.exists(path):
+                return True
+
+            if attempt < retries:
+                logger.debug(f"Path existence check failed for '{path}', retrying in {retry_delay}s (attempt {attempt + 1}/{retries})")
+                time.sleep(retry_delay)
+
+        return False
 
     @staticmethod
-    def format_green(s):
-        return f"{DARK_GREEN}{s}{RESET}"
+    def _get_external_drive_root(path):
+        """
+        Return an external/removable drive root for path, or None if not external.
 
-    @staticmethod
-    def format_white(s):
-        return f"{WHITE}{s}{RESET}"
+        Windows:
+            Treat drive letters E: and above as external/removable.
+        Non-Windows:
+            Best-effort check for common removable-media mount roots.
+        """
+        if not path:
+            return None
 
-    @staticmethod
-    def format_cyan(s):
-        return f"{CYAN}{s}{RESET}"
+        normalized = os.path.normpath(os.path.abspath(path))
 
-    @staticmethod
-    def print_list_str(ls):
-        out = "[\n"
-        for item in ls:
-            out += f"\t{item}\n"
-        out += "]"
-        return out
+        if sys.platform == "win32":
+            drive = os.path.splitdrive(normalized)[0]  # e.g. "E:"
+            if len(drive) == 2 and drive[1] == ":" and drive[0].isalpha():
+                if drive[0].upper() >= "E":
+                    return drive + os.sep
+            return None
+
+        # Common removable mount roots on macOS/Linux
+        removable_roots = (
+            "/Volumes",
+            "/media",
+            "/run/media",
+            "/mnt",
+        )
+        for root in removable_roots:
+            root_norm = os.path.normpath(root)
+            if normalized == root_norm or normalized.startswith(root_norm + os.sep):
+                return root_norm + os.sep
+
+        return None
 
     @staticmethod
     def count_cjk_characters(text):

@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from utils.globals import ProjectType
 
 from utils.logging_setup import get_logger
+from utils.utils import Utils
 
 logger = get_logger("settings_manager")
 
@@ -33,7 +34,7 @@ class SettingsManager:
                 project_path = settings.get('last_project')
                 
                 # Validate the project path
-                if project_path and os.path.exists(project_path):
+                if project_path and Utils.exists_with_retry(project_path):
                     return project_path
                 return None
         except Exception:
@@ -54,7 +55,7 @@ class SettingsManager:
                 recent_projects = settings.get('recent_projects', [])
                 
                 # Filter out invalid paths
-                valid_projects = [p for p in recent_projects if os.path.exists(p)]
+                valid_projects = [p for p in recent_projects if Utils.exists_with_retry(p)]
                 
                 # Update settings if we removed any invalid paths
                 if len(valid_projects) != len(recent_projects):

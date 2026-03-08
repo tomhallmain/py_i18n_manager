@@ -48,6 +48,7 @@ from ..i18n_manager_base import I18NManagerBase
 from .file_structure_manager import FileStructureManager
 
 from utils.logging_setup import get_logger
+from utils.utils import Utils
 
 logger = get_logger("ruby_i18n_manager")
 
@@ -139,7 +140,7 @@ class RubyI18NManager(I18NManagerBase):
         # Rails projects use config/locales
         config_locales_dir = os.path.join(self._directory, "config", "locales")
         
-        if os.path.exists(config_locales_dir):
+        if os.path.isdir(config_locales_dir):
             logger.info("Using 'config/locales' directory structure (Rails i18n)")
             return "config/locales"
         
@@ -147,11 +148,11 @@ class RubyI18NManager(I18NManagerBase):
         locale_dir = os.path.join(self._directory, "locale")
         locales_dir = os.path.join(self._directory, "locales")
         
-        if os.path.exists(locales_dir):
+        if os.path.isdir(locales_dir):
             logger.info("Using 'locales' directory structure")
             return "locales"
         
-        if os.path.exists(locale_dir):
+        if os.path.isdir(locale_dir):
             logger.info("Using 'locale' directory structure")
             return "locale"
         
@@ -494,7 +495,7 @@ class RubyI18NManager(I18NManagerBase):
         from i18n.translation_manager_results import TranslationManagerResults, LocaleStatus
         
         locale_dir = os.path.join(self._directory, self._locale_dir)
-        has_locale = os.path.exists(locale_dir) and os.path.isdir(locale_dir)
+        has_locale = Utils.exists_with_retry(locale_dir) and Utils.isdir_with_retry(locale_dir)
         
         # Check if there are any YAML files (equivalent to "has POT file")
         has_yaml_files = False
@@ -507,7 +508,7 @@ class RubyI18NManager(I18NManagerBase):
         if has_locale:
             for item in os.listdir(locale_dir):
                 full_path = os.path.join(locale_dir, item)
-                if os.path.isdir(full_path) and not item.startswith('__'):
+                if Utils.isdir_with_retry(full_path) and not item.startswith('__'):
                     # Check if this locale directory has YAML files
                     yaml_files = list(Path(full_path).rglob("*.yml"))
                     has_yaml = len(yaml_files) > 0
@@ -654,7 +655,7 @@ class RubyI18NManager(I18NManagerBase):
         locale_dir = os.path.join(self._directory, self._locale_dir)
         yaml_files_by_locale = {}
         
-        if not os.path.exists(locale_dir):
+        if not Utils.isdir_with_retry(locale_dir):
             return yaml_files_by_locale
         
         # First, look for locale subdirectories (e.g., config/locales/en/, config/locales/es/)
@@ -1170,7 +1171,7 @@ msgstr ""
             has_flat_file = os.path.exists(flat_file)
             
             # For directory structure, create locale_dir if needed
-            if not has_flat_file and not os.path.exists(locale_dir):
+            if not has_flat_file and not os.path.isdir(locale_dir):
                 os.makedirs(locale_dir, exist_ok=True)
             
             logger.debug(f"Writing YAML files for locale {locale}")
@@ -1203,7 +1204,7 @@ msgstr ""
                 
                 # Determine target file - prefer source file if available
                 source_file = self._file_structure_manager.get_source_file(key_str, locale)
-                if source_file and os.path.exists(source_file):
+                if source_file and Utils.exists_with_retry(source_file):
                     # Use existing source file for this locale
                     file_path = source_file
                     # Check if it's a flat file (directly in config/locales/, not in locale subdirectory)
@@ -1245,7 +1246,7 @@ msgstr ""
                         'preserve_comments': False
                     }
                     
-                    if os.path.exists(file_path):
+                    if Utils.exists_with_retry(file_path):
                         try:
                             # Store original content for comment preservation
                             with open(file_path, 'r', encoding='utf-8') as f:
@@ -1302,7 +1303,7 @@ msgstr ""
                         }
                         
                         # If file exists on disk, load its existing content to preserve structure
-                        if os.path.exists(target_file):
+                        if Utils.exists_with_retry(target_file):
                             try:
                                 with open(target_file, 'r', encoding='utf-8') as f:
                                     existing_content = f.read()
@@ -1925,7 +1926,7 @@ msgstr ""
             pot_file_path = self.get_pot_file_path()
             
             # Check if POT file exists
-            if not os.path.exists(pot_file_path):
+            if not Utils.exists_with_retry(pot_file_path):
                 # No existing POT file, so any generation would be a change
                 return True
                 
@@ -1990,35 +1991,6 @@ msgstr ""
                     os.remove(backup_pot_path)
                 except Exception as e:
                     logger.warning(f"Failed to clean up backup file {backup_pot_path}: {e}")
-
-    def _find_python_i18n_tool(self, tool_name: str) -> str:
-        """Find a valid Python i18n tool script.
-        
-        Args:
-            tool_name (str): Name of the tool to find (e.g., 'pygettext.py' or 'msgfmt.py')
-            
-        Returns:
-            str: Path to the tool if found, empty string if not found
-        """
-        python_version = f"Python{sys.version_info.major}{sys.version_info.minor}"
-        possible_paths = [
-            os.path.join(sys.prefix, "Tools", "i18n", tool_name),  # Current Python installation
-            rf"C:\{python_version}\Tools\i18n\{tool_name}",        # Windows specific Python version
-            rf"C:\Python310\Tools\i18n\{tool_name}",               # Hardcoded fallback
-            tool_name                                              # Assume it's in PATH
-        ]
-        
-        for tool_path in possible_paths:
-            try:
-                if os.path.exists(tool_path) or tool_path == tool_name:
-                    logger.debug(f"Found {tool_name} at {tool_path}")
-                    return tool_path
-            except Exception as e:
-                logger.debug(f"Failed to access {tool_name} at {tool_path}: {e}")
-                continue
-                
-        logger.error(f"Could not find {tool_name} installation")
-        return ""
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

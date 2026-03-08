@@ -9,6 +9,7 @@ from ..file_topology_manager import FileTopologyManager
 from ..i18n_manager_base import I18NManagerBase
 from ..translation_manager_results import LocaleStatus, TranslationAction, TranslationManagerResults
 from utils.logging_setup import get_logger
+from utils.utils import Utils
 
 logger = get_logger("java_i18n_manager")
 
@@ -139,7 +140,7 @@ class JavaI18NManager(I18NManagerBase):
 
     def _scan_bundle_files(self) -> Tuple[Dict[str, Dict[str, str]], Dict[str, str]]:
         locale_dir = os.path.join(self._directory, self._locale_dir)
-        if not os.path.isdir(locale_dir):
+        if not Utils.isdir_with_retry(locale_dir):
             return {}, {}
 
         unsuffixed_files: Dict[str, str] = {}
@@ -547,7 +548,7 @@ class JavaI18NManager(I18NManagerBase):
         # TODO(java-i18n): Compare all default-locale bundle templates, not only
         # the first primary bundle file. Current check is conservative.
         base_path = self.get_pot_file_path()
-        if not os.path.exists(base_path):
+        if not Utils.exists_with_retry(base_path):
             return True
         try:
             with open(base_path, "r", encoding="utf-8") as f:

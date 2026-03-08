@@ -4,6 +4,7 @@ from typing import Optional
 
 from utils.globals import ProjectType
 from utils.logging_setup import get_logger
+from utils.utils import Utils
 
 logger = get_logger("project_detector")
 
@@ -20,7 +21,7 @@ class ProjectDetector:
         Returns:
             Optional[ProjectType]: The detected project type, or None if unknown
         """
-        if not os.path.exists(project_path):
+        if not Utils.exists_with_retry(project_path):
             logger.warning(f"Project path does not exist: {project_path}")
             return None
             
