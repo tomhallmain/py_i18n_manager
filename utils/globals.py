@@ -435,6 +435,20 @@ valid_language_codes = {
     'zu'   # Zulu
 }
 
+# Language codes shown in the locale picker when no cross-project locale history exists.
+FALLBACK_SUGGESTED_LANGUAGE_CODES = (
+    "en",
+    "es",
+    "fr",
+    "de",
+    "it",
+    "pt",
+    "ja",
+    "ko",
+    "zh",
+    "ru",
+)
+
 
 # Common ISO 3166-1 country codes
 valid_country_codes = {

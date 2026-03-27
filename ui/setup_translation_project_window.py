@@ -5,7 +5,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 import os
 
 from lib.multi_display import SmartDialog
-from utils.globals import valid_language_codes, valid_country_codes, valid_script_codes, ProjectType
+from ui.locale_selection_window import LocaleSelectionWindow, validate_locale_code
+from utils.globals import ProjectType
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
 from utils.project_detector import ProjectDetector
@@ -123,13 +124,10 @@ class SetupTranslationProjectWindow(SmartDialog):
         # Locale management
         locale_controls = QHBoxLayout()
         
-        self.locale_input = QLineEdit()
-        self.locale_input.setPlaceholderText(_("Enter locale code (e.g., fr, de, es)"))
-        locale_controls.addWidget(self.locale_input)
-        
-        add_locale_btn = QPushButton(_("Add Locale"))
-        add_locale_btn.clicked.connect(self.add_locale)
+        add_locale_btn = QPushButton(_("Add locale…"))
+        add_locale_btn.clicked.connect(self.open_locale_selection)
         locale_controls.addWidget(add_locale_btn)
+        locale_controls.addStretch()
         
         locales_layout.addLayout(locale_controls)
         
@@ -221,7 +219,7 @@ class SetupTranslationProjectWindow(SmartDialog):
                 elif self.project_type == ProjectType.JAVASCRIPT.value and os.path.isfile(full_path):
                     # JS flat structure: src/locales/en.json or src/locales/en.js
                     base_name, ext = os.path.splitext(item)
-                    if ext.lower() in ['.json', '.js', '.ts'] and self.is_valid_locale_code(base_name) is None:
+                    if ext.lower() in ['.json', '.js', '.ts'] and validate_locale_code(base_name) is None:
                         if base_name not in temp_locales:
                             self.locales_list.addItem(base_name)
                             temp_locales.add(base_name)
@@ -266,29 +264,25 @@ class SetupTranslationProjectWindow(SmartDialog):
                 logger.debug(f"Removing locale: {locale}")
         self.project_locales = sorted(list(temp_locales))
 
-    def add_locale(self):
-        """Add a new locale to the project."""
-        locale_code = self.locale_input.text().strip().lower()
-        if not locale_code:
-            QMessageBox.warning(self, _("Error"), _("Please enter a locale code."))
-            return
-            
-        # Basic validation of locale code
-        if not locale_code.isalnum() or len(locale_code) not in [2, 5]:
-            QMessageBox.warning(self, _("Error"), 
-                              _("Invalid locale code. Use format 'xx' or 'xx_YY' (e.g., 'fr' or 'fr_FR')."))
-            return
-            
-        # Check if locale already exists
-        existing_items = self.locales_list.findItems(locale_code, Qt.MatchFlag.MatchExactly)
-        if existing_items:
+    def _current_locale_set(self) -> set[str]:
+        return {self.locales_list.item(i).text().strip() for i in range(self.locales_list.count())}
+
+    def open_locale_selection(self) -> None:
+        """Open the locale picker dialog."""
+        dlg = LocaleSelectionWindow(
+            settings_manager=self.settings_manager,
+            existing_locales=self._current_locale_set(),
+            parent=self,
+        )
+        dlg.locale_selected.connect(self._append_locale_from_picker)
+        dlg.exec()
+
+    def _append_locale_from_picker(self, locale_code: str) -> None:
+        if self.locales_list.findItems(locale_code, Qt.MatchFlag.MatchExactly):
             QMessageBox.warning(self, _("Error"), _("This locale already exists."))
             return
-            
-        # Add to list
         self.locales_list.addItem(locale_code)
-        self.locale_input.clear()
-        
+
     def remove_locale(self):
         """Remove the selected locale."""
         current_item = self.locales_list.currentItem()
@@ -330,7 +324,7 @@ class SetupTranslationProjectWindow(SmartDialog):
             # Validate locale codes
             invalid_locales = []
             for locale in locales:
-                validation_result = self.is_valid_locale_code(locale)
+                validation_result = validate_locale_code(locale)
                 if validation_result is not None:
                     invalid_locales.append((locale, validation_result))
             
@@ -486,47 +480,3 @@ msgstr ""
         # Ruby/Java/JavaScript projects don't use PO headers directly
         # but those are handled separately. Return empty string for now.
         return ""
-    
-    def is_valid_locale_code(self, locale_code):
-        """Validate a locale code against ISO standards.
-        
-        Valid formats:
-        - Two-letter language code (ISO 639-1) (e.g., 'en', 'fr')
-        - Language code with country code (ISO 639-1 + ISO 3166-1) (e.g., 'en_US', 'fr_FR')
-        - Language code with script and country (e.g., 'zh_Hans_CN')
-        
-        Returns:
-            True if valid, or a string error message if invalid
-        """
-        
-        # Basic format validation
-        parts = locale_code.split('_')
-        
-        # Check if we have at least a language code
-        if not parts or not parts[0].isalpha() or len(parts[0]) != 2:
-            return _("Language code must be a two-letter ISO 639-1 code")
-        
-        # Check if language code is valid
-        if parts[0].lower() not in valid_language_codes:
-            return _("Invalid language code. Must be a valid ISO 639-1 code")
-        
-        # If we have more parts, validate them
-        if len(parts) > 1:
-            # Country code should be 2 uppercase letters
-            if not parts[1].isalpha() or len(parts[1]) != 2 or not parts[1].isupper():
-                return _("Country code must be a two-letter uppercase ISO 3166-1 code")
-            
-            # Check if country code is valid
-            if parts[1] not in valid_country_codes:
-                return _("Invalid country code. Must be a valid ISO 3166-1 code")
-            
-            # If we have a third part (script), it should be 4 letters with first uppercase
-            if len(parts) > 2:
-                if not parts[2].isalpha() or len(parts[2]) != 4 or not parts[2][0].isupper():
-                    return _("Script code must be a four-letter code with first letter uppercase")
-                
-                # Check if script code is valid
-                if parts[2] not in valid_script_codes:
-                    return _("Invalid script code. Must be a valid ISO 15924 code")
-        
-        return None 

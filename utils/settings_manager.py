@@ -1,5 +1,6 @@
 import json
 import os
+from collections import Counter
 from pathlib import Path
 from typing import Optional, Any, TYPE_CHECKING
 
@@ -296,6 +297,40 @@ class SettingsManager:
             bool: True if successful, False otherwise
         """
         return self.save_project_setting(project_path, 'locales', locales)
+
+    def get_commonly_used_locale_counts(
+        self,
+        exclude_locales: Optional[set[str] | frozenset[str]] = None,
+    ) -> dict[str, int]:
+        """Count how often each locale appears across all projects' saved ``locales`` lists.
+
+        Excludes any locale in ``exclude_locales`` (e.g. locales already configured for
+        the project being edited). Result order is descending by count, then by locale id.
+
+        Returns:
+            dict[str, int]: Locale tag -> number of projects that list it.
+        """
+        excluded = frozenset(exclude_locales or ())
+        counts: Counter[str] = Counter()
+        if not self.settings_file.exists():
+            return {}
+        try:
+            with open(self.settings_file, "r", encoding="utf-8") as f:
+                settings = json.load(f)
+            for _path, cfg in (settings.get("project_settings") or {}).items():
+                for loc in cfg.get("locales") or []:
+                    if not isinstance(loc, str) or not loc.strip():
+                        continue
+                    loc = loc.strip()
+                    if loc in excluded:
+                        continue
+                    counts[loc] += 1
+            # Preserve descending count, then alphabetical
+            ordered = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
+            return dict(ordered)
+        except Exception as e:
+            logger.warning("Could not aggregate commonly used locales: %s", e)
+            return {}
 
     def get_project_type(self, project_path: str) -> Optional[str]:
         """Get the project type for a specific project.
