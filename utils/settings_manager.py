@@ -39,7 +39,49 @@ class SettingsManager:
                 return None
         except Exception:
             return None
-            
+
+    def _fill_recent_projects_to_max(self, existing_valid: list[str], settings: dict) -> list[str]:
+        """Merge stored recent paths with last_project and project_settings, up to MAX_RECENT_PROJECTS.
+
+        Order: last_project first (if valid and not already placed), then existing list order,
+        then other paths from project_settings by last_bulk_analysis_time (newest first).
+        """
+        out: list[str] = []
+        seen: set[str] = set()
+        max_n = self.MAX_RECENT_PROJECTS
+
+        last = settings.get("last_project")
+        if last and Utils.exists_with_retry(last):
+            out.append(last)
+            seen.add(last)
+
+        for p in existing_valid:
+            if len(out) >= max_n:
+                break
+            if p not in seen and Utils.exists_with_retry(p):
+                out.append(p)
+                seen.add(p)
+
+        project_settings = settings.get("project_settings") or {}
+
+        def sort_key(p: str) -> tuple:
+            cfg = project_settings.get(p, {})
+            t = cfg.get("last_bulk_analysis_time") or ""
+            return (t, p)
+
+        candidates = sorted(
+            (p for p in project_settings if p not in seen and Utils.exists_with_retry(p)),
+            key=sort_key,
+            reverse=True,
+        )
+        for p in candidates:
+            if len(out) >= max_n:
+                break
+            out.append(p)
+            seen.add(p)
+
+        return out
+
     def load_recent_projects(self) -> list[str]:
         """Load the list of recent projects from settings.
         
@@ -55,10 +97,12 @@ class SettingsManager:
                 recent_projects = settings.get('recent_projects', [])
                 
                 # Filter out invalid paths
-                valid_projects = [p for p in recent_projects if Utils.exists_with_retry(p)]
-                
-                # Update settings if we removed any invalid paths
-                if len(valid_projects) != len(recent_projects):
+                valid_before = [p for p in recent_projects if Utils.exists_with_retry(p)]
+                valid_projects = self._fill_recent_projects_to_max(valid_before, settings)
+                merged = valid_projects != valid_before
+
+                # Persist when we pruned invalid entries or merged in paths to reach up to MAX_RECENT_PROJECTS
+                if len(valid_before) != len(recent_projects) or merged:
                     settings['recent_projects'] = valid_projects
                     with open(self.settings_file, 'w') as f:
                         json.dump(settings, f, indent=4)
@@ -99,8 +143,8 @@ class SettingsManager:
             
             with open(self.settings_file, 'w') as f:
                 json.dump(settings, f, indent=4)
-        except Exception:
-            pass  # Silently fail if we can't save settings
+        except Exception as e:
+            logger.warning("Could not save last project / recent projects: %s", e)
             
     def remove_project(self, project_path):
         """Remove a project from recent projects list.

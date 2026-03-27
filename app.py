@@ -201,6 +201,9 @@ class MainWindow(SmartMainWindow):
             self.update_project_type_display()
             self.update_button_states()
 
+            # Keep recent_projects in sync (handle_project_selection does this; auto-load did not)
+            self.settings_manager.save_last_project(last_project)
+
             # Clear previous status
             self.status_text.clear()
             self.status_text.append(f"Loading project: {last_project}")
