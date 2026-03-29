@@ -1,7 +1,7 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QTableWidget, QHeaderView, QMessageBox
 
-from lib.multi_display import SmartDialog
+from lib.multi_display import SmartWindow
 from ui.frozen_table_widget import FrozenTableWidget
 from utils.translations import I18N
 
@@ -31,19 +31,28 @@ def configure_translation_table_column_widths(table: QTableWidget, num_locales: 
         table.updateFrozenColumn()
 
 
-class BaseTranslationWindow(SmartDialog):
-    """Base class for translation windows with shared table setup logic.
-    Positions on the same display as the parent via SmartDialog.
+class BaseTranslationWindow(SmartWindow):
+    """Base class for non-modal translation tool windows with shared table setup.
+
+    Uses :class:`~lib.multi_display.SmartWindow` so multiple editors can stay open alongside
+    the main window (unlike modal :class:`~lib.multi_display.SmartDialog`).
     """
 
-    def __init__(self, parent=None, title=None, geometry="1100x750"):
+    def __init__(
+        self,
+        parent=None,
+        title=None,
+        geometry="1100x750",
+        offset_x=50,
+        offset_y=50,
+    ):
         super().__init__(
-            parent=parent,
+            persistent_parent=parent,
             position_parent=parent,
             title=title,
             geometry=geometry,
-            offset_x=50,
-            offset_y=50,
+            offset_x=offset_x,
+            offset_y=offset_y,
         )
 
     def setup_table(self):

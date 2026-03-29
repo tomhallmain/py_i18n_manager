@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import List, Tuple, Dict
 
 from .translation_group import TranslationKey
+from utils.globals import QualityHeuristicKind
 
 
 @dataclass
@@ -10,13 +11,16 @@ class QualityReviewFinding:
 
     Distinct from :class:`InvalidTranslationGroupLocales` / :class:`InvalidTranslationGroups`:
     these are lower-severity hints and may be false positives.
+
+    Translation text for the default locale and for ``locale`` is not stored here; resolve it from
+    the in-memory catalog via :attr:`~i18n.translation_group.TranslationKey` and
+    :meth:`~i18n.translation_group.TranslationGroup.get_translation` when displaying.
     """
 
     key_msgid: str
     key_context: str
     locale: str
-    signal: str
-    detail: str
+    signal: QualityHeuristicKind
 
 
 @dataclass
@@ -32,7 +36,8 @@ class TranslationQualityFindings:
     def count_by_signal(self) -> Dict[str, int]:
         out: Dict[str, int] = {}
         for f in self.findings:
-            out[f.signal] = out.get(f.signal, 0) + 1
+            k = f.signal.value
+            out[k] = out.get(k, 0) + 1
         return out
 
 

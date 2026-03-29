@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Any, Optional, Set
 
 from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
-    QDialogButtonBox,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -38,9 +37,9 @@ from PyQt6.QtWidgets import (
 from i18n.invalid_translation_groups import TranslationQualityFindings
 from i18n.llm_catalog_review import CatalogLlmReviewResult
 from i18n.translation_group import TranslationKey
+from i18n.translation_quality_review import QualityHeuristicKind
 from i18n.translation_manager_results import TranslationAction, TranslationManagerResults
-from lib.multi_display import SmartDialog
-from ui.base_translation_window import create_frozen_translation_table
+from ui.base_translation_window import BaseTranslationWindow, create_frozen_translation_table
 from utils.translations import I18N
 from workers.translation_worker import TranslationWorker
 
@@ -100,8 +99,8 @@ class _CatalogLlmWorker(QObject):
         self.finished.emit(result)
 
 
-class TranslationQualityReviewWindow(SmartDialog):
-    """Advisory translation checks, custom rules, and optional LLM catalog review (future)."""
+class TranslationQualityReviewWindow(BaseTranslationWindow):
+    """Advisory translation checks, custom rules, and optional LLM catalog review."""
 
     def __init__(
         self,
@@ -112,13 +111,11 @@ class TranslationQualityReviewWindow(SmartDialog):
     ):
         super().__init__(
             parent=parent,
-            position_parent=parent,
             title=_("Translation Quality Review"),
             geometry="920x620",
             offset_x=40,
             offset_y=40,
         )
-        self.setModal(True)
         self.project_path = project_path
         self.settings_manager = settings_manager
         self._i18n_manager = i18n_manager
@@ -157,10 +154,6 @@ class TranslationQualityReviewWindow(SmartDialog):
         self._tabs.addTab(self._build_exclusions_tab(), _("Exclusions"))
         self._tabs.addTab(self._build_llm_tab(), _("LLM review"))
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.rejected.connect(self.reject)
-        root.addWidget(buttons)
-
     def _build_heuristic_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
@@ -175,17 +168,29 @@ class TranslationQualityReviewWindow(SmartDialog):
             )
         )
         self._heuristic_table = create_frozen_translation_table()
-        self._heuristic_table.setColumnCount(4)
+        self._heuristic_table.setColumnCount(6)
         self._heuristic_table.setHorizontalHeaderLabels(
-            [_("Key"), _("Locale"), _("Signal"), _("Detail")]
+            [
+                _("Key"),
+                _("Locale"),
+                _("Default locale value"),
+                _("Locale value"),
+                _("Signal"),
+                _("Detail"),
+            ]
         )
-        self._heuristic_table.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.ResizeMode.Stretch
-        )
-        for c in (1, 2, 3):
-            self._heuristic_table.horizontalHeader().setSectionResizeMode(
-                c, QHeaderView.ResizeMode.ResizeToContents
-            )
+        hdr = self._heuristic_table.horizontalHeader()
+        # Avoid Stretch on column 0: it would consume ~all width after tiny Locale/Signal cells,
+        # hiding Detail. Key is Interactive (user-resizable); Detail stretches for readability.
+        hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+        hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
+        hdr.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+        self._heuristic_table.setColumnWidth(0, 240)
+        self._heuristic_table.setColumnWidth(2, 200)
+        self._heuristic_table.setColumnWidth(3, 200)
         layout.addWidget(self._heuristic_table, stretch=1)
 
         row = QHBoxLayout()
@@ -749,6 +754,16 @@ class TranslationQualityReviewWindow(SmartDialog):
     def _populate_heuristic_table(self, qf: TranslationQualityFindings) -> None:
         rows = qf.findings
         self._heuristic_table.setRowCount(len(rows))
+        catalog = (
+            self._i18n_manager.translations
+            if self._i18n_manager
+            else {}
+        )
+        default_loc = (
+            self._i18n_manager.default_locale
+            if self._i18n_manager
+            else ""
+        )
         for i, f in enumerate(rows):
             key = TranslationKey(f.key_msgid, context=f.key_context or "")
             k_item = QTableWidgetItem(f.key_msgid)
@@ -756,9 +771,23 @@ class TranslationQualityReviewWindow(SmartDialog):
             k_item.setToolTip(f.key_msgid)
             self._heuristic_table.setItem(i, 0, k_item)
             self._heuristic_table.setItem(i, 1, QTableWidgetItem(f.locale))
-            self._heuristic_table.setItem(i, 2, QTableWidgetItem(f.signal))
-            d_item = QTableWidgetItem(f.detail)
-            d_item.setToolTip(f.detail)
-            self._heuristic_table.setItem(i, 3, d_item)
+            group = catalog.get(key)
+            default_text = ""
+            locale_text = ""
+            if group is not None:
+                default_text = group.get_translation(default_loc) or ""
+                locale_text = group.get_translation(f.locale) or ""
+            def_item = QTableWidgetItem(default_text)
+            def_item.setToolTip(default_text)
+            self._heuristic_table.setItem(i, 2, def_item)
+            loc_item = QTableWidgetItem(locale_text)
+            loc_item.setToolTip(locale_text)
+            self._heuristic_table.setItem(i, 3, loc_item)
+            kind = f.signal
+            self._heuristic_table.setItem(i, 4, QTableWidgetItem(kind.get_display_name()))
+            det = kind.get_display_details()
+            det_item = QTableWidgetItem(det)
+            det_item.setToolTip(det)
+            self._heuristic_table.setItem(i, 5, det_item)
         if hasattr(self._heuristic_table, "updateFrozenColumn"):
             self._heuristic_table.updateFrozenColumn()

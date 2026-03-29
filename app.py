@@ -445,7 +445,9 @@ class MainWindow(SmartMainWindow):
         
         # Only open the window if there are items to display
         if has_items:
-            self.outstanding_window.exec()
+            self.outstanding_window.show()
+            self.outstanding_window.raise_()
+            self.outstanding_window.activateWindow()
 
         # The timer will handle running the translation task when needed
 
@@ -465,7 +467,9 @@ class MainWindow(SmartMainWindow):
         self.quality_review_window.set_project_path(self.current_project)
         self.quality_review_window.set_i18n_manager(self.i18n_manager)
         self.quality_review_window.refresh_placeholder_lists()
-        self.quality_review_window.exec()
+        self.quality_review_window.show()
+        self.quality_review_window.raise_()
+        self.quality_review_window.activateWindow()
 
     def handle_translation_update(self, locale, changes):
         """Handle batched translation updates from the outstanding items window.
@@ -546,6 +550,8 @@ class MainWindow(SmartMainWindow):
         # NOTE if there are properties that need to be re-initialized, below method will need to be implemented
         # self.all_translations_window.setup_properties()
         self.all_translations_window.show()
+        self.all_translations_window.raise_()
+        self.all_translations_window.activateWindow()
 
     def handle_project_removal(self, project_path):
         """Handle removal of a project from recent projects."""

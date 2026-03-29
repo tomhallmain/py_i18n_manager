@@ -14,6 +14,7 @@ import math
 import re
 from typing import AbstractSet, Dict, List, Optional, Sequence, TYPE_CHECKING
 
+from utils.globals import QualityHeuristicKind
 from utils.utils import Utils
 
 if TYPE_CHECKING:
@@ -22,9 +23,7 @@ if TYPE_CHECKING:
 from .invalid_translation_groups import QualityReviewFinding, TranslationQualityFindings
 from .translation_group import TranslationGroup, TranslationKey
 
-SIGN_IDENTICAL_TO_DEFAULT = "identical_to_default"
-SIGN_LATIN_IN_CJK_LOCALE = "latin_in_cjk_locale"
-SIGN_HIGH_ENGLISH_RATIO = "high_english_ratio"
+
 
 
 def collect_findings_for_group(
@@ -44,23 +43,23 @@ def collect_findings_for_group(
             continue
         tstrip = text.strip()
         if base and tstrip == base:
+            h = QualityHeuristicKind.IDENTICAL_TO_DEFAULT
             findings.append(
                 QualityReviewFinding(
                     key_msgid=mid,
                     key_context=ctx,
                     locale=loc,
-                    signal=SIGN_IDENTICAL_TO_DEFAULT,
-                    detail="Translation equals default locale text.",
+                    signal=h,
                 )
             )
         if Utils.is_cjk_locale(loc) and _has_significant_latin_run(tstrip):
+            h = QualityHeuristicKind.LATIN_IN_CJK_LOCALE
             findings.append(
                 QualityReviewFinding(
                     key_msgid=mid,
                     key_context=ctx,
                     locale=loc,
-                    signal=SIGN_LATIN_IN_CJK_LOCALE,
-                    detail="Latin letter run (4+ chars) inside a CJK locale string.",
+                    signal=h,
                 )
             )
 

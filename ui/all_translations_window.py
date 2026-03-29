@@ -22,7 +22,7 @@ class AllTranslationsWindow(BaseTranslationWindow):
 
     def __init__(self, parent=None):
         super().__init__(parent, title=_("All Translations"), geometry="1200x800")
-        # Screen-relative min size; position already set by SmartDialog on parent's display
+        # Screen-relative min size; position already set by SmartWindow on parent's display
         screen = QApplication.primaryScreen().geometry()
         self.setMinimumSize(int(screen.width() * 0.8), int(screen.height() * 0.8))
         self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))

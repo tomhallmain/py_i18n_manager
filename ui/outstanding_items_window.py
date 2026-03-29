@@ -232,7 +232,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
 
     def __init__(self, parent=None, project_path=None):
         super().__init__(parent, title=_("Outstanding Translation Items"), geometry="1200x800")
-        # Screen-relative min size; position already set by SmartDialog on parent's display
+        # Screen-relative min size; position already set by SmartWindow on parent's display
         screen = QApplication.primaryScreen().geometry()
         self.setMinimumSize(int(screen.width() * 0.8), int(screen.height() * 0.8))
         self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))
@@ -442,7 +442,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 if parent and hasattr(parent, "process_batched_updates"):
                     logger.debug("Outstanding list exhausted after delete; triggering immediate batched update")
                     QTimer.singleShot(0, parent.process_batched_updates)
-                self.accept()
+                self.close()
 
     def show_header_context_menu(self, position):
         """Show context menu for header items."""
@@ -1262,8 +1262,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             
             # Close the dialog only when no outstanding items remain after revalidation.
             if not has_items:
-                logger.debug("No remaining outstanding translations, accepting dialog...")
-                self.accept()
+                logger.debug("No remaining outstanding translations; closing window.")
+                self.close()
                 
         except Exception as e:
             logger.error(f"Error during save changes: {e}")

@@ -1,5 +1,6 @@
 from enum import Enum
 import os
+from typing import Optional
 
 from utils.config import config_manager
 from utils.translations import I18N
@@ -198,6 +199,43 @@ class TranslationFilter(Enum):
         if self == TranslationFilter.ALL:
             return None
         return TranslationStatus[self.name]
+
+
+class QualityHeuristicKind(str, Enum):
+    """Built-in quality-review heuristics; ``value`` is the stable id stored on :class:`QualityReviewFinding`."""
+
+    IDENTICAL_TO_DEFAULT = "identical_to_default"
+    LATIN_IN_CJK_LOCALE = "latin_in_cjk_locale"
+    HIGH_ENGLISH_RATIO = "high_english_ratio"
+
+    @classmethod
+    def from_signal(cls, signal: str) -> Optional["QualityHeuristicKind"]:
+        try:
+            return cls(signal)
+        except ValueError:
+            return None
+
+    def stable_detail_text(self) -> str:
+        """English detail text persisted on findings (gettext msgid)."""
+        if self is QualityHeuristicKind.IDENTICAL_TO_DEFAULT:
+            return _("Translation equals default locale text.")
+        if self is QualityHeuristicKind.LATIN_IN_CJK_LOCALE:
+            return _("Latin letter run (4+ chars) inside a CJK locale string.")
+        if self is QualityHeuristicKind.HIGH_ENGLISH_RATIO:
+            return _("English token ratio above threshold (heuristic not yet enabled).")
+        raise AssertionError(f"unhandled heuristic: {self!r}")
+
+    def get_display_name(self) -> str:
+        if self is QualityHeuristicKind.IDENTICAL_TO_DEFAULT:
+            return _("Identical to default")
+        if self is QualityHeuristicKind.LATIN_IN_CJK_LOCALE:
+            return _("Latin in CJK locale")
+        if self is QualityHeuristicKind.HIGH_ENGLISH_RATIO:
+            return _("High English ratio")
+        raise AssertionError(f"unhandled heuristic: {self!r}")
+
+    def get_display_details(self) -> str:
+        return self.stable_detail_text()
 
 
 # Common ISO 639-1 language codes
