@@ -150,13 +150,13 @@ class MainWindow(SmartMainWindow):
         second_row_layout = QHBoxLayout()
         self.bulk_pot_btn = QPushButton(_("Bulk Project Status"))
         self.cross_project_btn = QPushButton(_("Cross-Project Analysis"))
-        self.generate_pot_btn = QPushButton(_("Generate Base File"))
+        self.generate_pot_btn = QPushButton(_("Sync Base Translations"))
         self.update_po_btn = QPushButton(_("Update Translation Files"))
         self.create_mo_btn = QPushButton(_("Compile Translations"))
 
         self.bulk_pot_btn.clicked.connect(self.show_bulk_pot_analysis)
         self.cross_project_btn.clicked.connect(self.show_cross_project_analysis)
-        self.generate_pot_btn.clicked.connect(self.generate_pot)
+        self.generate_pot_btn.clicked.connect(self.generate_base_file)
         self.update_po_btn.clicked.connect(lambda: self.run_translation_task(TranslationAction.WRITE_PO_FILES))
         self.create_mo_btn.clicked.connect(lambda: self.run_translation_task(TranslationAction.WRITE_MO_FILES))
 
@@ -571,22 +571,31 @@ class MainWindow(SmartMainWindow):
             logger.error(error_msg)
             QMessageBox.critical(self, "Error", error_msg)
 
-    def generate_pot(self):
-        """Generate the base translation file for the current project."""
+    def generate_base_file(self):
+        """Refresh the base translation set (POT for Python, i18n-tasks for Ruby, etc.)."""
         if not self.current_project:
             QMessageBox.warning(self, "Error", "Please select a project first")
             return
-            
+
         try:
-            self.status_text.append("\nGenerating base translation file...")
+            self.status_text.append("\n" + _("Updating base translation files..."))
             if self.i18n_manager and self.i18n_manager.generate_pot_file():
-                self.status_text.append("Successfully generated base translation file")
-                # Run status check to refresh translations
+                self.status_text.append(_("Base translation files updated successfully."))
                 self.run_translation_task()
             else:
-                QMessageBox.warning(self, "Error", "Failed to generate base translation file")
+                detail = (
+                    self.i18n_manager.get_last_generate_base_error()
+                    if self.i18n_manager
+                    else None
+                )
+                if detail:
+                    QMessageBox.warning(self, _("Update failed"), detail)
+                else:
+                    QMessageBox.warning(
+                        self, "Error", _("Failed to update base translation files.")
+                    )
         except Exception as e:
-            error_msg = f"Failed to generate base translation file: {e}"
+            error_msg = f"{_('Failed to update base translation files.')}: {e}"
             logger.error(error_msg)
             QMessageBox.critical(self, "Error", error_msg)
 

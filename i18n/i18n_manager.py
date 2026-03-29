@@ -189,6 +189,10 @@ class I18NManager(I18NManagerBase):
     def generate_pot_file(self) -> bool:
         """Generate the source translation file."""
         return self._manager.generate_pot_file()
+
+    def get_last_generate_base_error(self) -> Optional[str]:
+        """Last error from generate_pot_file(), if the backend set one (e.g. Ruby i18n-tasks)."""
+        return getattr(self._manager, "_last_generate_base_error", None)
     
     def create_mo_files(self, results):
         """Create compiled translation files."""

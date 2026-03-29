@@ -2,11 +2,13 @@ from datetime import datetime
 import glob
 import os
 import shutil
+import subprocess
 import sys
 import time
 import re
 import yaml
 from pathlib import Path
+from typing import Optional
 
 # IMPORTANT: Why we use both PyYAML and ruamel.yaml
 #
@@ -112,6 +114,7 @@ class RubyI18NManager(I18NManagerBase):
         # Initialize file structure manager (after _locale_dir is set by parent __init__)
         base_locale_dir = os.path.join(self._directory, self._locale_dir)
         self._file_structure_manager = FileStructureManager(base_locale_dir, self.default_locale)
+        self._last_generate_base_error: Optional[str] = None
 
     def _safe_yaml_load(self, stream):
         """Load YAML while preserving string-like i18n keys (no implicit bool coercion)."""
@@ -1574,47 +1577,95 @@ msgstr ""
         """
         return self.write_locale_yaml_files(locale)
 
+    def _run_i18n_tasks_add_missing(self) -> tuple[bool, str]:
+        """Run `bundle exec i18n-tasks add-missing` in the project root.
+
+        Returns:
+            (success, message) where message is stderr/stdout (failure) or informational output (success).
+        """
+        project_root = self._get_project_root()
+        cmd = ["bundle", "exec", "i18n-tasks", "add-missing"]
+        try:
+            completed = subprocess.run(
+                cmd,
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=600,
+                encoding="utf-8",
+                errors="replace",
+            )
+        except subprocess.TimeoutExpired:
+            return False, "i18n-tasks timed out after 10 minutes."
+        except FileNotFoundError:
+            return (
+                False,
+                "Could not run 'bundle'. Install Ruby Bundler or ensure it is on your PATH.",
+            )
+        except Exception as e:
+            return False, str(e)
+
+        out = (completed.stdout or "").strip()
+        err = (completed.stderr or "").strip()
+        combined = "\n".join(x for x in (out, err) if x)
+        if completed.returncode != 0:
+            return False, combined or f"Exit code {completed.returncode}"
+        return True, combined
+
     def generate_pot_file(self):
-        """Generate base translation structure for Ruby/Rails projects.
-        
-        For Rails projects, this creates/updates the default locale YAML files
-        based on existing translations. For full string extraction from Ruby/ERB files,
-        consider using tools like `i18n-tasks`.
-        
+        """Generate or update base locale data for Ruby/Rails projects.
+
+        When a ``Gemfile`` exists at the project root, runs
+        ``bundle exec i18n-tasks add-missing`` (same role as extracting a POT for Python).
+
+        Without a Gemfile, falls back to ensuring default locale YAML structure exists.
+
         Returns:
             bool: True if successful, False otherwise
         """
+        self._last_generate_base_error = None
         try:
-            # For Ruby/Rails, "generating POT" means ensuring base locale structure exists
+            project_root = self._get_project_root()
+            gemfile = os.path.join(project_root, "Gemfile")
+            if os.path.isfile(gemfile):
+                logger.info("Running bundle exec i18n-tasks add-missing")
+                ok, msg = self._run_i18n_tasks_add_missing()
+                if not ok:
+                    self._last_generate_base_error = msg
+                    logger.error(f"i18n-tasks add-missing failed: {msg}")
+                    return False
+                if msg:
+                    logger.info(f"i18n-tasks add-missing output:\n{msg}")
+                return True
+
+            # No Gemfile: ensure default locale structure (legacy behavior)
             default_locale = self.default_locale
             locale_dir = os.path.join(self._directory, self._locale_dir, default_locale)
-            
-            # If we have translations in memory, write them to the default locale
+
             if self.translations:
                 logger.info(f"Writing base translation structure for locale {default_locale}")
                 return self.write_locale_yaml_files(default_locale)
-            else:
-                # No translations in memory, create a basic structure
-                os.makedirs(locale_dir, exist_ok=True)
-                application_yml = os.path.join(locale_dir, "application.yml")
-                
-                if not os.path.exists(application_yml):
-                    # Create a basic application.yml file
-                    basic_data = {
-                        default_locale: {
-                            "application": {
-                                "name": "Application Name"
-                            }
+
+            os.makedirs(locale_dir, exist_ok=True)
+            application_yml = os.path.join(locale_dir, "application.yml")
+
+            if not os.path.exists(application_yml):
+                basic_data = {
+                    default_locale: {
+                        "application": {
+                            "name": "Application Name"
                         }
                     }
-                    with open(application_yml, 'w', encoding='utf-8') as f:
-                        yaml.dump(basic_data, f, default_flow_style=False, allow_unicode=True)
-                    logger.info(f"Created basic application.yml for locale {default_locale}")
-                
-                return True
-                
+                }
+                with open(application_yml, 'w', encoding='utf-8') as f:
+                    yaml.dump(basic_data, f, default_flow_style=False, allow_unicode=True)
+                logger.info(f"Created basic application.yml for locale {default_locale}")
+
+            return True
+
         except Exception as e:
             logger.error(f"Error generating base translation structure: {e}", exc_info=True)
+            self._last_generate_base_error = str(e)
             return False
 
     def _get_project_root(self) -> str:
