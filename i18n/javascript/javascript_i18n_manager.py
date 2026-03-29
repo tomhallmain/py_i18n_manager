@@ -344,15 +344,12 @@ class JavaScriptI18NManager(I18NManagerBase):
         results.action_successful = True
 
         try:
-            if action == TranslationAction.CHECK_STATUS:
+            if action in (TranslationAction.CHECK_STATUS, TranslationAction.QUALITY_REVIEW):
                 self.translations = {}
                 self._load_locale_state()
                 self._parse_loaded_files()
 
-            if self.translations:
-                results.total_strings = len(self.translations)
-                results.total_locales = len(self.locales)
-                results.invalid_groups = self.get_invalid_translations()
+            self._populate_translation_statistics(results, action)
 
             if action == TranslationAction.WRITE_PO_FILES:
                 if self.fix_invalid_translations():

@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Set
 
 from polib import POEntry
 
@@ -471,6 +471,16 @@ class TranslationGroup():
                 invalid_cjk_locales.append(locale)
 
         return invalid_cjk_locales
+
+    def collect_quality_review_findings(
+        self, default_locale: str, locales: List[str], excluded_msgids: Set[str]
+    ) -> list:
+        """Run advisory quality checks for this group (see :mod:`i18n.translation_quality_review`)."""
+        from i18n.translation_quality_review import collect_findings_for_group
+
+        if self.key.msgid in excluded_msgids:
+            return []
+        return collect_findings_for_group(self, default_locale, locales)
 
     def has_translation_changes(self, other: 'TranslationGroup') -> bool:
         """Compare this translation group with another to check if translations have changed.

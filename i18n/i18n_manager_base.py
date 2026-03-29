@@ -46,7 +46,41 @@ class I18NManagerBase(ABC):
     def clear_queued_deleted_keys(self) -> None:
         """Clear queued translation-key deletions after successful persistence."""
         self.pending_deleted_keys.clear()
-    
+
+    def get_quality_review_excluded_msgids(self) -> frozenset:
+        """Msgids excluded from heuristic quality review for this project (see SettingsManager)."""
+        if self.settings_manager:
+            return frozenset(self.settings_manager.get_quality_review_excluded_msgids(self._directory))
+        return frozenset()
+
+    def _total_locales_for_statistics(self, results: TranslationManagerResults) -> int:
+        """How many locales to report on ``results`` (bundle managers use ``self.locales``)."""
+        if self.locales:
+            return len(self.locales)
+        return len(results.locale_statuses)
+
+    def _populate_translation_statistics(
+        self,
+        results: TranslationManagerResults,
+        action: TranslationAction,
+    ) -> None:
+        """Set ``total_strings``, ``total_locales``, and either quality findings or invalid groups."""
+        if not self.translations:
+            return
+        results.total_strings = len(self.translations)
+        results.total_locales = self._total_locales_for_statistics(results)
+        if action == TranslationAction.QUALITY_REVIEW:
+            from i18n.translation_quality_review import collect_project_quality_findings
+
+            results.quality_findings = collect_project_quality_findings(
+                self.translations,
+                self.locales,
+                self.default_locale,
+                self.get_quality_review_excluded_msgids(),
+            )
+        else:
+            results.invalid_groups = self.get_invalid_translations()
+
     @property
     @abstractmethod
     def default_locale(self) -> str:

@@ -548,6 +548,9 @@ class RubyI18NManager(I18NManagerBase):
         )
         return results
 
+    def _total_locales_for_statistics(self, results: TranslationManagerResults) -> int:
+        return len(results.locale_statuses)
+
     def manage_translations(self, action: TranslationAction = TranslationAction.CHECK_STATUS, modified_locales: set[str] = None):
         """Manage translations based on the specified action.
         
@@ -567,8 +570,8 @@ class RubyI18NManager(I18NManagerBase):
             yaml_files_by_locale = self.gather_yaml_files()
             logger.debug(f"Found YAML files for {len(yaml_files_by_locale)} locales")
             
-            # Only parse files and fill translations during CHECK_STATUS
-            if action == TranslationAction.CHECK_STATUS:
+            # Parse YAML and fill translations for status load or quality review
+            if action in (TranslationAction.CHECK_STATUS, TranslationAction.QUALITY_REVIEW):
                 # Parse YAML files to extract translations
                 if results.has_locale_dir:
                     self._parse_yaml_files(yaml_files_by_locale)
@@ -582,14 +585,8 @@ class RubyI18NManager(I18NManagerBase):
                 else:
                     logger.warning("No locale directory found, cannot parse YAML files")
             
-            # Update statistics
-            if self.translations:
-                results.total_strings = len(self.translations)
-                results.total_locales = len(results.locale_statuses)
-                
-                # Get invalid translations info
-                results.invalid_groups = self.get_invalid_translations()
-            
+            self._populate_translation_statistics(results, action)
+
             # Perform requested action
             if action == TranslationAction.WRITE_PO_FILES:
                 # Fix any invalid translations that we can before writing files

@@ -166,6 +166,9 @@ class PythonI18NManager(I18NManagerBase):
             print("Error while creating mo file for locale " + locale + ": " + str(e))
             return False
 
+    def _total_locales_for_statistics(self, results: TranslationManagerResults) -> int:
+        return len(results.locale_statuses)
+
     def manage_translations(self, action: TranslationAction = TranslationAction.CHECK_STATUS, modified_locales: set[str] = None):
         """Manage translations based on the specified action.
         
@@ -195,8 +198,8 @@ class PythonI18NManager(I18NManagerBase):
             # 4. Stale translations not being properly purged after writes
             # 5. Locale status tracking getting out of sync with file state
             
-            # Only parse files and fill translations during CHECK_STATUS
-            if action == TranslationAction.CHECK_STATUS:
+            # Parse files and fill translations for status load or quality review
+            if action in (TranslationAction.CHECK_STATUS, TranslationAction.QUALITY_REVIEW):
                 # Parse POT file if it exists
                 if results.has_pot_file:
                     self._parse_pot(pot_file)
@@ -205,14 +208,8 @@ class PythonI18NManager(I18NManagerBase):
                 if results.has_locale_dir:
                     self._fill_translations(po_files)
             
-            # Update statistics
-            if self.translations:
-                results.total_strings = len(self.translations)
-                results.total_locales = len(results.locale_statuses)
-                
-                # Get invalid translations info
-                results.invalid_groups = self.get_invalid_translations()
-            
+            self._populate_translation_statistics(results, action)
+
             # Perform requested action
             if action == TranslationAction.WRITE_PO_FILES:
                 # Fix any invalid translations that we can before writing files

@@ -15,6 +15,9 @@ logger = get_logger("settings_manager")
 class SettingsManager:
     MAX_RECENT_PROJECTS = 10
     DEFAULT_LLM_CJK_REJECT_THRESHOLD_PERCENTAGE = 30
+
+    # Conservative default for local / low-context models: catalog slice only (system + reply live outside).
+    DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS = 2400
     
     def __init__(self):
         self.settings_file = Path.home() / '.i18n_manager' / 'settings.json'
@@ -373,6 +376,52 @@ class SettingsManager:
             bool: True if successful, False otherwise
         """
         return self.save_project_setting(project_path, 'project_type', project_type)
+
+    # --- Translation quality review (per-project) ---------------------------------
+
+    def get_quality_review_excluded_msgids(self, project_path: str) -> list[str]:
+        """Msgids skipped by built-in heuristic quality review for this project."""
+        raw = self.get_project_setting(project_path, "quality_review_excluded_msgids", [])
+        if not isinstance(raw, list):
+            return []
+        return [str(x).strip() for x in raw if isinstance(x, str) and str(x).strip()]
+
+    def save_quality_review_excluded_msgids(self, project_path: str, msgids: list[str]) -> bool:
+        """Persist excluded msgids for quality review heuristics."""
+        cleaned = sorted({str(x).strip() for x in msgids if isinstance(x, str) and str(x).strip()})
+        return self.save_project_setting(project_path, "quality_review_excluded_msgids", cleaned)
+
+    def get_quality_review_custom_rules(self, project_path: str) -> list[dict]:
+        """User-defined business rules for quality review (schema TBD; stored as JSON objects)."""
+        raw = self.get_project_setting(project_path, "quality_review_custom_rules", [])
+        if not isinstance(raw, list):
+            return []
+        return [x for x in raw if isinstance(x, dict)]
+
+    def save_quality_review_custom_rules(self, project_path: str, rules: list[dict]) -> bool:
+        """Persist custom quality-review rules for this project."""
+        cleaned = [dict(x) for x in rules if isinstance(x, dict)]
+        return self.save_project_setting(project_path, "quality_review_custom_rules", cleaned)
+
+    def get_quality_review_llm_max_catalog_tokens(self, project_path: str) -> int:
+        """Max estimated tokens per catalog batch for LLM review (conservative for local / small context)."""
+        v = self.get_project_setting(project_path, "quality_review_llm_max_catalog_tokens")
+        if v is None:
+            return self.DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS
+        try:
+            n = int(v)
+            return max(128, min(n, 32000))
+        except (TypeError, ValueError):
+            return self.DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS
+
+    def save_quality_review_llm_max_catalog_tokens(self, project_path: str, max_tokens: int) -> bool:
+        """Save max estimated catalog tokens per LLM batch for this project."""
+        try:
+            n = int(max_tokens)
+        except (TypeError, ValueError):
+            n = self.DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS
+        n = max(128, min(n, 32000))
+        return self.save_project_setting(project_path, "quality_review_llm_max_catalog_tokens", n)
 
     def get_intro_details(self) -> dict[str, str]:
         """Get the intro details from config_manager (default config).

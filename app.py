@@ -18,6 +18,7 @@ from ui.outstanding_items_window import OutstandingItemsWindow
 from ui.recent_projects_dialog import RecentProjectsDialog
 from ui.setup_translation_project_window import SetupTranslationProjectWindow
 from ui.stats_widget import StatsWidget
+from ui.translation_quality_review_window import TranslationQualityReviewWindow
 from utils.globals import ProjectType
 from utils.logging_setup import get_logger
 from utils.project_detector import ProjectDetector
@@ -48,6 +49,7 @@ class MainWindow(SmartMainWindow):
         self.current_project = None
         self.locales = None
         self.outstanding_window = None
+        self.quality_review_window = None
         self.all_translations_window = None
         self.i18n_manager = None  # Store I18NManager instance
 
@@ -132,18 +134,21 @@ class MainWindow(SmartMainWindow):
         self.write_default_btn = QPushButton(_("Write Default Locale"))
         self.show_all_btn = QPushButton(_("Show All Translations"))
         self.show_outstanding_btn = QPushButton(_("Show Outstanding Items"))
+        self.quality_review_btn = QPushButton(_("Translation Quality Review"))
         self.find_untranslated_btn = QPushButton(_("Find Untranslated"))
 
         self.check_status_btn.clicked.connect(lambda: self.run_translation_task())
         self.write_default_btn.clicked.connect(self.write_default_locale)
         self.show_all_btn.clicked.connect(self.show_all_translations)
         self.show_outstanding_btn.clicked.connect(self.show_outstanding_items)
+        self.quality_review_btn.clicked.connect(self.show_translation_quality_review)
         self.find_untranslated_btn.clicked.connect(self.find_untranslated_strings)
 
         first_row_layout.addWidget(self.check_status_btn)
         first_row_layout.addWidget(self.write_default_btn)
         first_row_layout.addWidget(self.show_all_btn)
         first_row_layout.addWidget(self.show_outstanding_btn)
+        first_row_layout.addWidget(self.quality_review_btn)
         first_row_layout.addWidget(self.find_untranslated_btn)
 
         # Second row of buttons
@@ -314,6 +319,7 @@ class MainWindow(SmartMainWindow):
         self.check_status_btn.setEnabled(has_project)
         self.update_po_btn.setEnabled(has_project)
         self.show_outstanding_btn.setEnabled(has_project and has_translations)
+        self.quality_review_btn.setEnabled(has_project and has_translations)
         self.show_all_btn.setEnabled(has_project and has_translations)
         self.write_default_btn.setEnabled(has_project and has_translations)
         self.generate_pot_btn.setEnabled(has_project and has_translations)
@@ -443,6 +449,24 @@ class MainWindow(SmartMainWindow):
 
         # The timer will handle running the translation task when needed
 
+    def show_translation_quality_review(self):
+        """Open advisory checks, custom rules, and LLM review (shell for upcoming features)."""
+        if not self.i18n_manager or not self.i18n_manager.translations or not self.locales:
+            QMessageBox.warning(self, _("Error"), _("No translation data available"))
+            return
+
+        if not self.quality_review_window:
+            self.quality_review_window = TranslationQualityReviewWindow(
+                self,
+                project_path=self.current_project,
+                settings_manager=self.settings_manager,
+                i18n_manager=self.i18n_manager,
+            )
+        self.quality_review_window.set_project_path(self.current_project)
+        self.quality_review_window.set_i18n_manager(self.i18n_manager)
+        self.quality_review_window.refresh_placeholder_lists()
+        self.quality_review_window.exec()
+
     def handle_translation_update(self, locale, changes):
         """Handle batched translation updates from the outstanding items window.
         
@@ -510,7 +534,7 @@ class MainWindow(SmartMainWindow):
         
     def show_all_translations(self):
         if not self.i18n_manager or not self.i18n_manager.translations or not self.locales:
-            QMessageBox.warning(self, "Error", "Please check status first to load translation data")
+            QMessageBox.warning(self, _("Error"), _("Please check status first to load translation data"))
             return
             
         if not self.all_translations_window:
@@ -552,7 +576,7 @@ class MainWindow(SmartMainWindow):
     def write_default_locale(self):
         """Write the PO file for the default locale."""
         if not self.i18n_manager or not self.i18n_manager.translations:
-            QMessageBox.warning(self, "Error", "No translation data available")
+            QMessageBox.warning(self, _("Error"), _("No translation data available"))
             return
             
         try:
@@ -574,7 +598,7 @@ class MainWindow(SmartMainWindow):
     def generate_base_file(self):
         """Refresh the base translation set (POT for Python, i18n-tasks for Ruby, etc.)."""
         if not self.current_project:
-            QMessageBox.warning(self, "Error", "Please select a project first")
+            QMessageBox.warning(self, _("Error"), _("Please select a project first"))
             return
 
         try:
@@ -602,7 +626,7 @@ class MainWindow(SmartMainWindow):
     def find_untranslated_strings(self):
         """Find and display potential untranslated strings in the project."""
         if not self.i18n_manager:
-            QMessageBox.warning(self, "Error", "Please select a project first")
+            QMessageBox.warning(self, _("Error"), _("Please select a project first"))
             return
             
         try:
@@ -655,7 +679,7 @@ class MainWindow(SmartMainWindow):
     def show_cross_project_analysis(self):
         """Show the cross-project analysis window."""
         if not self.current_project:
-            QMessageBox.warning(self, "Error", "Please select a project first")
+            QMessageBox.warning(self, _("Error"), _("Please select a project first"))
             return
             
         # Check if we have recent projects to analyze against

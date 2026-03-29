@@ -3,13 +3,15 @@ from datetime import datetime
 from enum import Enum, auto
 from typing import Dict, List, Optional
 import os
-from .invalid_translation_groups import InvalidTranslationGroups
+from .invalid_translation_groups import InvalidTranslationGroups, TranslationQualityFindings
 
 class TranslationAction(Enum):
     CHECK_STATUS = auto()
     WRITE_PO_FILES = auto()
     WRITE_MO_FILES = auto()
     GENERATE_POT = auto()
+    # Reload catalog and run advisory heuristics; skips building InvalidTranslationGroups.
+    QUALITY_REVIEW = auto()
 
 @dataclass
 class LocaleStatus:
@@ -67,8 +69,11 @@ class TranslationManagerResults:
     total_strings: int = 0
     total_locales: int = 0
     
-    # Translation validation results
+    # Translation validation results (not filled for QUALITY_REVIEW)
     invalid_groups: InvalidTranslationGroups = field(default_factory=InvalidTranslationGroups)
+
+    # Advisory quality review (only for TranslationAction.QUALITY_REVIEW)
+    quality_findings: Optional[TranslationQualityFindings] = None
     
     # PO/MO file update tracking
     po_files_updated: bool = False
@@ -218,5 +223,10 @@ class TranslationManagerResults:
                 lines.append(f"- Invalid Leading Spaces: {error_counts['invalid_leading_spaces']}")
             if error_counts['invalid_newlines']:
                 lines.append(f"- Invalid Newlines: {error_counts['invalid_newlines']}")
-            
+
+        if self.quality_findings and self.quality_findings.has_findings:
+            lines.append(
+                f"\nQuality review (advisory): {len(self.quality_findings.findings)} finding(s)"
+            )
+
         return "\n".join(lines) 

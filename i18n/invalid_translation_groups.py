@@ -5,6 +5,38 @@ from .translation_group import TranslationKey
 
 
 @dataclass
+class QualityReviewFinding:
+    """One advisory signal from quality review (heuristics or custom rules).
+
+    Distinct from :class:`InvalidTranslationGroupLocales` / :class:`InvalidTranslationGroups`:
+    these are lower-severity hints and may be false positives.
+    """
+
+    key_msgid: str
+    key_context: str
+    locale: str
+    signal: str
+    detail: str
+
+
+@dataclass
+class TranslationQualityFindings:
+    """Aggregated quality review output; only populated for ``QUALITY_REVIEW`` actions."""
+
+    findings: List[QualityReviewFinding] = field(default_factory=list)
+
+    @property
+    def has_findings(self) -> bool:
+        return len(self.findings) > 0
+
+    def count_by_signal(self) -> Dict[str, int]:
+        out: Dict[str, int] = {}
+        for f in self.findings:
+            out[f.signal] = out.get(f.signal, 0) + 1
+        return out
+
+
+@dataclass
 class InvalidTranslationGroups:
     """Container for all types of invalid translations found in a project.
     Keys are always TranslationKey (group.key from translations).
