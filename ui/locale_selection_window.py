@@ -5,6 +5,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QComboBox,
+    QCompleter,
     QDialogButtonBox,
     QFormLayout,
     QFrame,
@@ -19,7 +20,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PyQt6.QtGui import QCompleter
 
 from lib.multi_display import SmartDialog
 from ui.app_style import AppStyle
