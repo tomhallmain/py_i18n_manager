@@ -349,51 +349,44 @@ class TranslationGroup():
         invalid_brace_locales = []
         default_translation = self.get_translation(self.default_locale)
         
-        # Define structural brace pairs to check
-        # Parentheses are treated more leniently (only check closure)
-        # Other braces are checked against default locale
-        # Include Unicode close parenthesis \uff09 as alternative to )
+        # Parentheses row: balance-only vs default; see _brace_pair_counts.
         brace_pairs = [
-            ('(', (')', '\uff09')),  # Parentheses - only check closure, unicode close parenthsis is valid
+            ('(', (')', '\uff09')),
             ('[', ']'),  # Square brackets - check against default
             ('<', '>'),  # Angle brackets - check against default
             ('{', '}')   # Curly braces - check against default
         ]
-        
-        # Get default locale brace counts for non-parentheses braces
+
+        def _brace_pair_counts(text: str, open_brace: str, close_brace) -> tuple[int, int]:
+            """Return (open_count, close_count) for one structural pair.
+
+            For ``(``, ``)`` counts include full-width （ U+FF08 / ） U+FF09 so CJK typography
+            matches ASCII. Callers treat parentheses as balanced-only; other pairs vs default.
+            """
+            if open_brace == '(':
+                opens = text.count('(') + text.count('\uff08')
+            else:
+                opens = text.count(open_brace)
+            if isinstance(close_brace, tuple):
+                closes = sum(text.count(c) for c in close_brace)
+            else:
+                closes = text.count(close_brace)
+            return opens, closes
+
         default_counts = {}
         for open_brace, close_brace in brace_pairs:
-            # Calculate total count of close braces (handling both single and tuple cases)
-            close_brace_count = 0
-            if isinstance(close_brace, tuple):
-                for close_brace_variant in close_brace:
-                    close_brace_count += default_translation.count(close_brace_variant)
-            else:
-                close_brace_count = default_translation.count(close_brace)
-            
-            # Store the open count and total close count
-            default_counts[open_brace] = (
-                default_translation.count(open_brace),
-                close_brace_count
+            default_counts[open_brace] = _brace_pair_counts(
+                default_translation, open_brace, close_brace
             )
-        
-        # Check each locale
+
         for locale, translation in self.values.items():
             if locale == self.default_locale:
                 continue
-                
+
             for open_brace, close_brace in brace_pairs:
-                open_count = translation.count(open_brace)
-                
-                # Calculate total count of close braces (handling both single and tuple cases)
-                close_count = 0
-                if isinstance(close_brace, tuple):
-                    for close_brace_variant in close_brace:
-                        close_count += translation.count(close_brace_variant)
-                else:
-                    close_count = translation.count(close_brace)
-                
-                if open_brace == '(':  # Parentheses - only check closure
+                open_count, close_count = _brace_pair_counts(translation, open_brace, close_brace)
+
+                if open_brace == '(':  # Parentheses - only check balance (ASCII or full-width)
                     if open_count != close_count:
                         invalid_brace_locales.append(locale)
                         break
