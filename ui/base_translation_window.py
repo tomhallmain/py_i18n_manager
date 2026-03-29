@@ -1,11 +1,22 @@
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QTableWidget, QHeaderView, QMessageBox
+from __future__ import annotations
 
+from typing import Any, Dict, Optional
+
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox
+
+from i18n.translation_group import TranslationGroup, TranslationKey
 from lib.multi_display import SmartWindow
+from lib.translation_service import TranslationService
 from ui.frozen_table_widget import FrozenTableWidget
+from utils.config import config_manager
+from utils.logging_setup import get_logger
+from utils.settings_manager import SettingsManager
 from utils.translations import I18N
 
 _ = I18N._
+
+logger = get_logger("base_translation_window")
 
 
 def create_frozen_translation_table() -> FrozenTableWidget:
@@ -75,6 +86,121 @@ class BaseTranslationWindow(SmartWindow):
         if key is not None:
             return key
         return item.text() if item else ""
+
+    def _translation_key_for_row(self, row: int) -> Any:
+        """Key used for catalog lookups; subclasses may override (e.g. outstanding duplicates)."""
+        return self.get_key_from_row(row)
+
+    def _get_translations_catalog(self) -> Optional[Dict[Any, TranslationGroup]]:
+        """In-memory ``TranslationKey`` → :class:`~i18n.translation_group.TranslationGroup`` map."""
+        return None
+
+    def setup_translation_service(self, project_path: Optional[str] = None) -> None:
+        """Create :class:`~lib.translation_service.TranslationService` for Argos/LLM cell translation."""
+        self.project_path = project_path
+        self.default_locale = config_manager.get("translation.default_locale", "en")
+        if not hasattr(self, "settings_manager") or self.settings_manager is None:
+            self.settings_manager = SettingsManager()
+        prompt_template = self.settings_manager.get_llm_prompt_template(self.project_path)
+        cjk_reject = self.settings_manager.get_llm_cjk_reject_threshold_percentage(
+            self.project_path
+        )
+        self.translation_service = TranslationService(
+            default_locale=self.default_locale,
+            prompt_template=prompt_template,
+            cjk_reject_threshold_percentage=cjk_reject,
+            project_path=self.project_path,
+        )
+
+    def reload_translation_service_settings(self) -> None:
+        """Reload LLM prompt / CJK threshold on the active translation service."""
+        if not getattr(self, "translation_service", None) or not getattr(
+            self, "settings_manager", None
+        ):
+            return
+        pt = self.settings_manager.get_llm_prompt_template(self.project_path)
+        cjk = self.settings_manager.get_llm_cjk_reject_threshold_percentage(self.project_path)
+        self.translation_service.set_prompt_template(pt)
+        self.translation_service.set_cjk_reject_threshold_percentage(cjk)
+        logger.info("LLM translation settings reloaded")
+
+    def copy_text_to_clipboard(self, text: str) -> None:
+        QApplication.clipboard().setText(text)
+
+    def copy_cell_text(self, item: QTableWidgetItem) -> None:
+        if item:
+            self.copy_text_to_clipboard(item.text())
+
+    def copy_default_translation(self, item: QTableWidgetItem, default_locale: str) -> None:
+        row = item.row()
+        key = self._translation_key_for_row(row)
+        cat = self._get_translations_catalog()
+        if cat and key in cat:
+            default_text = cat[key].get_translation(default_locale)
+            if default_text:
+                self.copy_text_to_clipboard(default_text)
+
+    @staticmethod
+    def _prompt_context_for_key(key: Any, source_text: str) -> Optional[str]:
+        if isinstance(key, TranslationKey):
+            key_str = key.msgid
+        elif isinstance(key, tuple):
+            key_str = key[1]
+        elif isinstance(key, str):
+            key_str = key
+        else:
+            key_str = str(key)
+        if key_str != source_text:
+            return f"Translation key: {key_str}"
+        return None
+
+    def translate_selected_item(self, item: QTableWidgetItem, use_llm: bool = False) -> None:
+        """Translate one non-key cell using Argos or LLM (same pipeline as Outstanding Items)."""
+        row = item.row()
+        col = item.column()
+        if col == 0:
+            return
+        key = self._translation_key_for_row(row)
+        locale = self.table.horizontalHeaderItem(col).text()
+        self.translate_table_cell(row, col, key, locale, use_llm=use_llm)
+
+    def translate_table_cell(
+        self,
+        row: int,
+        col: int,
+        key: Any,
+        locale: str,
+        use_llm: bool = False,
+    ) -> None:
+        """Run translation for a single table cell and refresh the item."""
+        cat = self._get_translations_catalog()
+        if not cat or key not in cat:
+            return
+        if not getattr(self, "translation_service", None):
+            return
+        group = cat[key]
+        default_locale = self.default_locale
+        source_text = group.get_translation("en") or group.get_translation(default_locale)
+        if not source_text:
+            return
+        context = self._prompt_context_for_key(key, source_text)
+        for attempt in range(2):
+            try:
+                translated = self.translation_service.translate(
+                    text=source_text,
+                    target_locale=locale,
+                    context=context,
+                    use_llm=use_llm,
+                )
+                if translated:
+                    new_item = QTableWidgetItem(translated)
+                    self.table.setItem(row, col, new_item)
+                    QTimer.singleShot(0, lambda: self.table.viewport().update())
+                    return
+            except Exception as e:
+                if attempt == 0:
+                    continue
+                logger.error("Translation failed for %s → %s: %s", key, locale, e)
 
     def confirm_delete_translation_group(self, key_display: str) -> bool:
         """Show confirmation dialog before deleting a translation group."""

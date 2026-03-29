@@ -10,7 +10,6 @@ import os
 import random
 import string
 
-from lib.translation_service import TranslationService
 from ui.app_style import AppStyle
 from utils.globals import config_manager
 from utils.globals import TranslationStatus
@@ -252,19 +251,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.setup_ui()
 
     def setup_properties(self):
-        self.default_locale = config_manager.get('translation.default_locale', 'en')
-        self.settings_manager = SettingsManager()
-        
-        # Load prompt template (project-specific or global)
-        prompt_template = self.settings_manager.get_llm_prompt_template(self.project_path)
-        cjk_reject_threshold = self.settings_manager.get_llm_cjk_reject_threshold_percentage(self.project_path)
-        self.translation_service = TranslationService(
-            default_locale=self.default_locale,
-            prompt_template=prompt_template,
-            cjk_reject_threshold_percentage=cjk_reject_threshold,
-            project_path=self.project_path,
-        )
-        
+        self.setup_translation_service(self.project_path)
         self.is_translating = False
         self._translation_worker = None
         self._translation_thread = None
@@ -489,14 +476,11 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.table.horizontalHeader().setMinimumSectionSize(OTHER_COLUMN_MIN_WIDTH)
         self.table.horizontalHeader().setMaximumSectionSize(800)
 
-    def copy_cell_text(self, item):
-        """Copy the text from a cell to the clipboard."""
-        if item:
-            self.copy_text_to_clipboard(item.text())
+    def _translation_key_for_row(self, row):
+        return self._get_key_from_row(row)
 
-    def copy_text_to_clipboard(self, text):
-        """Copy the given text to the clipboard."""
-        QApplication.clipboard().setText(text)
+    def _get_translations_catalog(self):
+        return self.translations
 
     def _get_key_from_row(self, row):
         """Extract the translation key from a table row (stored in UserRole when populated).
@@ -517,80 +501,6 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         if " (" in msgid_display and " duplicates)" in msgid_display:
             return msgid_display.split(" (")[0]
         return msgid_display
-
-    def copy_default_translation(self, item, default_locale):
-        """Copy the default locale's translation for the selected item.
-        
-        Args:
-            item: The table item that was right-clicked
-            default_locale (str): The default locale code
-        """
-        row = item.row()
-        key = self._get_key_from_row(row)
-        if key in self.translations:
-            default_text = self.translations[key].get_translation(default_locale)
-            if default_text:
-                self.copy_text_to_clipboard(default_text)
-
-    def translate_selected_item(self, item, use_llm=False):
-        """Translate a single selected item.
-        
-        Args:
-            item: The table item to translate
-            use_llm (bool): Whether to use LLM for translation
-        """
-        row = item.row()
-        col = item.column()
-        if col == 0:  # Don't translate the key column
-            return
-            
-        key = self._get_key_from_row(row)
-        locale = self.table.horizontalHeaderItem(col).text()
-        self.translate_item(row, col, key, locale, use_llm)
-
-    def translate_item(self, row, col, key, locale, use_llm=False):
-        """Translate a single item and update the table.
-        
-        Args:
-            row (int): The row number in the table
-            col (int): The column number in the table
-            key: The translation key (str or (context, msgid) for Python)
-            locale (str): The target locale
-            use_llm (bool): Whether to use LLM for translation
-        """
-        # Get the English translation if available, otherwise use default locale
-        default_locale = config_manager.get('translation.default_locale', 'en')
-        source_text = self.translations[key].get_translation('en') or self.translations[key].get_translation(default_locale)
-
-        if not source_text:
-            return
-
-        # Build smart context - only include key if it differs from source text
-        key_str = key if isinstance(key, str) else key[1] if isinstance(key, tuple) else str(key)
-        if key_str != source_text:
-            context = f"Translation key: {key_str}"
-        else:
-            context = None  # Key is same as source, no extra context needed
-
-        # Try translation once, retry once if it fails
-        for attempt in range(2):
-            try:
-                translated = self.translation_service.translate(
-                    text=source_text,
-                    target_locale=locale,
-                    context=context,
-                    use_llm=use_llm
-                )
-                if translated:
-                    item = QTableWidgetItem(translated)
-                    self.table.setItem(row, col, item)
-                    # Force UI update
-                    QTimer.singleShot(0, lambda: self.table.viewport().update())
-                    return
-            except Exception as e:
-                if attempt == 0:  # First attempt failed, will retry
-                    continue
-                logger.error(f"Translation failed for {key} to {locale}: {e}")
 
     def translate_all_missing(self, use_llm=False):
         """Translate all missing items using the specified method.
@@ -717,17 +627,10 @@ class OutstandingItemsWindow(BaseTranslationWindow):
     
     def open_llm_settings(self):
         """Open the LLM settings dialog."""
+        # TODO: Move to base class
         dialog = LLMSettingsDialog(project_path=self.project_path, parent=self)
-        dialog.settings_saved.connect(self._reload_prompt_template)
+        dialog.settings_saved.connect(self.reload_translation_service_settings)
         dialog.exec()
-    
-    def _reload_prompt_template(self):
-        """Reload the prompt template after settings change."""
-        prompt_template = self.settings_manager.get_llm_prompt_template(self.project_path)
-        cjk_reject_threshold = self.settings_manager.get_llm_cjk_reject_threshold_percentage(self.project_path)
-        self.translation_service.set_prompt_template(prompt_template)
-        self.translation_service.set_cjk_reject_threshold_percentage(cjk_reject_threshold)
-        logger.info("LLM translation settings reloaded")
         
     def _detect_duplicate_values(self, translations, locales):
         """Detect duplicate translation values in the default locale.
@@ -1177,18 +1080,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                             self.translation_service.llm._loop.close()
                     logger.debug("Deleting translation service...")
                     del self.translation_service
-                    
-                    # Reinitialize translation service
                     logger.debug("Reinitializing translation service...")
-                    default_locale = config_manager.get('translation.default_locale', 'en')
-                    prompt_template = self.settings_manager.get_llm_prompt_template(self.project_path)
-                    cjk_reject_threshold = self.settings_manager.get_llm_cjk_reject_threshold_percentage(self.project_path)
-                    self.translation_service = TranslationService(
-                        default_locale=default_locale,
-                        prompt_template=prompt_template,
-                        cjk_reject_threshold_percentage=cjk_reject_threshold,
-                        project_path=self.project_path,
-                    )
+                    self.setup_translation_service(self.project_path)
                 except Exception as e:
                     logger.error(f"Error during translation service cleanup/reinitialization: {e}")
             

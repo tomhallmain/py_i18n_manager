@@ -544,7 +544,9 @@ class MainWindow(SmartMainWindow):
     def _ensure_all_translations_window(self) -> AllTranslationsWindow:
         """Create and wire the All Translations window once; reuse it thereafter."""
         if not self.all_translations_window:
-            self.all_translations_window = AllTranslationsWindow(self)
+            self.all_translations_window = AllTranslationsWindow(
+                self, project_path=self.current_project
+            )
             self.all_translations_window.translation_updated.connect(self.handle_translation_update)
             self.all_translations_window.translation_group_deleted.connect(self.handle_translation_group_delete)
         return self.all_translations_window

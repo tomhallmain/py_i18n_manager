@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton,
                             QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
@@ -10,9 +10,10 @@ from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QAction
 
-from i18n.translation_group import TranslationKey
+from i18n.translation_group import TranslationGroup, TranslationKey
 from ui.app_style import AppStyle
 from ui.base_translation_window import BaseTranslationWindow
+from utils.config import config_manager
 from utils.globals import TranslationStatus, TranslationFilter
 from utils.translations import I18N
 
@@ -26,15 +27,16 @@ class AllTranslationsWindow(BaseTranslationWindow):
     translation_updated = pyqtSignal(str, list)  # locale, [(msgid, new_value), ...]
     translation_group_deleted = pyqtSignal(object)  # key object (TranslationKey or str)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, project_path: Optional[str] = None):
         super().__init__(parent, title=_("All Translations"), geometry="1200x800")
         # Screen-relative min size; position already set by SmartWindow on parent's display
         screen = QApplication.primaryScreen().geometry()
         self.setMinimumSize(int(screen.width() * 0.8), int(screen.height() * 0.8))
         self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))
-        
+
         self.show_escaped = False  # By default it should be encoded, not escaped
         self.setup_ui()
+        self.setup_translation_service(project_path)
         
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -117,6 +119,14 @@ class AllTranslationsWindow(BaseTranslationWindow):
         self.missing_color = highlight_colors["missing"]
         self.critical_color = highlight_colors["critical"]
         self.style_color = highlight_colors["style"]
+
+    def _get_translations_catalog(self) -> Optional[Dict[Any, TranslationGroup]]:
+        return self.all_translations
+
+    def closeEvent(self, event) -> None:
+        if hasattr(self, "translation_service") and self.translation_service is not None:
+            del self.translation_service
+        super().closeEvent(event)
 
     def set_dynamic_column_widths(self, num_locales: int):
         """Override: key column and locale columns start at minimum width, resizable to higher."""
@@ -277,13 +287,29 @@ class AllTranslationsWindow(BaseTranslationWindow):
         """Build and show context menu for a specific table item."""
         menu = QMenu()
         copy_action = QAction(_("Copy Text"), self)
-        copy_action.triggered.connect(lambda: QApplication.clipboard().setText(item.text()))
+        copy_action.triggered.connect(lambda: self.copy_cell_text(item))
         menu.addAction(copy_action)
+
+        default_locale = config_manager.get("translation.default_locale", "en")
+        copy_default = QAction(_("Copy Default Translation"), self)
+        copy_default.triggered.connect(
+            lambda: self.copy_default_translation(item, default_locale)
+        )
+        menu.addAction(copy_default)
 
         menu.addSeparator()
         delete_action = QAction(_("Delete Translation Key"), self)
         delete_action.triggered.connect(lambda: self.delete_translation_group_for_row(item.row()))
         menu.addAction(delete_action)
+
+        if item.column() > 0:
+            menu.addSeparator()
+            argos = QAction(_("Translate with Argos Translate"), self)
+            argos.triggered.connect(lambda: self.translate_selected_item(item, use_llm=False))
+            menu.addAction(argos)
+            llm = QAction(_("Translate with LLM"), self)
+            llm.triggered.connect(lambda: self.translate_selected_item(item, use_llm=True))
+            menu.addAction(llm)
 
         menu.exec(global_position)
 
