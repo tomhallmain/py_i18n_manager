@@ -2,9 +2,9 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2026-03-01 18:28-0500\n"
-"PO-Revision-Date: 2026-03-01 18:28-0500\n"
-"Last-Translator: Translator Name <translator@example.com>\n"
+"POT-Creation-Date: 2026-03-29 01:16-0400\n"
+"PO-Revision-Date: 2026-03-29 01:16-0400\n"
+"Last-Translator: Thomas Hall <tomhall.main@gmail.com>\n"
 "Language-Team: en Team <<EMAIL>>\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
@@ -12,51 +12,51 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: app.py:37 app.py:187
+#: app.py:38 app.py:192
 msgid "i18n Translation Manager"
 msgstr "i18n Translation Manager"
 
-#: app.py:73
+#: app.py:75
 msgid "Current Project:"
 msgstr "Current Project:"
 
-#: app.py:75
+#: app.py:77
 msgid "No project selected"
 msgstr "No project selected"
 
-#: app.py:94 ui/recent_projects_dialog.py:82
+#: app.py:96 ui/recent_projects_dialog.py:82
 msgid "Select Project"
 msgstr "Select Project"
 
-#: app.py:98
+#: app.py:100
 msgid "Modify Project Settings"
 msgstr "Modify Project Settings"
 
-#: app.py:131
+#: app.py:133
 msgid "Check Status"
 msgstr "Check Status"
 
-#: app.py:132
+#: app.py:134
 msgid "Write Default Locale"
 msgstr "Write Default Locale"
 
-#: app.py:133
+#: app.py:135
 msgid "Show All Translations"
 msgstr "Show All Translations"
 
-#: app.py:134
+#: app.py:136
 msgid "Show Outstanding Items"
 msgstr "Show Outstanding Items"
 
-#: app.py:135
+#: app.py:138
 msgid "Find Untranslated"
 msgstr "Find Untranslated"
 
-#: app.py:151 ui/bulk_pot_analysis_window.py:77
+#: app.py:156 ui/bulk_pot_analysis_window.py:77
 msgid "Bulk Project Status"
 msgstr "Bulk Project Status"
 
-#: app.py:152
+#: app.py:157
 msgid "Cross-Project Analysis"
 msgstr "Cross-Project Analysis"
 
@@ -64,15 +64,15 @@ msgstr "Cross-Project Analysis"
 msgid "Generate Base File"
 msgstr "Generate Base File"
 
-#: app.py:154
+#: app.py:159
 msgid "Update Translation Files"
 msgstr "Update Translation Files"
 
-#: app.py:155
+#: app.py:160
 msgid "Compile Translations"
 msgstr "Compile Translations"
 
-#: app.py:174 ui/bulk_pot_analysis_window.py:129
+#: app.py:179 ui/bulk_pot_analysis_window.py:129
 msgid "Status"
 msgstr "Status"
 
@@ -84,11 +84,11 @@ msgstr ""
 "Translation file compilation is not relevant for {} projects. {} projects "
 "use YAML files directly without a compilation step."
 
-#: app.py:654 app.py:670
+#: app.py:690 app.py:706
 msgid "No Projects to Analyze"
 msgstr "No Projects to Analyze"
 
-#: app.py:655
+#: app.py:691
 msgid ""
 "You need at least 2 projects in your recent projects list to perform cross-"
 "project analysis."
@@ -96,7 +96,7 @@ msgstr ""
 "You need at least 2 projects in your recent projects list to perform cross-"
 "project analysis."
 
-#: app.py:671
+#: app.py:707
 msgid ""
 "You need at least 1 project in your recent projects list to perform bulk POT"
 " analysis."
@@ -104,15 +104,15 @@ msgstr ""
 "You need at least 1 project in your recent projects list to perform bulk POT"
 " analysis."
 
-#: app.py:689
+#: app.py:725
 msgid "Compiled Files Need Update"
 msgstr "Compiled Files Need Update"
 
-#: app.py:690
+#: app.py:726
 msgid "Translation files have been updated for the following locales:"
 msgstr "Translation files have been updated for the following locales:"
 
-#: app.py:692
+#: app.py:728
 msgid "Remember to run Compile Translations to apply these changes."
 msgstr "Remember to run Compile Translations to apply these changes."
 
@@ -154,6 +154,26 @@ msgstr "Close"
 msgid "Show Escaped Unicode"
 msgstr "Show Escaped Unicode"
 
+#: ui/all_translations_window.py:273 ui/all_translations_window.py:291
+#: ui/all_translations_window.py:302 ui/outstanding_items_window.py:387
+#: ui/outstanding_items_window.py:458 ui/outstanding_items_window.py:469
+msgid "Copy Text"
+msgstr "Copy Text"
+
+#: ui/all_translations_window.py:278 ui/base_translation_window.py:74
+#: ui/outstanding_items_window.py:398
+msgid "Delete Translation Key"
+msgstr "Delete Translation Key"
+
+#: ui/all_translations_window.py:366 ui/all_translations_window.py:377
+#: ui/cross_project_analysis_window.py:548 ui/llm_settings_dialog.py:259
+msgid "Success"
+msgstr "Success"
+
+#: ui/all_translations_window.py:366
+msgid "Saved key deletions successfully!"
+msgstr "Saved key deletions successfully!"
+
 #: ui/all_translations_window.py:369 ui/cross_project_analysis_window.py:471
 #: ui/cross_project_analysis_window.py:474
 #: ui/cross_project_analysis_window.py:495
@@ -164,14 +184,19 @@ msgstr "Info"
 msgid "No changes to save."
 msgstr "No changes to save."
 
-#: ui/all_translations_window.py:366 ui/all_translations_window.py:377
-#: ui/cross_project_analysis_window.py:548 ui/llm_settings_dialog.py:259
-msgid "Success"
-msgstr "Success"
-
 #: ui/all_translations_window.py:377
 msgid "Saved {} changes successfully!"
 msgstr "Saved {} changes successfully!"
+
+#: ui/base_translation_window.py:75
+msgid ""
+"Delete translation key \"{key_display}\" from all locales?\n"
+"\n"
+"This will remove the key from written translation files on save/update."
+msgstr ""
+"Delete translation key \"{key_display}\" from all locales?\n"
+"\n"
+"This will remove the key from written translation files on save/update."
 
 #: ui/bulk_pot_analysis_window.py:40
 msgid "No projects available for analysis."
@@ -209,8 +234,8 @@ msgstr "Project"
 msgid "Type"
 msgstr "Type"
 
-#: ui/bulk_pot_analysis_window.py:129 utils/globals.py:78 utils/globals.py:103
-#: utils/globals.py:139 utils/globals.py:166
+#: ui/bulk_pot_analysis_window.py:129 utils/globals.py:88 utils/globals.py:113
+#: utils/globals.py:149 utils/globals.py:176
 msgid "Missing"
 msgstr "Missing"
 
@@ -242,15 +267,27 @@ msgstr "No analysis performed yet"
 msgid "Analysis in progress..."
 msgstr "Analysis in progress..."
 
+#: app.py:455 app.py:537 app.py:579 app.py:601 app.py:629 app.py:682
 #: ui/bulk_pot_analysis_window.py:235 ui/bulk_pot_analysis_window.py:263
 #: ui/cross_project_analysis_window.py:268
 #: ui/cross_project_analysis_window.py:560 ui/llm_settings_dialog.py:265
-#: ui/llm_settings_dialog.py:321 ui/setup_translation_project_window.py:228
-#: ui/setup_translation_project_window.py:233
-#: ui/setup_translation_project_window.py:240
-#: ui/setup_translation_project_window.py:251
-#: ui/setup_translation_project_window.py:256
-#: ui/setup_translation_project_window.py:372
+#: ui/llm_settings_dialog.py:321 ui/locale_selection_window.py:279
+#: ui/locale_selection_window.py:290 ui/locale_selection_window.py:298
+#: ui/locale_selection_window.py:306
+#: ui/setup_translation_project_window.py:282
+#: ui/setup_translation_project_window.py:290
+#: ui/setup_translation_project_window.py:295
+#: ui/setup_translation_project_window.py:447
+#: ui/translation_quality_review_window.py:448
+#: ui/translation_quality_review_window.py:471
+#: ui/translation_quality_review_window.py:488
+#: ui/translation_quality_review_window.py:511
+#: ui/translation_quality_review_window.py:534
+#: ui/translation_quality_review_window.py:559
+#: ui/translation_quality_review_window.py:568
+#: ui/translation_quality_review_window.py:657
+#: ui/translation_quality_review_window.py:693
+#: ui/translation_quality_review_window.py:724
 msgid "Error"
 msgstr "Error"
 
@@ -330,8 +367,8 @@ msgstr "Target Project:"
 msgid "Locales:"
 msgstr "Locales:"
 
-#: ui/cross_project_analysis_window.py:107 utils/globals.py:137
-#: utils/globals.py:164
+#: ui/cross_project_analysis_window.py:107 utils/globals.py:147
+#: utils/globals.py:174
 msgid "All"
 msgstr "All"
 
@@ -385,7 +422,7 @@ msgstr "Translation Matches"
 #: ui/cross_project_analysis_window.py:488
 #: ui/cross_project_analysis_window.py:554
 #: ui/cross_project_analysis_window.py:556
-#: ui/setup_translation_project_window.py:276
+#: ui/setup_translation_project_window.py:315
 msgid "Warning"
 msgstr "Warning"
 
@@ -523,311 +560,6 @@ msgstr "No missing translations were applied."
 msgid "Failed to apply translations: {}"
 msgstr "Failed to apply translations: {}"
 
-#: ui/outstanding_items_window.py:234
-msgid "Outstanding Translation Items"
-msgstr "Outstanding Translation Items"
-
-#: ui/outstanding_items_window.py:276
-msgid "Translation in Progress"
-msgstr "Translation in Progress"
-
-#: ui/outstanding_items_window.py:277
-msgid "Translation is in progress. Are you sure you want to close?"
-msgstr "Translation is in progress. Are you sure you want to close?"
-
-#: ui/outstanding_items_window.py:126
-msgid "Translate All Missing"
-msgstr "Translate All Missing"
-
-#: ui/outstanding_items_window.py:207
-msgid "Cancel Translation"
-msgstr "Cancel Translation"
-
-#: ui/all_translations_window.py:273 ui/all_translations_window.py:291
-#: ui/all_translations_window.py:302 ui/outstanding_items_window.py:387
-#: ui/outstanding_items_window.py:458 ui/outstanding_items_window.py:469
-msgid "Copy Text"
-msgstr "Copy Text"
-
-#: ui/outstanding_items_window.py:393
-msgid "Copy Default Translation"
-msgstr "Copy Default Translation"
-
-#: ui/outstanding_items_window.py:406
-msgid "Translate with Argos Translate"
-msgstr "Translate with Argos Translate"
-
-#: ui/outstanding_items_window.py:411
-msgid "Translate with LLM"
-msgstr "Translate with LLM"
-
-#: ui/outstanding_items_window.py:833
-msgid "Combine Duplicate Translations?"
-msgstr "Combine Duplicate Translations?"
-
-#: ui/outstanding_items_window.py:1072
-msgid "All Translations Resolved"
-msgstr "All Translations Resolved"
-
-#: ui/recent_projects_dialog.py:42 ui/recent_projects_dialog.py:112
-msgid "Select"
-msgstr "Select"
-
-#: ui/recent_projects_dialog.py:95
-msgid "Select a Recent Project"
-msgstr "Select a Recent Project"
-
-#: ui/recent_projects_dialog.py:116
-msgid "Browse..."
-msgstr "Browse..."
-
-#: ui/llm_settings_dialog.py:159 ui/outstanding_items_window.py:183
-#: ui/recent_projects_dialog.py:119 ui/setup_translation_project_window.py:154
-msgid "Cancel"
-msgstr "Cancel"
-
-#: ui/recent_projects_dialog.py:163
-msgid "Select Project Directory"
-msgstr "Select Project Directory"
-
-#: ui/setup_translation_project_window.py:25
-msgid "Setup Translation Project"
-msgstr "Setup Translation Project"
-
-#: ui/setup_translation_project_window.py:85
-msgid "Project Type:"
-msgstr "Project Type:"
-
-#: ui/setup_translation_project_window.py:89
-msgid "Application name"
-msgstr "Application name"
-
-#: ui/setup_translation_project_window.py:90
-msgid "Application Name:"
-msgstr "Application Name:"
-
-#: ui/setup_translation_project_window.py:94
-msgid "Version:"
-msgstr "Version:"
-
-#: ui/setup_translation_project_window.py:97
-msgid "Author Name <author@example.com>"
-msgstr "Author Name <author@example.com>"
-
-#: ui/setup_translation_project_window.py:98
-msgid "Author:"
-msgstr "Author:"
-
-#: ui/setup_translation_project_window.py:101
-msgid "Translator Name <translator@example.com>"
-msgstr "Translator Name <translator@example.com>"
-
-#: ui/setup_translation_project_window.py:102
-msgid "Default Translator:"
-msgstr "Default Translator:"
-
-#: ui/setup_translation_project_window.py:109
-msgid "Default Locale:"
-msgstr "Default Locale:"
-
-#: ui/setup_translation_project_window.py:119
-msgid "Project Locales"
-msgstr "Project Locales"
-
-#: ui/setup_translation_project_window.py:127
-msgid "Enter locale code (e.g., fr, de, es)"
-msgstr "Enter locale code (e.g., fr, de, es)"
-
-#: ui/setup_translation_project_window.py:130
-msgid "Add Locale"
-msgstr "Add Locale"
-
-#: ui/setup_translation_project_window.py:143
-msgid "Remove Selected Locale"
-msgstr "Remove Selected Locale"
-
-#: ui/setup_translation_project_window.py:152
-msgid "Save Configuration"
-msgstr "Save Configuration"
-
-#: ui/setup_translation_project_window.py:228
-msgid "Please enter a locale code."
-msgstr "Please enter a locale code."
-
-#: ui/setup_translation_project_window.py:234
-msgid ""
-"Invalid locale code. Use format 'xx' or 'xx_YY' (e.g., 'fr' or 'fr_FR')."
-msgstr ""
-"Invalid locale code. Use format 'xx' or 'xx_YY' (e.g., 'fr' or 'fr_FR')."
-
-#: ui/setup_translation_project_window.py:240
-msgid "This locale already exists."
-msgstr "This locale already exists."
-
-#: ui/setup_translation_project_window.py:251
-msgid "Please select a locale to remove."
-msgstr "Please select a locale to remove."
-
-#: ui/setup_translation_project_window.py:256
-msgid "Cannot remove the default locale."
-msgstr "Cannot remove the default locale."
-
-#: ui/setup_translation_project_window.py:259
-msgid "Confirm Removal"
-msgstr "Confirm Removal"
-
-#: ui/setup_translation_project_window.py:260
-msgid ""
-"Are you sure you want to remove locale '{}'? This will delete the locale "
-"directory and all its translations."
-msgstr ""
-"Are you sure you want to remove locale '{}'? This will delete the locale "
-"directory and all its translations."
-
-#: ui/setup_translation_project_window.py:277
-msgid ""
-"The default locale '{}' is not in the list of locales. Do you want to add "
-"it?"
-msgstr ""
-"The default locale '{}' is not in the list of locales. Do you want to add "
-"it?"
-
-#: ui/setup_translation_project_window.py:293
-msgid "The following locale codes are invalid:"
-msgstr "The following locale codes are invalid:"
-
-#: ui/setup_translation_project_window.py:296
-msgid ""
-"Locale codes must follow ISO 639-1 (language) and optionally ISO 3166-1 "
-"(country) standards."
-msgstr ""
-"Locale codes must follow ISO 639-1 (language) and optionally ISO 3166-1 "
-"(country) standards."
-
-#: ui/setup_translation_project_window.py:300
-msgid "Invalid Locale Codes"
-msgstr "Invalid Locale Codes"
-
-#: ui/setup_translation_project_window.py:373
-msgid "Failed to save configuration: {}"
-msgstr "Failed to save configuration: {}"
-
-#: ui/setup_translation_project_window.py:426
-msgid "Language code must be a two-letter ISO 639-1 code"
-msgstr "Language code must be a two-letter ISO 639-1 code"
-
-#: ui/setup_translation_project_window.py:430
-msgid "Invalid language code. Must be a valid ISO 639-1 code"
-msgstr "Invalid language code. Must be a valid ISO 639-1 code"
-
-#: ui/setup_translation_project_window.py:436
-msgid "Country code must be a two-letter uppercase ISO 3166-1 code"
-msgstr "Country code must be a two-letter uppercase ISO 3166-1 code"
-
-#: ui/setup_translation_project_window.py:440
-msgid "Invalid country code. Must be a valid ISO 3166-1 code"
-msgstr "Invalid country code. Must be a valid ISO 3166-1 code"
-
-#: ui/setup_translation_project_window.py:445
-msgid "Script code must be a four-letter code with first letter uppercase"
-msgstr "Script code must be a four-letter code with first letter uppercase"
-
-#: ui/setup_translation_project_window.py:449
-msgid "Invalid script code. Must be a valid ISO 15924 code"
-msgstr "Invalid script code. Must be a valid ISO 15924 code"
-
-#: ui/stats_widget.py:50
-msgid "Translation Statistics"
-msgstr "Translation Statistics"
-
-#: ui/stats_widget.py:59
-msgid "Total Translations:"
-msgstr "Total Translations:"
-
-#: ui/stats_widget.py:68
-msgid "Total Locales:"
-msgstr "Total Locales:"
-
-#: ui/stats_widget.py:77
-msgid "Missing Translations:"
-msgstr "Missing Translations:"
-
-#: ui/stats_widget.py:88
-msgid "Invalid Unicode:"
-msgstr "Invalid Unicode:"
-
-#: ui/stats_widget.py:99
-msgid "Invalid Indices:"
-msgstr "Invalid Indices:"
-
-#: ui/stats_widget.py:110
-msgid "Invalid Braces:"
-msgstr "Invalid Braces:"
-
-#: ui/stats_widget.py:121
-msgid "Invalid Leading Space:"
-msgstr "Invalid Leading Space:"
-
-#: ui/stats_widget.py:132
-msgid "Invalid Newline:"
-msgstr "Invalid Newline:"
-
-#: ui/stats_widget.py:154
-msgid "Stale Translations:"
-msgstr "Stale Translations:"
-
-#: utils/globals.py:40 utils/globals.py:55
-msgid "Python"
-msgstr "Python"
-
-#: utils/globals.py:42 utils/globals.py:57
-msgid "Ruby"
-msgstr "Ruby"
-
-#: utils/globals.py:80 utils/globals.py:105 utils/globals.py:141
-#: utils/globals.py:168
-msgid "Invalid Unicode"
-msgstr "Invalid Unicode"
-
-#: utils/globals.py:82 utils/globals.py:107 utils/globals.py:143
-#: utils/globals.py:170
-msgid "Invalid Indices"
-msgstr "Invalid Indices"
-
-#: utils/globals.py:84 utils/globals.py:109 utils/globals.py:145
-#: utils/globals.py:172
-msgid "Invalid Braces"
-msgstr "Invalid Braces"
-
-#: utils/globals.py:86 utils/globals.py:111 utils/globals.py:147
-#: utils/globals.py:174
-msgid "Invalid Leading Space"
-msgstr "Invalid Leading Space"
-
-#: utils/globals.py:88 utils/globals.py:113 utils/globals.py:149
-#: utils/globals.py:176
-msgid "Invalid Newline"
-msgstr "Invalid Newline"
-
-#: ui/all_translations_window.py:278 ui/base_translation_window.py:81
-#: ui/outstanding_items_window.py:398
-msgid "Delete Translation Key"
-msgstr "Delete Translation Key"
-
-#: ui/all_translations_window.py:366
-msgid "Saved key deletions successfully!"
-msgstr "Saved key deletions successfully!"
-
-#: ui/base_translation_window.py:82
-msgid ""
-"Delete translation key \"{key_display}\" from all locales?\n"
-"\n"
-"This will remove the key from written translation files on save/update."
-msgstr ""
-"Delete translation key \"{key_display}\" from all locales?\n"
-"\n"
-"This will remove the key from written translation files on save/update."
-
 #: ui/llm_settings_dialog.py:34
 msgid "LLM Translation Settings"
 msgstr "LLM Translation Settings"
@@ -916,6 +648,12 @@ msgstr "Remove project-specific template and use global default"
 msgid "Save"
 msgstr "Save"
 
+#: ui/llm_settings_dialog.py:159 ui/outstanding_items_window.py:183
+#: ui/recent_projects_dialog.py:119 ui/setup_translation_project_window.py:152
+#: ui/translation_quality_review_window.py:304
+msgid "Cancel"
+msgstr "Cancel"
+
 #: ui/llm_settings_dialog.py:219
 msgid "Are you sure you want to reset the template to the default?"
 msgstr "Are you sure you want to reset the template to the default?"
@@ -970,6 +708,10 @@ msgstr "global"
 msgid "Failed to save settings."
 msgstr "Failed to save settings."
 
+#: ui/outstanding_items_window.py:207
+msgid "Cancel Translation"
+msgstr "Cancel Translation"
+
 #: ui/outstanding_items_window.py:208
 msgid ""
 "Are you sure you want to cancel the translation process?\n"
@@ -983,6 +725,18 @@ msgstr ""
 #: ui/outstanding_items_window.py:213
 msgid "Cancelling..."
 msgstr "Cancelling..."
+
+#: ui/outstanding_items_window.py:234
+msgid "Outstanding Translation Items"
+msgstr "Outstanding Translation Items"
+
+#: ui/outstanding_items_window.py:276
+msgid "Translation in Progress"
+msgstr "Translation in Progress"
+
+#: ui/outstanding_items_window.py:277
+msgid "Translation is in progress. Are you sure you want to close?"
+msgstr "Translation is in progress. Are you sure you want to close?"
 
 #: ui/outstanding_items_window.py:295
 msgid "Translate All (Argos)"
@@ -1015,6 +769,18 @@ msgstr "Export Outstanding TSV"
 #: ui/outstanding_items_window.py:309
 msgid "Export outstanding keys and invalid locale buckets to TSV"
 msgstr "Export outstanding keys and invalid locale buckets to TSV"
+
+#: ui/outstanding_items_window.py:393
+msgid "Copy Default Translation"
+msgstr "Copy Default Translation"
+
+#: ui/outstanding_items_window.py:406
+msgid "Translate with Argos Translate"
+msgstr "Translate with Argos Translate"
+
+#: ui/outstanding_items_window.py:411
+msgid "Translate with LLM"
+msgstr "Translate with LLM"
 
 #: ui/outstanding_items_window.py:627
 msgid "No Items"
@@ -1060,6 +826,10 @@ msgstr ""
 "An error occurred during translation:\n"
 "{error}"
 
+#: ui/outstanding_items_window.py:833
+msgid "Combine Duplicate Translations?"
+msgstr "Combine Duplicate Translations?"
+
 #: ui/outstanding_items_window.py:864
 msgid "No Data"
 msgstr "No Data"
@@ -1096,11 +866,833 @@ msgstr ""
 "Could not export TSV file:\n"
 "{error}"
 
+#: ui/outstanding_items_window.py:1072
+msgid "All Translations Resolved"
+msgstr "All Translations Resolved"
+
+#: ui/recent_projects_dialog.py:42 ui/recent_projects_dialog.py:112
+msgid "Select"
+msgstr "Select"
+
+#: ui/recent_projects_dialog.py:95
+msgid "Select a Recent Project"
+msgstr "Select a Recent Project"
+
+#: ui/recent_projects_dialog.py:116
+msgid "Browse..."
+msgstr "Browse..."
+
+#: ui/recent_projects_dialog.py:163
+msgid "Select Project Directory"
+msgstr "Select Project Directory"
+
+#: ui/setup_translation_project_window.py:26
+msgid "Setup Translation Project"
+msgstr "Setup Translation Project"
+
+#: ui/setup_translation_project_window.py:86
+msgid "Project Type:"
+msgstr "Project Type:"
+
+#: ui/setup_translation_project_window.py:90
+msgid "Application name"
+msgstr "Application name"
+
+#: ui/setup_translation_project_window.py:91
+msgid "Application Name:"
+msgstr "Application Name:"
+
+#: ui/setup_translation_project_window.py:95
+msgid "Version:"
+msgstr "Version:"
+
+#: ui/setup_translation_project_window.py:98
+msgid "Author Name <author@example.com>"
+msgstr "Author Name <author@example.com>"
+
+#: ui/setup_translation_project_window.py:99
+msgid "Author:"
+msgstr "Author:"
+
+#: ui/setup_translation_project_window.py:102
+msgid "Translator Name <translator@example.com>"
+msgstr "Translator Name <translator@example.com>"
+
+#: ui/setup_translation_project_window.py:103
+msgid "Default Translator:"
+msgstr "Default Translator:"
+
+#: ui/setup_translation_project_window.py:110
+msgid "Default Locale:"
+msgstr "Default Locale:"
+
+#: ui/setup_translation_project_window.py:120
+msgid "Project Locales"
+msgstr "Project Locales"
+
+#: ui/setup_translation_project_window.py:127
+msgid "Enter locale code (e.g., fr, de, es)"
+msgstr "Enter locale code (e.g., fr, de, es)"
+
+#: ui/setup_translation_project_window.py:130
+msgid "Add Locale"
+msgstr "Add Locale"
+
+#: ui/setup_translation_project_window.py:141
+msgid "Remove Selected Locale"
+msgstr "Remove Selected Locale"
+
+#: ui/setup_translation_project_window.py:150
+msgid "Save Configuration"
+msgstr "Save Configuration"
+
+#: ui/setup_translation_project_window.py:228
+msgid "Please enter a locale code."
+msgstr "Please enter a locale code."
+
+#: ui/setup_translation_project_window.py:234
+msgid ""
+"Invalid locale code. Use format 'xx' or 'xx_YY' (e.g., 'fr' or 'fr_FR')."
+msgstr ""
+"Invalid locale code. Use format 'xx' or 'xx_YY' (e.g., 'fr' or 'fr_FR')."
+
+#: ui/setup_translation_project_window.py:282
+msgid "This locale already exists."
+msgstr "This locale already exists."
+
+#: ui/setup_translation_project_window.py:290
+msgid "Please select a locale to remove."
+msgstr "Please select a locale to remove."
+
+#: ui/setup_translation_project_window.py:295
+msgid "Cannot remove the default locale."
+msgstr "Cannot remove the default locale."
+
+#: ui/setup_translation_project_window.py:298
+msgid "Confirm Removal"
+msgstr "Confirm Removal"
+
+#: ui/setup_translation_project_window.py:299
+msgid ""
+"Are you sure you want to remove locale '{}'? This will delete the locale "
+"directory and all its translations."
+msgstr ""
+"Are you sure you want to remove locale '{}'? This will delete the locale "
+"directory and all its translations."
+
+#: ui/setup_translation_project_window.py:316
+msgid ""
+"The default locale '{}' is not in the list of locales. Do you want to add "
+"it?"
+msgstr ""
+"The default locale '{}' is not in the list of locales. Do you want to add "
+"it?"
+
+#: ui/setup_translation_project_window.py:332
+msgid "The following locale codes are invalid:"
+msgstr "The following locale codes are invalid:"
+
+#: ui/setup_translation_project_window.py:335
+msgid ""
+"Locale codes must follow ISO 639-1 (language) and optionally ISO 3166-1 "
+"(country) standards."
+msgstr ""
+"Locale codes must follow ISO 639-1 (language) and optionally ISO 3166-1 "
+"(country) standards."
+
+#: ui/setup_translation_project_window.py:339
+msgid "Invalid Locale Codes"
+msgstr "Invalid Locale Codes"
+
+#: ui/setup_translation_project_window.py:448
+msgid "Failed to save configuration: {}"
+msgstr "Failed to save configuration: {}"
+
+#: ui/locale_selection_window.py:54
+msgid "Language code must be a two-letter ISO 639-1 code"
+msgstr "Language code must be a two-letter ISO 639-1 code"
+
+#: ui/locale_selection_window.py:57
+msgid "Invalid language code. Must be a valid ISO 639-1 code"
+msgstr "Invalid language code. Must be a valid ISO 639-1 code"
+
+#: ui/locale_selection_window.py:61
+msgid "Country code must be a two-letter uppercase ISO 3166-1 code"
+msgstr "Country code must be a two-letter uppercase ISO 3166-1 code"
+
+#: ui/locale_selection_window.py:64
+msgid "Invalid country code. Must be a valid ISO 3166-1 code"
+msgstr "Invalid country code. Must be a valid ISO 3166-1 code"
+
+#: ui/locale_selection_window.py:68
+msgid "Script code must be a four-letter code with first letter uppercase"
+msgstr "Script code must be a four-letter code with first letter uppercase"
+
+#: ui/locale_selection_window.py:71
+msgid "Invalid script code. Must be a valid ISO 15924 code"
+msgstr "Invalid script code. Must be a valid ISO 15924 code"
+
+#: ui/stats_widget.py:50
+msgid "Translation Statistics"
+msgstr "Translation Statistics"
+
+#: ui/stats_widget.py:59
+msgid "Total Translations:"
+msgstr "Total Translations:"
+
+#: ui/stats_widget.py:68
+msgid "Total Locales:"
+msgstr "Total Locales:"
+
+#: ui/stats_widget.py:77
+msgid "Missing Translations:"
+msgstr "Missing Translations:"
+
+#: ui/stats_widget.py:88
+msgid "Invalid Unicode:"
+msgstr "Invalid Unicode:"
+
+#: ui/stats_widget.py:99
+msgid "Invalid Indices:"
+msgstr "Invalid Indices:"
+
+#: ui/stats_widget.py:110
+msgid "Invalid Braces:"
+msgstr "Invalid Braces:"
+
+#: ui/stats_widget.py:121
+msgid "Invalid Leading Space:"
+msgstr "Invalid Leading Space:"
+
+#: ui/stats_widget.py:132
+msgid "Invalid Newline:"
+msgstr "Invalid Newline:"
+
 #: ui/stats_widget.py:143
 msgid "Invalid CJK:"
 msgstr "Invalid CJK:"
 
+#: ui/stats_widget.py:154
+msgid "Stale Translations:"
+msgstr "Stale Translations:"
+
+#: utils/globals.py:42 utils/globals.py:61
+msgid "Python"
+msgstr "Python"
+
+#: utils/globals.py:44 utils/globals.py:63
+msgid "Ruby"
+msgstr "Ruby"
+
 #: utils/globals.py:90 utils/globals.py:115 utils/globals.py:151
 #: utils/globals.py:178
+msgid "Invalid Unicode"
+msgstr "Invalid Unicode"
+
+#: utils/globals.py:92 utils/globals.py:117 utils/globals.py:153
+#: utils/globals.py:180
+msgid "Invalid Indices"
+msgstr "Invalid Indices"
+
+#: utils/globals.py:94 utils/globals.py:119 utils/globals.py:155
+#: utils/globals.py:182
+msgid "Invalid Braces"
+msgstr "Invalid Braces"
+
+#: utils/globals.py:96 utils/globals.py:121 utils/globals.py:157
+#: utils/globals.py:184
+msgid "Invalid Leading Space"
+msgstr "Invalid Leading Space"
+
+#: utils/globals.py:98 utils/globals.py:123 utils/globals.py:159
+#: utils/globals.py:186
+msgid "Invalid Newline"
+msgstr "Invalid Newline"
+
+#: utils/globals.py:100 utils/globals.py:125 utils/globals.py:161
+#: utils/globals.py:188
 msgid "Invalid CJK"
 msgstr "Invalid CJK"
+
+#: app.py:137 ui/translation_quality_review_window.py:116
+msgid "Translation Quality Review"
+msgstr "Translation Quality Review"
+
+#: app.py:158
+msgid "Sync Base Translations"
+msgstr "Sync Base Translations"
+
+#: app.py:310
+msgid ""
+"Translation file compilation is not relevant for {} projects. {} projects "
+"use source translation files directly without a compilation step."
+msgstr ""
+"Translation file compilation is not relevant for {} projects. {} projects "
+"use source translation files directly without a compilation step."
+
+#: app.py:455 app.py:579
+msgid "No translation data available"
+msgstr "No translation data available"
+
+#: app.py:537
+msgid "Please check status first to load translation data"
+msgstr "Please check status first to load translation data"
+
+#: app.py:601 app.py:629 app.py:682
+msgid "Please select a project first"
+msgstr "Please select a project first"
+
+#: app.py:605
+msgid "Updating base translation files..."
+msgstr "Updating base translation files..."
+
+#: app.py:607
+msgid "Base translation files updated successfully."
+msgstr "Base translation files updated successfully."
+
+#: app.py:616
+msgid "Update failed"
+msgstr "Update failed"
+
+#: app.py:619
+msgid "Failed to update base translation files."
+msgstr "Failed to update base translation files."
+
+#: i18n/llm_catalog_review.py:109
+msgid ""
+"(Note: last model output was {pct:.0f}% CJK by character count; verify "
+"readability.)"
+msgstr ""
+"(Note: last model output was {pct:.0f}% CJK by character count; verify "
+"readability.)"
+
+#: i18n/llm_catalog_review.py:139
+msgid ""
+"You consolidate localization review notes. You receive PRIOR_STATE (notes "
+"carried from earlier batches) and NEW_FINDINGS (observations for the current"
+" batch only). Produce UPDATED_STATE: a concise bullet list (max ~800 words) "
+"that (1) keeps recurring issues, terminology gaps, and locale patterns from "
+"PRIOR_STATE if still relevant, (2) adds important new points from "
+"NEW_FINDINGS, (3) drops noise. Stay within the facts given; do not invent "
+"msgids. Use the same language as specified in the user message."
+msgstr ""
+"You consolidate localization review notes. You receive PRIOR_STATE (notes "
+"carried from earlier batches) and NEW_FINDINGS (observations for the current"
+" batch only). Produce UPDATED_STATE: a concise bullet list (max ~800 words) "
+"that (1) keeps recurring issues, terminology gaps, and locale patterns from "
+"PRIOR_STATE if still relevant, (2) adds important new points from "
+"NEW_FINDINGS, (3) drops noise. Stay within the facts given; do not invent "
+"msgids. Use the same language as specified in the user message."
+
+#: i18n/llm_catalog_review.py:149
+msgid "Response language for UPDATED_STATE: {lang}"
+msgstr "Response language for UPDATED_STATE: {lang}"
+
+#: i18n/llm_catalog_review.py:150
+msgid "Batch progress: {i} / {total}."
+msgstr "Batch progress: {i} / {total}."
+
+#: i18n/llm_catalog_review.py:151
+msgid "(none — first batch)"
+msgstr "(none — first batch)"
+
+#: i18n/llm_catalog_review.py:152
+msgid "(no findings)"
+msgstr "(no findings)"
+
+#: i18n/llm_catalog_review.py:154
+msgid ""
+"Output ONLY the bullet list for UPDATED_STATE, with a short "
+"\"CarryForward:\" line at the end listing msgid/locale pairs to watch in "
+"later batches (or \"none\")."
+msgstr ""
+"Output ONLY the bullet list for UPDATED_STATE, with a short "
+"\"CarryForward:\" line at the end listing msgid/locale pairs to watch in "
+"later batches (or \"none\")."
+
+#: i18n/llm_catalog_review.py:164
+msgid "Rolling merge returned empty; using local merge fallback."
+msgstr "Rolling merge returned empty; using local merge fallback."
+
+#: i18n/llm_catalog_review.py:171
+msgid "Rolling merge failed ({err}); using local merge fallback."
+msgstr "Rolling merge failed ({err}); using local merge fallback."
+
+#: i18n/llm_catalog_review.py:186
+msgid "You are reviewing a slice of a translation catalog. Reply in {lang}."
+msgstr "You are reviewing a slice of a translation catalog. Reply in {lang}."
+
+#: i18n/llm_catalog_review.py:191
+msgid "(No prior notes — this is the first batch.)"
+msgstr "(No prior notes — this is the first batch.)"
+
+#: i18n/llm_catalog_review.py:193
+msgid "New data for this batch only:"
+msgstr "New data for this batch only:"
+
+#: i18n/llm_catalog_review.py:196
+msgid ""
+"Rules: (1) Comment only on rows in this batch. (2) Reference msgid and "
+"locale. (3) Flag likely copy-paste of default locale, broken placeholders, "
+"or obvious untranslated fragments when the locale suggests translation. (4) "
+"Note cross-batch themes only if they match ROLLING_NOTES or clearly repeat "
+"here."
+msgstr ""
+"Rules: (1) Comment only on rows in this batch. (2) Reference msgid and "
+"locale. (3) Flag likely copy-paste of default locale, broken placeholders, "
+"or obvious untranslated fragments when the locale suggests translation. (4) "
+"Note cross-batch themes only if they match ROLLING_NOTES or clearly repeat "
+"here."
+
+#: i18n/llm_catalog_review.py:213
+msgid "Write the final localization review report in {lang}."
+msgstr "Write the final localization review report in {lang}."
+
+#: i18n/llm_catalog_review.py:216
+msgid "Number of catalog batches reviewed: {n}."
+msgstr "Number of catalog batches reviewed: {n}."
+
+#: i18n/llm_catalog_review.py:219
+msgid ""
+"Produce: (1) Executive summary, (2) Top issues by severity, (3) Locale-"
+"specific gaps if any, (4) Suggested next checks. Be concise; do not invent "
+"msgids not implied by the notes."
+msgstr ""
+"Produce: (1) Executive summary, (2) Top issues by severity, (3) Locale-"
+"specific gaps if any, (4) Suggested next checks. Be concise; do not invent "
+"msgids not implied by the notes."
+
+#: i18n/llm_catalog_review.py:248
+msgid "No catalog data to send (empty project or batches)."
+msgstr "No catalog data to send (empty project or batches)."
+
+#: i18n/llm_catalog_review.py:256
+msgid ""
+"You are an expert software localization reviewer. Data lines are MSGID, "
+"LOCALE, TEXT separated by tabs. A header line may show default_locale=. You "
+"are given ROLLING_NOTES from earlier batches to track trends—do not "
+"contradict them without evidence in the current batch."
+msgstr ""
+"You are an expert software localization reviewer. Data lines are MSGID, "
+"LOCALE, TEXT separated by tabs. A header line may show default_locale=. You "
+"are given ROLLING_NOTES from earlier batches to track trends—do not "
+"contradict them without evidence in the current batch."
+
+#: i18n/llm_catalog_review.py:262
+msgid ""
+"You write clear localization audit reports for developers. Only use "
+"information in ACCUMULATED_NOTES; do not fabricate msgids."
+msgstr ""
+"You write clear localization audit reports for developers. Only use "
+"information in ACCUMULATED_NOTES; do not fabricate msgids."
+
+#: i18n/llm_catalog_review.py:278
+msgid "Cancelled."
+msgstr "Cancelled."
+
+#: i18n/llm_catalog_review.py:282
+msgid "Batch {i} / {n}: sending to model…"
+msgstr "Batch {i} / {n}: sending to model…"
+
+#: i18n/llm_catalog_review.py:294
+msgid "Batch {idx} failed: {err}"
+msgstr "Batch {idx} failed: {err}"
+
+#: i18n/llm_catalog_review.py:301
+msgid "Batch {i} / {n}: merging rolling summary…"
+msgstr "Batch {i} / {n}: merging rolling summary…"
+
+#: i18n/llm_catalog_review.py:320
+msgid "Cancelled before final summary."
+msgstr "Cancelled before final summary."
+
+#: i18n/llm_catalog_review.py:325
+msgid "Generating final summary…"
+msgstr "Generating final summary…"
+
+#: i18n/llm_catalog_review.py:333
+msgid ""
+"Final summary failed: {err}\n"
+"\n"
+"Last rolling notes:\n"
+"\n"
+"{notes}"
+msgstr ""
+"Final summary failed: {err}\n"
+"\n"
+"Last rolling notes:\n"
+"\n"
+"{notes}"
+
+#: i18n/llm_catalog_review.py:343
+msgid ""
+"(Empty final response; see rolling notes below.)\n"
+"\n"
+msgstr ""
+"(Empty final response; see rolling notes below.)\n"
+"\n"
+
+#: ui/locale_selection_window.py:107 ui/locale_selection_window.py:200
+msgid "Add locale"
+msgstr "Add locale"
+
+#: ui/locale_selection_window.py:125
+msgid ""
+"Choose a language code (required). Country and script are optional. A script"
+" requires a country code."
+msgstr ""
+"Choose a language code (required). Country and script are optional. A script"
+" requires a country code."
+
+#: ui/locale_selection_window.py:132
+msgid "Suggestions from other projects"
+msgstr "Suggestions from other projects"
+
+#: ui/locale_selection_window.py:163
+msgid "ISO 639-1 (e.g. de)"
+msgstr "ISO 639-1 (e.g. de)"
+
+#: ui/locale_selection_window.py:171
+msgid "Optional — ISO 3166-1 (e.g. US)"
+msgstr "Optional — ISO 3166-1 (e.g. US)"
+
+#: ui/locale_selection_window.py:175
+msgid "Optional — ISO 15924 (e.g. Latn); requires country"
+msgstr "Optional — ISO 15924 (e.g. Latn); requires country"
+
+#: ui/locale_selection_window.py:177
+msgid "Language:"
+msgstr "Language:"
+
+#: ui/locale_selection_window.py:178
+msgid "Country:"
+msgstr "Country:"
+
+#: ui/locale_selection_window.py:179
+msgid "Script:"
+msgstr "Script:"
+
+#: ui/locale_selection_window.py:183
+msgid "Preview:"
+msgstr "Preview:"
+
+#: ui/locale_selection_window.py:228
+msgid "No suggestions yet — use the fields below."
+msgstr "No suggestions yet — use the fields below."
+
+#: ui/locale_selection_window.py:274
+msgid "(invalid combination)"
+msgstr "(invalid combination)"
+
+#: ui/locale_selection_window.py:279
+msgid "Please enter a language code."
+msgstr "Please enter a language code."
+
+#: ui/locale_selection_window.py:291
+msgid "A country code is required when a script code is set."
+msgstr "A country code is required when a script code is set."
+
+#: ui/locale_selection_window.py:299
+msgid "Country code must be exactly two letters when provided."
+msgstr "Country code must be exactly two letters when provided."
+
+#: ui/locale_selection_window.py:311
+msgid "Invalid locale"
+msgstr "Invalid locale"
+
+#: ui/setup_translation_project_window.py:127
+msgid "Add locale…"
+msgstr "Add locale…"
+
+#: ui/translation_quality_review_window.py:140
+msgid ""
+"Review possible issues (lower severity than Outstanding Items), manage "
+"exclusions and business rules per project, and use the LLM tab when catalog "
+"review is enabled. Findings may be false positives—verify before changing "
+"translations."
+msgstr ""
+"Review possible issues (lower severity than Outstanding Items), manage "
+"exclusions and business rules per project, and use the LLM tab when catalog "
+"review is enabled. Findings may be false positives—verify before changing "
+"translations."
+
+#: ui/translation_quality_review_window.py:155
+msgid "Possible issues"
+msgstr "Possible issues"
+
+#: ui/translation_quality_review_window.py:156
+msgid "Business rules"
+msgstr "Business rules"
+
+#: ui/translation_quality_review_window.py:157
+msgid "Exclusions"
+msgstr "Exclusions"
+
+#: ui/translation_quality_review_window.py:158
+#: ui/translation_quality_review_window.py:638
+#: ui/translation_quality_review_window.py:644
+msgid "LLM review"
+msgstr "LLM review"
+
+#: ui/translation_quality_review_window.py:171
+msgid ""
+"Built-in checks: CJK locales with long Latin runs; translations identical to"
+" the default locale. Respects exclusions from the Exclusions tab. (English-"
+"ratio heuristic reserved.)"
+msgstr ""
+"Built-in checks: CJK locales with long Latin runs; translations identical to"
+" the default locale. Respects exclusions from the Exclusions tab. (English-"
+"ratio heuristic reserved.)"
+
+#: ui/translation_quality_review_window.py:180
+msgid "Key"
+msgstr "Key"
+
+#: ui/translation_quality_review_window.py:180
+msgid "Locale"
+msgstr "Locale"
+
+#: ui/translation_quality_review_window.py:180
+msgid "Signal"
+msgstr "Signal"
+
+#: ui/translation_quality_review_window.py:180
+msgid "Detail"
+msgstr "Detail"
+
+#: ui/translation_quality_review_window.py:192
+#: ui/translation_quality_review_window.py:718
+msgid "Run heuristic analysis"
+msgstr "Run heuristic analysis"
+
+#: ui/translation_quality_review_window.py:194
+msgid "Reloads from disk and scans for advisory signals (may take a moment)."
+msgstr "Reloads from disk and scans for advisory signals (may take a moment)."
+
+#: ui/translation_quality_review_window.py:210
+msgid ""
+"Per-project rules saved in application settings. The rule engine may still "
+"be extended; use “Run custom rules” to evaluate when implemented."
+msgstr ""
+"Per-project rules saved in application settings. The rule engine may still "
+"be extended; use “Run custom rules” to evaluate when implemented."
+
+#: ui/translation_quality_review_window.py:216
+#: ui/translation_quality_review_window.py:575
+#: ui/translation_quality_review_window.py:595
+#: ui/translation_quality_review_window.py:604
+msgid "Custom rules"
+msgstr "Custom rules"
+
+#: ui/translation_quality_review_window.py:224
+msgid "Add rule…"
+msgstr "Add rule…"
+
+#: ui/translation_quality_review_window.py:225
+msgid "Edit…"
+msgstr "Edit…"
+
+#: ui/translation_quality_review_window.py:226
+#: ui/translation_quality_review_window.py:266
+msgid "Remove"
+msgstr "Remove"
+
+#: ui/translation_quality_review_window.py:238
+msgid "Run custom rules"
+msgstr "Run custom rules"
+
+#: ui/translation_quality_review_window.py:240
+msgid ""
+"Evaluate saved rules against the loaded catalog (when the engine reports "
+"findings)."
+msgstr ""
+"Evaluate saved rules against the loaded catalog (when the engine reports "
+"findings)."
+
+#: ui/translation_quality_review_window.py:254
+msgid ""
+"Msgids excluded from heuristic and custom-rule checks (saved per project). "
+"Re-run heuristic analysis to refresh the Possible issues table after "
+"changes."
+msgstr ""
+"Msgids excluded from heuristic and custom-rule checks (saved per project). "
+"Re-run heuristic analysis to refresh the Possible issues table after "
+"changes."
+
+#: ui/translation_quality_review_window.py:265
+msgid "Add key…"
+msgstr "Add key…"
+
+#: ui/translation_quality_review_window.py:283
+msgid ""
+"Optional catalog-wide LLM review sends token-batched TSV slices to your "
+"local Ollama model, updates a rolling summary between batches, then requests"
+" a final report. Requires loaded translations (e.g. Check Status). Cancel "
+"stops between batches; the current request may still finish."
+msgstr ""
+"Optional catalog-wide LLM review sends token-batched TSV slices to your "
+"local Ollama model, updates a rolling summary between batches, then requests"
+" a final report. Requires loaded translations (e.g. Check Status). Cancel "
+"stops between batches; the current request may still finish."
+
+#: ui/translation_quality_review_window.py:293
+msgid ""
+"Progress lines and the final report appear here after you run the analysis."
+msgstr ""
+"Progress lines and the final report appear here after you run the analysis."
+
+#: ui/translation_quality_review_window.py:298
+#: ui/translation_quality_review_window.py:627
+msgid "Run LLM analysis"
+msgstr "Run LLM analysis"
+
+#: ui/translation_quality_review_window.py:300
+msgid ""
+"Uses lib.llm.LLM against localhost:11434 (Ollama). May take several minutes."
+msgstr ""
+"Uses lib.llm.LLM against localhost:11434 (Ollama). May take several minutes."
+
+#: ui/translation_quality_review_window.py:306
+msgid "Request stop after the current batch completes."
+msgstr "Request stop after the current batch completes."
+
+#: ui/translation_quality_review_window.py:328
+msgid "Select a project with settings support."
+msgstr "Select a project with settings support."
+
+#: ui/translation_quality_review_window.py:402
+msgid "(unnamed rule)"
+msgstr "(unnamed rule)"
+
+#: ui/translation_quality_review_window.py:430
+msgid "Add exclusion"
+msgstr "Add exclusion"
+
+#: ui/translation_quality_review_window.py:431
+msgid "Translation msgid to exclude:"
+msgstr "Translation msgid to exclude:"
+
+#: ui/translation_quality_review_window.py:441
+msgid "Already excluded"
+msgstr "Already excluded"
+
+#: ui/translation_quality_review_window.py:442
+msgid "This msgid is already in the exclusion list."
+msgstr "This msgid is already in the exclusion list."
+
+#: ui/translation_quality_review_window.py:448
+#: ui/translation_quality_review_window.py:471
+msgid "Could not save exclusions."
+msgstr "Could not save exclusions."
+
+#: ui/translation_quality_review_window.py:461
+msgid "Remove exclusion"
+msgstr "Remove exclusion"
+
+#: ui/translation_quality_review_window.py:462
+msgid ""
+"Stop excluding this msgid?\n"
+"\n"
+"{mid}"
+msgstr ""
+"Stop excluding this msgid?\n"
+"\n"
+"{mid}"
+
+#: ui/translation_quality_review_window.py:481
+msgid "Rule name:"
+msgstr "Rule name:"
+
+#: ui/translation_quality_review_window.py:488
+msgid "Rule name cannot be empty."
+msgstr "Rule name cannot be empty."
+
+#: ui/translation_quality_review_window.py:493
+msgid "Description or notes (optional):"
+msgstr "Description or notes (optional):"
+
+#: ui/translation_quality_review_window.py:503
+msgid "Add rule"
+msgstr "Add rule"
+
+#: ui/translation_quality_review_window.py:511
+#: ui/translation_quality_review_window.py:534
+#: ui/translation_quality_review_window.py:559
+msgid "Could not save custom rules."
+msgstr "Could not save custom rules."
+
+#: ui/translation_quality_review_window.py:525
+msgid "Edit rule"
+msgstr "Edit rule"
+
+#: ui/translation_quality_review_window.py:549
+msgid "Remove rule"
+msgstr "Remove rule"
+
+#: ui/translation_quality_review_window.py:550
+msgid ""
+"Remove this rule?\n"
+"\n"
+"{name}"
+msgstr ""
+"Remove this rule?\n"
+"\n"
+"{name}"
+
+#: ui/translation_quality_review_window.py:569
+#: ui/translation_quality_review_window.py:658
+msgid "Load translation data first (e.g. Check Status on the main window)."
+msgstr "Load translation data first (e.g. Check Status on the main window)."
+
+#: ui/translation_quality_review_window.py:576
+msgid "Add at least one rule before running."
+msgstr "Add at least one rule before running."
+
+#: ui/translation_quality_review_window.py:597
+msgid ""
+"No findings reported. Rules are saved for this project; extend the rule "
+"engine in i18n.translation_quality_review when you add evaluators."
+msgstr ""
+"No findings reported. Rules are saved for this project; extend the rule "
+"engine in i18n.translation_quality_review when you add evaluators."
+
+#: ui/translation_quality_review_window.py:605
+msgid "Reported {n} finding(s). (Detailed table UI can be added later.)"
+msgstr "Reported {n} finding(s). (Detailed table UI can be added later.)"
+
+#: ui/translation_quality_review_window.py:632
+msgid "--- Final report ---"
+msgstr "--- Final report ---"
+
+#: ui/translation_quality_review_window.py:665
+msgid "Starting catalog LLM review…"
+msgstr "Starting catalog LLM review…"
+
+#: ui/translation_quality_review_window.py:687
+#: ui/translation_quality_review_window.py:704
+msgid "Running…"
+msgstr "Running…"
+
+#: ui/translation_quality_review_window.py:693
+msgid "No project or translation manager available."
+msgstr "No project or translation manager available."
+
+#: ui/translation_quality_review_window.py:725
+msgid "Quality review failed."
+msgstr "Quality review failed."
+
+#: ui/translation_quality_review_window.py:734
+msgid "Quality review"
+msgstr "Quality review"
+
+#: ui/translation_quality_review_window.py:735
+msgid "No advisory findings for the current built-in heuristics."
+msgstr "No advisory findings for the current built-in heuristics."
+
+#: utils/globals.py:46 utils/globals.py:65
+msgid "Java"
+msgstr "Java"
+
+#: utils/globals.py:48 utils/globals.py:67
+msgid "JavaScript"
+msgstr "JavaScript"
