@@ -1,6 +1,7 @@
 from datetime import datetime
 import os
 import sys
+from typing import Optional
 
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, 
                             QHBoxLayout, QPushButton, QLabel, QFileDialog, 
@@ -8,6 +9,7 @@ from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout,
 from PyQt6.QtCore import Qt, QTimer
 
 from i18n.i18n_manager import I18NManager
+from i18n.translation_group import TranslationKey
 from i18n.translation_manager_results import TranslationManagerResults, TranslationAction
 from lib.multi_display import SmartMainWindow
 from ui.all_translations_window import AllTranslationsWindow
@@ -464,6 +466,9 @@ class MainWindow(SmartMainWindow):
                 settings_manager=self.settings_manager,
                 i18n_manager=self.i18n_manager,
             )
+            self.quality_review_window.navigate_to_all_translations_requested.connect(
+                self.navigate_to_all_translations_key
+            )
         self.quality_review_window.set_project_path(self.current_project)
         self.quality_review_window.set_i18n_manager(self.i18n_manager)
         self.quality_review_window.refresh_placeholder_lists()
@@ -536,22 +541,48 @@ class MainWindow(SmartMainWindow):
             f"Queued deletion for persistence (waiting for save/accept). Pending deletions: {len(self.pending_deletions)}"
         )
         
-    def show_all_translations(self):
-        if not self.i18n_manager or not self.i18n_manager.translations or not self.locales:
-            QMessageBox.warning(self, _("Error"), _("Please check status first to load translation data"))
-            return
-            
+    def _ensure_all_translations_window(self) -> AllTranslationsWindow:
+        """Create and wire the All Translations window once; reuse it thereafter."""
         if not self.all_translations_window:
             self.all_translations_window = AllTranslationsWindow(self)
             self.all_translations_window.translation_updated.connect(self.handle_translation_update)
             self.all_translations_window.translation_group_deleted.connect(self.handle_translation_group_delete)
-            
-        self.all_translations_window.load_data(self.i18n_manager.translations, self.locales)
+        return self.all_translations_window
+
+    def show_all_translations(self):
+        if not self.i18n_manager or not self.i18n_manager.translations or not self.locales:
+            QMessageBox.warning(self, _("Error"), _("Please check status first to load translation data"))
+            return
+
+        w = self._ensure_all_translations_window()
+        w.load_data(self.i18n_manager.translations, self.locales)
         # NOTE if there are properties that need to be re-initialized, below method will need to be implemented
-        # self.all_translations_window.setup_properties()
-        self.all_translations_window.show()
-        self.all_translations_window.raise_()
-        self.all_translations_window.activateWindow()
+        # w.setup_properties()
+        w.show()
+        w.raise_()
+        w.activateWindow()
+
+    def navigate_to_all_translations_key(
+        self, key: TranslationKey, locale: Optional[str] = None
+    ) -> None:
+        """Open All Translations (if needed), refresh data, and scroll to ``key`` / optional ``locale`` column."""
+        if not self.i18n_manager or not self.i18n_manager.translations or not self.locales:
+            QMessageBox.warning(self, _("Error"), _("Please check status first to load translation data"))
+            return
+
+        w = self._ensure_all_translations_window()
+        w.load_data(self.i18n_manager.translations, self.locales)
+        loc = locale.strip() if locale else None
+        if not w.navigate_to_translation_key(key, loc):
+            QMessageBox.information(
+                self,
+                _("All Translations"),
+                _("Could not find that translation key in the current catalog."),
+            )
+            return
+        w.show()
+        w.raise_()
+        w.activateWindow()
 
     def handle_project_removal(self, project_path):
         """Handle removal of a project from recent projects."""

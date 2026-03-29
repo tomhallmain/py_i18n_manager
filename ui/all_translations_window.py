@@ -1,10 +1,16 @@
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from __future__ import annotations
+
+from typing import Optional
+
+from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton,
                             QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
-                            QMessageBox, QLineEdit, QComboBox, QCheckBox, QMenu)
+                            QMessageBox, QLineEdit, QComboBox, QCheckBox, QMenu,
+                            QAbstractItemView)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QAction
 
+from i18n.translation_group import TranslationKey
 from ui.app_style import AppStyle
 from ui.base_translation_window import BaseTranslationWindow
 from utils.globals import TranslationStatus, TranslationFilter
@@ -405,6 +411,63 @@ class AllTranslationsWindow(BaseTranslationWindow):
         """Clear the search box and reset the filter to show all items."""
         self.search_box.clear()
         self.filter_table()
+
+    def _row_for_translation_key(self, key: TranslationKey) -> int:
+        """Logical row index whose first column carries ``key`` in UserRole, or ``-1``."""
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            if not item:
+                continue
+            k = item.data(Qt.ItemDataRole.UserRole)
+            if k == key:
+                return row
+        return -1
+
+    def navigate_to_translation_key(
+        self, key: TranslationKey, locale: Optional[str] = None
+    ) -> bool:
+        """Make ``key`` visible (reset search/status filters), select the row, and scroll into view.
+
+        If ``locale`` is a project locale code, scroll focus to that column; otherwise column 0.
+        Returns ``False`` if the key is not in the loaded catalog or no matching row exists.
+        """
+        if not self.all_translations or key not in self.all_translations:
+            return False
+
+        self.search_box.blockSignals(True)
+        self.status_filter.blockSignals(True)
+        try:
+            self.search_box.clear()
+            self.status_filter.setCurrentIndex(0)
+        finally:
+            self.search_box.blockSignals(False)
+            self.status_filter.blockSignals(False)
+        self.filter_table()
+
+        row = self._row_for_translation_key(key)
+        if row < 0:
+            return False
+
+        col = 0
+        if locale and self.all_locales:
+            try:
+                col = 1 + self.all_locales.index(locale)
+            except ValueError:
+                col = 0
+
+        self.table.clearSelection()
+        self.table.selectRow(row)
+        item = self.table.item(row, col)
+        if item is None:
+            item = self.table.item(row, 0)
+        if item is not None:
+            self.table.setCurrentItem(item)
+            self.table.scrollToItem(
+                item, QAbstractItemView.ScrollHint.PositionAtCenter
+            )
+        if hasattr(self.table, "updateFrozenColumn"):
+            self.table.updateFrozenColumn()
+        return True
 
     def toggle_unicode_display(self):
         """Toggle the Unicode display mode."""

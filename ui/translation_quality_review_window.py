@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional, Set
 
 from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
@@ -23,6 +24,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QMessageBox,
     QInputDialog,
     QPushButton,
@@ -37,7 +39,6 @@ from PyQt6.QtWidgets import (
 from i18n.invalid_translation_groups import TranslationQualityFindings
 from i18n.llm_catalog_review import CatalogLlmReviewResult
 from i18n.translation_group import TranslationKey
-from i18n.translation_quality_review import QualityHeuristicKind
 from i18n.translation_manager_results import TranslationAction, TranslationManagerResults
 from ui.base_translation_window import BaseTranslationWindow, create_frozen_translation_table
 from utils.translations import I18N
@@ -101,6 +102,10 @@ class _CatalogLlmWorker(QObject):
 
 class TranslationQualityReviewWindow(BaseTranslationWindow):
     """Advisory translation checks, custom rules, and optional LLM catalog review."""
+
+    #: Request main window to open :class:`~ui.all_translations_window.AllTranslationsWindow`
+    #: and scroll to this key; second argument is locale code or ``None``.
+    navigate_to_all_translations_requested = pyqtSignal(object, object)
 
     def __init__(
         self,
@@ -191,6 +196,13 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         self._heuristic_table.setColumnWidth(0, 240)
         self._heuristic_table.setColumnWidth(2, 200)
         self._heuristic_table.setColumnWidth(3, 200)
+        self._heuristic_table.cellDoubleClicked.connect(self._on_heuristic_cell_double_clicked)
+        self._heuristic_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._heuristic_table.customContextMenuRequested.connect(self._on_heuristic_context_menu)
+        if hasattr(self._heuristic_table, "_frozen_table"):
+            frozen = self._heuristic_table._frozen_table
+            frozen.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            frozen.customContextMenuRequested.connect(self._on_heuristic_frozen_context_menu)
         layout.addWidget(self._heuristic_table, stretch=1)
 
         row = QHBoxLayout()
@@ -750,6 +762,53 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         if self._llm_thread and self._llm_thread.isRunning():
             self._llm_thread.wait(30000)
         super().closeEvent(event)
+
+    def _heuristic_row_key_and_locale(self, row: int) -> tuple[Optional[TranslationKey], Optional[str]]:
+        key_item = self._heuristic_table.item(row, 0)
+        loc_item = self._heuristic_table.item(row, 1)
+        if not key_item:
+            return None, None
+        key = key_item.data(Qt.ItemDataRole.UserRole)
+        if key is None:
+            return None, None
+        locale = loc_item.text().strip() if loc_item else ""
+        return key, locale or None
+
+    def _on_heuristic_cell_double_clicked(self, row: int, _col: int) -> None:
+        key, locale = self._heuristic_row_key_and_locale(row)
+        if key is not None:
+            self.navigate_to_all_translations_requested.emit(key, locale)
+
+    def _on_heuristic_context_menu(self, position) -> None:
+        item = self._heuristic_table.itemAt(position)
+        if not item:
+            return
+        self._show_heuristic_row_context_menu(
+            item.row(), self._heuristic_table.mapToGlobal(position)
+        )
+
+    def _on_heuristic_frozen_context_menu(self, position) -> None:
+        frozen = self._heuristic_table._frozen_table
+        index = frozen.indexAt(position)
+        if not index.isValid():
+            return
+        self._show_heuristic_row_context_menu(
+            index.row(), frozen.viewport().mapToGlobal(position)
+        )
+
+    def _show_heuristic_row_context_menu(self, row: int, global_pos) -> None:
+        key, locale = self._heuristic_row_key_and_locale(row)
+        if key is None:
+            return
+        menu = QMenu(self)
+        act = QAction(_("Open in All Translations"), self)
+        act.triggered.connect(
+            lambda checked=False, k=key, loc=locale: self.navigate_to_all_translations_requested.emit(
+                k, loc
+            )
+        )
+        menu.addAction(act)
+        menu.exec(global_pos)
 
     def _populate_heuristic_table(self, qf: TranslationQualityFindings) -> None:
         rows = qf.findings
