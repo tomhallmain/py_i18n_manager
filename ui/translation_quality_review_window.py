@@ -6,7 +6,7 @@ Translation quality review (single entry point for two related feature areas):
 2. **Business rules** — per-project rules stored in settings; evaluation hooks in
    :mod:`i18n.translation_quality_review` (engine may still return no findings until extended).
 
-3. **LLM-assisted review** — reserved; batching helpers exist, run loop not wired here.
+3. **LLM-assisted review** — batched catalog review with rolling state in :mod:`i18n.llm_catalog_review`.
 
 The heuristic tab reuses :func:`ui.base_translation_window.create_frozen_translation_table`.
 """
@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Optional, Set
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QGroupBox,
@@ -36,6 +36,7 @@ from PyQt6.QtWidgets import (
 )
 
 from i18n.invalid_translation_groups import TranslationQualityFindings
+from i18n.llm_catalog_review import CatalogLlmReviewResult
 from i18n.translation_group import TranslationKey
 from i18n.translation_manager_results import TranslationAction, TranslationManagerResults
 from lib.multi_display import SmartDialog
@@ -47,6 +48,56 @@ if TYPE_CHECKING:
     from i18n.i18n_manager import I18NManager
 
 _ = I18N._
+
+
+class _CatalogLlmWorker(QObject):
+    """Runs :func:`i18n.llm_catalog_review.run_catalog_llm_review` off the UI thread."""
+
+    progress = pyqtSignal(str)
+    finished = pyqtSignal(object)
+
+    def __init__(
+        self,
+        translations,
+        locales: list,
+        default_locale: str,
+        settings_manager,
+        project_path: str,
+    ):
+        super().__init__()
+        self._translations = translations
+        self._locales = locales
+        self._default_locale = default_locale
+        self._settings_manager = settings_manager
+        self._project_path = project_path
+        self._cancel = False
+
+    def cancel(self) -> None:
+        self._cancel = True
+
+    def run(self) -> None:
+        from i18n.llm_catalog_review import run_catalog_llm_review
+        from lib.llm import LLM
+
+        llm = LLM()
+        try:
+            result = run_catalog_llm_review(
+                llm,
+                self._translations,
+                self._locales,
+                self._default_locale,
+                self._settings_manager,
+                self._project_path,
+                on_progress=lambda m: self.progress.emit(m),
+                should_cancel=lambda: self._cancel,
+            )
+        except Exception as e:
+            result = CatalogLlmReviewResult(
+                final_report="",
+                rolling_summary="",
+                error_message=str(e),
+            )
+        self.finished.emit(result)
 
 
 class TranslationQualityReviewWindow(SmartDialog):
@@ -74,6 +125,8 @@ class TranslationQualityReviewWindow(SmartDialog):
         self._excluded_msgids: Set[str] = set()
         self._custom_rules: list[dict[str, Any]] = []
         self._heuristic_worker: Optional[TranslationWorker] = None
+        self._llm_thread: Optional[QThread] = None
+        self._llm_worker: Optional[_CatalogLlmWorker] = None
 
         self._setup_ui()
         self._refresh_lists_from_settings()
@@ -227,23 +280,32 @@ class TranslationQualityReviewWindow(SmartDialog):
         layout.addWidget(
             QLabel(
                 _(
-                    "Optional catalog-wide LLM review will use token-batched TSV snippets from "
-                    "i18n.translation_quality_review. This tab is not wired to the LLM yet."
+                    "Optional catalog-wide LLM review sends token-batched TSV slices to your local "
+                    "Ollama model, updates a rolling summary between batches, then requests a "
+                    "final report. Requires loaded translations (e.g. Check Status). Cancel stops "
+                    "between batches; the current request may still finish."
                 )
             )
         )
         self._llm_output = QTextEdit()
         self._llm_output.setReadOnly(True)
         self._llm_output.setPlaceholderText(
-            _("LLM analysis will appear here when the catalog review run is implemented.")
+            _("Progress lines and the final report appear here after you run the analysis.")
         )
         layout.addWidget(self._llm_output, stretch=1)
 
         llm_row = QHBoxLayout()
         self._run_llm_btn = QPushButton(_("Run LLM analysis"))
-        self._run_llm_btn.setEnabled(False)
-        self._run_llm_btn.setToolTip(_("Not implemented yet."))
+        self._run_llm_btn.setToolTip(
+            _("Uses lib.llm.LLM against localhost:11434 (Ollama). May take several minutes.")
+        )
+        self._run_llm_btn.clicked.connect(self._on_run_llm_analysis)
         llm_row.addWidget(self._run_llm_btn)
+        self._cancel_llm_btn = QPushButton(_("Cancel"))
+        self._cancel_llm_btn.setEnabled(False)
+        self._cancel_llm_btn.setToolTip(_("Request stop after the current batch completes."))
+        self._cancel_llm_btn.clicked.connect(self._on_cancel_llm_analysis)
+        llm_row.addWidget(self._cancel_llm_btn)
         llm_row.addStretch()
         layout.addLayout(llm_row)
 
@@ -276,6 +338,10 @@ class TranslationQualityReviewWindow(SmartDialog):
         self._update_exclusions_buttons()
         has_mgr = self._i18n_manager is not None
         self._run_rules_btn.setEnabled(has_mgr and bool(self._custom_rules))
+        has_catalog = has_mgr and bool(self._i18n_manager.translations)
+        llm_running = self._llm_thread is not None and self._llm_thread.isRunning()
+        self._run_llm_btn.setEnabled(has_catalog and not llm_running)
+        self._cancel_llm_btn.setEnabled(llm_running)
 
     def _update_rules_buttons(self) -> None:
         if not self._can_edit_settings():
@@ -549,6 +615,79 @@ class TranslationQualityReviewWindow(SmartDialog):
             pass
         self._heuristic_worker = None
 
+    def _cleanup_llm_thread(self) -> None:
+        self._llm_worker = None
+        self._llm_thread = None
+        self._update_settings_dependent_controls()
+
+    def _on_llm_progress(self, line: str) -> None:
+        self._llm_output.append(line)
+
+    def _on_llm_finished(self, result: object) -> None:
+        self._run_llm_btn.setText(_("Run LLM analysis"))
+        if isinstance(result, CatalogLlmReviewResult):
+            cr = result
+            if cr.final_report.strip():
+                self._llm_output.append("")
+                self._llm_output.append(_("--- Final report ---"))
+                self._llm_output.append(cr.final_report)
+            if cr.error_message:
+                if cr.cancelled:
+                    QMessageBox.information(
+                        self,
+                        _("LLM review"),
+                        cr.error_message,
+                    )
+                else:
+                    QMessageBox.warning(
+                        self,
+                        _("LLM review"),
+                        cr.error_message,
+                    )
+        self._cleanup_llm_thread()
+
+    def _on_cancel_llm_analysis(self) -> None:
+        if self._llm_worker:
+            self._llm_worker.cancel()
+
+    def _on_run_llm_analysis(self) -> None:
+        if not self._i18n_manager or not self._i18n_manager.translations:
+            QMessageBox.warning(
+                self,
+                _("Error"),
+                _("Load translation data first (e.g. Check Status on the main window)."),
+            )
+            return
+        if self._llm_thread and self._llm_thread.isRunning():
+            return
+
+        self._llm_output.clear()
+        self._llm_output.append(_("Starting catalog LLM review…"))
+
+        project_path = self.project_path or ""
+        worker = _CatalogLlmWorker(
+            self._i18n_manager.translations,
+            list(self._i18n_manager.locales),
+            self._i18n_manager.default_locale,
+            self.settings_manager,
+            project_path,
+        )
+        thread = QThread()
+        worker.moveToThread(thread)
+        self._llm_worker = worker
+        self._llm_thread = thread
+
+        thread.started.connect(worker.run)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        worker.finished.connect(self._on_llm_finished)
+        worker.progress.connect(self._on_llm_progress)
+
+        self._run_llm_btn.setText(_("Running…"))
+        self._update_settings_dependent_controls()
+        thread.start()
+
     def _on_run_heuristic_analysis(self) -> None:
         if not self.project_path or not self._i18n_manager:
             QMessageBox.warning(self, _("Error"), _("No project or translation manager available."))
@@ -601,6 +740,10 @@ class TranslationQualityReviewWindow(SmartDialog):
 
     def closeEvent(self, event) -> None:
         self._disconnect_heuristic_worker()
+        if self._llm_worker:
+            self._llm_worker.cancel()
+        if self._llm_thread and self._llm_thread.isRunning():
+            self._llm_thread.wait(30000)
         super().closeEvent(event)
 
     def _populate_heuristic_table(self, qf: TranslationQualityFindings) -> None:
