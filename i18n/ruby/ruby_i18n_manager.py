@@ -1574,18 +1574,62 @@ msgstr ""
         """
         return self.write_locale_yaml_files(locale)
 
+    def _bundle_subprocess_env(self) -> dict:
+        """Environment for Bundler subprocesses.
+
+        ``I18N_MANAGER_PATH_EXTRA`` (if set) is prepended to ``PATH`` so GUI-started
+        processes can find Ruby/Bundler without changing the system PATH.
+        """
+        env = os.environ.copy()
+        extra = os.environ.get("I18N_MANAGER_PATH_EXTRA", "").strip()
+        if extra:
+            env["PATH"] = extra + os.pathsep + env.get("PATH", "")
+        return env
+
+    def _resolve_bundle_executable(self) -> Optional[str]:
+        """Locate the Bundler executable.
+
+        Order: ``I18N_MANAGER_BUNDLE`` (full path or name), then ``shutil.which("bundle")``,
+        on Windows also ``bundle.cmd``.
+        """
+        override = os.environ.get("I18N_MANAGER_BUNDLE", "").strip()
+        if override:
+            return override
+        exe = shutil.which("bundle")
+        if exe:
+            return exe
+        if sys.platform == "win32":
+            return shutil.which("bundle.cmd")
+        return None
+
+    # TODO: Port functionality of this gem natively into this project or parse the results of its "missing" command to add missing translations ourselves.
     def _run_i18n_tasks_add_missing(self) -> tuple[bool, str]:
         """Run `bundle exec i18n-tasks add-missing` in the project root.
+
+        Uses the same environment as the host process, except ``PATH`` may be extended
+        via ``I18N_MANAGER_PATH_EXTRA``. Override the Bundler program with
+        ``I18N_MANAGER_BUNDLE`` when the app is started without Ruby's ``bin`` on ``PATH``
+        (common for GUI / Explorer launches on Windows).
 
         Returns:
             (success, message) where message is stderr/stdout (failure) or informational output (success).
         """
+        bundle_exe = self._resolve_bundle_executable()
+        if not bundle_exe:
+            return (
+                False,
+                "Could not find 'bundle'. Install Ruby/Bundler, ensure its bin directory is on PATH "
+                "for this process, set I18N_MANAGER_PATH_EXTRA to that bin directory (prepended for this command only), "
+                "or set I18N_MANAGER_BUNDLE to the bundle executable path.",
+            )
         project_root = self._get_project_root()
-        cmd = ["bundle", "exec", "i18n-tasks", "add-missing"]
+        cmd = [bundle_exe, "exec", "i18n-tasks", "add-missing"]
+        env = self._bundle_subprocess_env()
         try:
             completed = subprocess.run(
                 cmd,
                 cwd=project_root,
+                env=env,
                 capture_output=True,
                 text=True,
                 timeout=600,
@@ -1597,7 +1641,7 @@ msgstr ""
         except FileNotFoundError:
             return (
                 False,
-                "Could not run 'bundle'. Install Ruby Bundler or ensure it is on your PATH.",
+                f"Could not execute {bundle_exe!r}. Check I18N_MANAGER_BUNDLE and PATH.",
             )
         except Exception as e:
             return False, str(e)
