@@ -633,13 +633,28 @@ class MainWindow(SmartMainWindow):
             self.all_translations_window.translation_group_deleted.connect(self.handle_translation_group_delete)
         return self.all_translations_window
 
+    def _all_translations_window_is_synced(self, window: AllTranslationsWindow) -> bool:
+        if not self.i18n_manager or not self.locales:
+            return False
+        if window.all_translations is None or window.all_locales is None:
+            return False
+        if window.all_translations is not self.i18n_manager.translations:
+            return False
+        return list(window.all_locales) == list(self.locales)
+
+    def _ensure_all_translations_window_data(self) -> AllTranslationsWindow:
+        """Load data only when cached window data is stale."""
+        w = self._ensure_all_translations_window()
+        if not self._all_translations_window_is_synced(w):
+            w.load_data(self.i18n_manager.translations, self.locales)
+        return w
+
     def show_all_translations(self):
         if not self.i18n_manager or not self.i18n_manager.translations or not self.locales:
             QMessageBox.warning(self, _("Error"), _("Please check status first to load translation data"))
             return
 
-        w = self._ensure_all_translations_window()
-        w.load_data(self.i18n_manager.translations, self.locales)
+        w = self._ensure_all_translations_window_data()
         # NOTE if there are properties that need to be re-initialized, below method will need to be implemented
         # w.setup_properties()
         w.show()
@@ -654,8 +669,7 @@ class MainWindow(SmartMainWindow):
             QMessageBox.warning(self, _("Error"), _("Please check status first to load translation data"))
             return
 
-        w = self._ensure_all_translations_window()
-        w.load_data(self.i18n_manager.translations, self.locales)
+        w = self._ensure_all_translations_window_data()
         loc = locale.strip() if locale else None
         if not w.navigate_to_translation_key(key, loc):
             QMessageBox.information(
