@@ -27,6 +27,9 @@ class SettingsManager:
         r"(?i)\bJSON\b",
         r"(?i)\bXML\b",
         r"(?i)\bYAML\b",
+        # Common uppercase file-type terms (no leading dot), e.g. "PDF", "JSON", "MP4".
+        # Keep this practical/common only: no single-letter and no niche extensions.
+        r"\b(?:JSON|YML|YAML|XML|CSV|TSV|TXT|LOG|MD|PDF|PNG|JPG|JPEG|GIF|WEBP|SVG|MP3|MP4|WAV|ZIP|EXE|APK|IPA|JS|TS|JSX|TSX|PY|RB|JAVA|KT|GO|RS|SQL|INI|CFG|CONF|TOML)s?\b",
         # Common file extensions.
         r"(?i)\.(?:json|yml|yaml|xml|csv|tsv|txt|log|md|pdf|png|jpe?g|gif|webp|svg|mp3|mp4|wav|zip|tar|gz|7z|exe|msi|dmg|apk|ipa|js|ts|jsx|tsx|py|rb|java|kt|go|rs|c|cpp|h|hpp|ini|cfg|conf|toml|lock|sql)\b",
     ]

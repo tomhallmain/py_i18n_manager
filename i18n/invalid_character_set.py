@@ -228,7 +228,10 @@ class InvalidCharacterSetAnalyzer:
         if not text:
             return set()
         # Focus on compact ASCII words/acronyms often reused intentionally across locales.
-        return {m.group(0).casefold() for m in re.finditer(r"[A-Za-z][A-Za-z0-9]{1,31}", text)}
+        return {
+            m.group(0).casefold()
+            for m in re.finditer(r"[A-Za-z][A-Za-z0-9_]{1,31}", text)
+        }
 
     @classmethod
     def _build_shared_token_ignore_patterns(

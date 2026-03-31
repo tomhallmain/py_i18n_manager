@@ -23,6 +23,10 @@ class TestQualityReviewExclusionsSettings(unittest.TestCase):
         self.assertIn(r"(?i)\bCSV\b", patterns)
         self.assertIn(r"(?i)\bHTML\b", patterns)
         self.assertIn(
+            r"\b(?:JSON|YML|YAML|XML|CSV|TSV|TXT|LOG|MD|PDF|PNG|JPG|JPEG|GIF|WEBP|SVG|MP3|MP4|WAV|ZIP|EXE|APK|IPA|JS|TS|JSX|TSX|PY|RB|JAVA|KT|GO|RS|SQL|INI|CFG|CONF|TOML)s?\b",
+            patterns,
+        )
+        self.assertIn(
             r"(?i)\b(?:Ctrl|Cmd|Shift)(?:(?:\+Shift)?\+[A-Za-z])?\b",
             patterns,
         )

@@ -265,6 +265,45 @@ class TestInvalidCharacterSet(unittest.TestCase):
         )
         self.assertFalse(has_issue)
 
+    def test_analyzer_allows_pdf_gif_terms_after_default_ignore_patterns(self):
+        text = "PDF GIF PDFs GIFs"
+        self.assertTrue(InvalidCharacterSetAnalyzer.analyze_locale("ru", text))
+        has_issue = InvalidCharacterSetAnalyzer.analyze_locale(
+            "ru",
+            text,
+            ignore_patterns=self.default_ignore_patterns,
+        )
+        self.assertFalse(has_issue)
+
+    def test_analyzer_allows_common_media_doc_terms_after_default_ignore_patterns(self):
+        text = "PDF PNG JPEG GIF MP4 WAV"
+        self.assertTrue(InvalidCharacterSetAnalyzer.analyze_locale("ru", text))
+        has_issue = InvalidCharacterSetAnalyzer.analyze_locale(
+            "ru",
+            text,
+            ignore_patterns=self.default_ignore_patterns,
+        )
+        self.assertFalse(has_issue)
+
+    def test_analyzer_allows_common_config_terms_after_default_ignore_patterns(self):
+        text = "JSON YAML TOML INI CFG XML CSV"
+        self.assertTrue(InvalidCharacterSetAnalyzer.analyze_locale("ru", text))
+        has_issue = InvalidCharacterSetAnalyzer.analyze_locale(
+            "ru",
+            text,
+            ignore_patterns=self.default_ignore_patterns,
+        )
+        self.assertFalse(has_issue)
+
+    def test_analyzer_uppercase_term_ignore_does_not_hide_lowercase_plain_tokens(self):
+        text = "pdf gif"
+        has_issue = InvalidCharacterSetAnalyzer.analyze_locale(
+            "ru",
+            text,
+            ignore_patterns=self.default_ignore_patterns,
+        )
+        self.assertTrue(has_issue)
+
     def test_flags_latin_locale_when_non_latin_letters_dominate(self):
         group = TranslationGroup("sample.key", is_in_base=True)
         group.add_translation("en", "Sample text")
@@ -402,6 +441,21 @@ class TestInvalidCharacterSet(unittest.TestCase):
             "pt": "Ficheiros IPAdapter",
             "ru": "Файлы IPAdapter",
             "zh": "IPAdapter 文件",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        self.assertEqual([], invalid)
+
+    def test_group_shared_identifier_file_browser_find_is_excluded(self):
+        values = {
+            "de": "Der file_browser.find() ist ungueltig.",
+            "es": "El file_browser.find() no es valido.",
+            "fr": "Le file_browser.find() est invalide.",
+            "it": "Il file_browser.find() non e valido.",
+            "ja": "file_browser.find()が無効です。",
+            "ko": "file_browser.find()이(가) 유효하지 않습니다.",
+            "pt": "O file_browser.find() e invalido.",
+            "ru": "file_browser.find() недопустим.",
+            "zh": "file_browser.find() 无效。",
         }
         invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
         self.assertEqual([], invalid)
