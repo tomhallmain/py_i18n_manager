@@ -17,11 +17,15 @@ import re
 from typing import TYPE_CHECKING, Any, Optional, Set
 
 from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QStandardItem
 from PyQt6.QtWidgets import (
+    QComboBox,
+    QFileDialog,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
+    QLineEdit,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -128,6 +132,7 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         self._excluded_msgids: Set[str] = set()
         self._latin_ignore_patterns: Set[str] = set()
         self._custom_rules: list[dict[str, Any]] = []
+        self._heuristic_rows: list[dict[str, Any]] = []
         self._heuristic_worker: Optional[TranslationWorker] = None
         self._llm_thread: Optional[QThread] = None
         self._llm_worker: Optional[_CatalogLlmWorker] = None
@@ -174,6 +179,38 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
                 )
             )
         )
+        filter_box = QGroupBox(_("Filters"))
+        filter_layout = QGridLayout(filter_box)
+        filter_layout.addWidget(QLabel(_("Key contains:")), 0, 0)
+        self._filter_key_edit = QLineEdit()
+        self._filter_key_edit.setPlaceholderText(_("e.g. home.index"))
+        self._filter_key_edit.textChanged.connect(self._apply_heuristic_filters)
+        filter_layout.addWidget(self._filter_key_edit, 0, 1)
+
+        filter_layout.addWidget(QLabel(_("Default value contains:")), 0, 2)
+        self._filter_default_edit = QLineEdit()
+        self._filter_default_edit.textChanged.connect(self._apply_heuristic_filters)
+        filter_layout.addWidget(self._filter_default_edit, 0, 3)
+
+        filter_layout.addWidget(QLabel(_("Locale value contains:")), 1, 0)
+        self._filter_locale_value_edit = QLineEdit()
+        self._filter_locale_value_edit.textChanged.connect(self._apply_heuristic_filters)
+        filter_layout.addWidget(self._filter_locale_value_edit, 1, 1)
+
+        filter_layout.addWidget(QLabel(_("Detail contains:")), 1, 2)
+        self._filter_detail_edit = QLineEdit()
+        self._filter_detail_edit.textChanged.connect(self._apply_heuristic_filters)
+        filter_layout.addWidget(self._filter_detail_edit, 1, 3)
+
+        filter_layout.addWidget(QLabel(_("Target locale:")), 2, 0)
+        self._filter_locale_combo = self._create_multi_select_combo(_("All locales"))
+        filter_layout.addWidget(self._filter_locale_combo, 2, 1)
+
+        filter_layout.addWidget(QLabel(_("Signal:")), 2, 2)
+        self._filter_signal_combo = self._create_multi_select_combo(_("All signals"))
+        filter_layout.addWidget(self._filter_signal_combo, 2, 3)
+        layout.addWidget(filter_box)
+
         self._heuristic_table = create_frozen_translation_table()
         self._heuristic_table.setColumnCount(6)
         self._heuristic_table.setHorizontalHeaderLabels(
@@ -195,9 +232,12 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
         hdr.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+        hdr.setSectionsClickable(True)
+        hdr.setSortIndicatorShown(True)
         self._heuristic_table.setColumnWidth(0, 240)
         self._heuristic_table.setColumnWidth(2, 200)
         self._heuristic_table.setColumnWidth(3, 200)
+        self._heuristic_table.setSortingEnabled(True)
         self._heuristic_table.cellDoubleClicked.connect(self._on_heuristic_cell_double_clicked)
         self._heuristic_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._heuristic_table.customContextMenuRequested.connect(self._on_heuristic_context_menu)
@@ -214,6 +254,12 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         )
         self._run_heuristic_btn.clicked.connect(self._on_run_heuristic_analysis)
         row.addWidget(self._run_heuristic_btn)
+        self._export_filtered_btn = QPushButton(_("Export filtered TSV…"))
+        self._export_filtered_btn.setToolTip(
+            _("Export the currently filtered rows from this table to a TSV file.")
+        )
+        self._export_filtered_btn.clicked.connect(self._on_export_filtered_tsv)
+        row.addWidget(self._export_filtered_btn)
         row.addStretch()
         layout.addLayout(row)
 
@@ -386,6 +432,7 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         llm_running = self._llm_thread is not None and self._llm_thread.isRunning()
         self._run_llm_btn.setEnabled(has_catalog and not llm_running)
         self._cancel_llm_btn.setEnabled(llm_running)
+        self._export_filtered_btn.setEnabled(bool(self._heuristic_rows))
 
     def _update_rules_buttons(self) -> None:
         if not self._can_edit_settings():
@@ -851,7 +898,11 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
 
         qf = results.quality_findings
         if not qf or not qf.findings:
+            self._heuristic_rows = []
             self._heuristic_table.setRowCount(0)
+            self._set_multi_select_items(self._filter_locale_combo, [])
+            self._set_multi_select_items(self._filter_signal_combo, [])
+            self._update_settings_dependent_controls()
             QMessageBox.information(
                 self,
                 _("Quality review"),
@@ -859,7 +910,10 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             )
             return
 
-        self._populate_heuristic_table(qf)
+        self._heuristic_rows = self._build_heuristic_rows(qf)
+        self._sync_filter_options_from_rows()
+        self._apply_heuristic_filters()
+        self._update_settings_dependent_controls()
 
     def closeEvent(self, event) -> None:
         self._disconnect_heuristic_worker()
@@ -916,9 +970,9 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         menu.addAction(act)
         menu.exec(global_pos)
 
-    def _populate_heuristic_table(self, qf: TranslationQualityFindings) -> None:
+    def _build_heuristic_rows(self, qf: TranslationQualityFindings) -> list[dict[str, Any]]:
         rows = qf.findings
-        self._heuristic_table.setRowCount(len(rows))
+        out: list[dict[str, Any]] = []
         catalog = (
             self._i18n_manager.translations
             if self._i18n_manager
@@ -929,30 +983,185 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             if self._i18n_manager
             else ""
         )
-        for i, f in enumerate(rows):
+        for f in rows:
             key = TranslationKey(f.key_msgid, context=f.key_context or "")
-            k_item = QTableWidgetItem(f.key_msgid)
-            k_item.setData(Qt.ItemDataRole.UserRole, key)
-            k_item.setToolTip(f.key_msgid)
-            self._heuristic_table.setItem(i, 0, k_item)
-            self._heuristic_table.setItem(i, 1, QTableWidgetItem(f.locale))
             group = catalog.get(key)
             default_text = ""
             locale_text = ""
             if group is not None:
                 default_text = group.get_translation(default_loc) or ""
                 locale_text = group.get_translation(f.locale) or ""
-            def_item = QTableWidgetItem(default_text)
-            def_item.setToolTip(default_text)
-            self._heuristic_table.setItem(i, 2, def_item)
-            loc_item = QTableWidgetItem(locale_text)
-            loc_item.setToolTip(locale_text)
-            self._heuristic_table.setItem(i, 3, loc_item)
             kind = f.signal
-            self._heuristic_table.setItem(i, 4, QTableWidgetItem(kind.get_display_name()))
             det = kind.get_display_details()
-            det_item = QTableWidgetItem(det)
-            det_item.setToolTip(det)
+            out.append(
+                {
+                    "key_obj": key,
+                    "key_msgid": f.key_msgid,
+                    "locale": f.locale,
+                    "default_text": default_text,
+                    "locale_text": locale_text,
+                    "signal_name": kind.get_display_name(),
+                    "detail": det,
+                }
+            )
+        return out
+
+    def _render_heuristic_rows(self, rows: list[dict[str, Any]]) -> None:
+        hdr = self._heuristic_table.horizontalHeader()
+        sort_col = hdr.sortIndicatorSection()
+        sort_order = hdr.sortIndicatorOrder()
+        self._heuristic_table.setSortingEnabled(False)
+        self._heuristic_table.setRowCount(len(rows))
+        for i, r in enumerate(rows):
+            k_item = QTableWidgetItem(r["key_msgid"])
+            k_item.setData(Qt.ItemDataRole.UserRole, r["key_obj"])
+            k_item.setToolTip(r["key_msgid"])
+            self._heuristic_table.setItem(i, 0, k_item)
+            self._heuristic_table.setItem(i, 1, QTableWidgetItem(r["locale"]))
+            def_item = QTableWidgetItem(r["default_text"])
+            def_item.setToolTip(r["default_text"])
+            self._heuristic_table.setItem(i, 2, def_item)
+            loc_item = QTableWidgetItem(r["locale_text"])
+            loc_item.setToolTip(r["locale_text"])
+            self._heuristic_table.setItem(i, 3, loc_item)
+            self._heuristic_table.setItem(i, 4, QTableWidgetItem(r["signal_name"]))
+            det_item = QTableWidgetItem(r["detail"])
+            det_item.setToolTip(r["detail"])
             self._heuristic_table.setItem(i, 5, det_item)
+        self._heuristic_table.setSortingEnabled(True)
+        if sort_col >= 0:
+            self._heuristic_table.sortItems(sort_col, sort_order)
         if hasattr(self._heuristic_table, "updateFrozenColumn"):
             self._heuristic_table.updateFrozenColumn()
+
+    def _create_multi_select_combo(self, placeholder: str) -> QComboBox:
+        combo = QComboBox(self)
+        combo.setEditable(True)
+        line = combo.lineEdit()
+        if line:
+            line.setReadOnly(True)
+            line.setPlaceholderText(placeholder)
+        model = combo.model()
+        if model is not None:
+            model.itemChanged.connect(lambda _item=None, c=combo: self._on_multi_select_changed(c))
+        return combo
+
+    def _on_multi_select_changed(self, combo: QComboBox) -> None:
+        self._update_multi_select_combo_text(combo)
+        self._apply_heuristic_filters()
+
+    def _set_multi_select_items(self, combo: QComboBox, values: list[str]) -> None:
+        selected = self._selected_multi_select_values(combo)
+        model = combo.model()
+        if model is None:
+            return
+        model.blockSignals(True)
+        combo.clear()
+        for value in values:
+            item = QStandardItem(value)
+            item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setData(
+                Qt.CheckState.Checked if value in selected else Qt.CheckState.Unchecked,
+                Qt.ItemDataRole.CheckStateRole,
+            )
+            model.appendRow(item)
+        model.blockSignals(False)
+        self._update_multi_select_combo_text(combo)
+
+    def _selected_multi_select_values(self, combo: QComboBox) -> set[str]:
+        out: set[str] = set()
+        model = combo.model()
+        if model is None:
+            return out
+        for i in range(model.rowCount()):
+            item = model.item(i)
+            if item and item.checkState() == Qt.CheckState.Checked:
+                out.add(item.text())
+        return out
+
+    def _update_multi_select_combo_text(self, combo: QComboBox) -> None:
+        selected = sorted(self._selected_multi_select_values(combo))
+        line = combo.lineEdit()
+        if line is None:
+            return
+        if not selected:
+            line.setText(_("All"))
+            return
+        if len(selected) <= 2:
+            line.setText(", ".join(selected))
+            return
+        line.setText(_("{n} selected").format(n=len(selected)))
+
+    def _sync_filter_options_from_rows(self) -> None:
+        locales = sorted({r["locale"] for r in self._heuristic_rows})
+        signals = sorted({r["signal_name"] for r in self._heuristic_rows})
+        self._set_multi_select_items(self._filter_locale_combo, locales)
+        self._set_multi_select_items(self._filter_signal_combo, signals)
+
+    @staticmethod
+    def _matches_filter(value: str, needle: str) -> bool:
+        if not needle:
+            return True
+        return needle.casefold() in (value or "").casefold()
+
+    def _apply_heuristic_filters(self) -> None:
+        rows = self._heuristic_rows
+        key_filter = (self._filter_key_edit.text() or "").strip()
+        default_filter = (self._filter_default_edit.text() or "").strip()
+        locale_val_filter = (self._filter_locale_value_edit.text() or "").strip()
+        detail_filter = (self._filter_detail_edit.text() or "").strip()
+        locale_selected = self._selected_multi_select_values(self._filter_locale_combo)
+        signal_selected = self._selected_multi_select_values(self._filter_signal_combo)
+
+        filtered = []
+        for r in rows:
+            if locale_selected and r["locale"] not in locale_selected:
+                continue
+            if signal_selected and r["signal_name"] not in signal_selected:
+                continue
+            if not self._matches_filter(r["key_msgid"], key_filter):
+                continue
+            if not self._matches_filter(r["default_text"], default_filter):
+                continue
+            if not self._matches_filter(r["locale_text"], locale_val_filter):
+                continue
+            if not self._matches_filter(r["detail"], detail_filter):
+                continue
+            filtered.append(r)
+        self._render_heuristic_rows(filtered)
+
+    def _on_export_filtered_tsv(self) -> None:
+        if self._heuristic_table.rowCount() == 0:
+            QMessageBox.information(self, _("Export TSV"), _("No filtered rows to export."))
+            return
+        path, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            _("Export filtered findings as TSV"),
+            "quality_review_findings.tsv",
+            _("TSV files (*.tsv);;All files (*.*)"),
+        )
+        if not selected_filter:
+            selected_filter = ""
+        if not path:
+            return
+        headers = ["Key", "Locale", "Default locale value", "Locale value", "Signal", "Detail"]
+        try:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
+                f.write("\t".join(headers) + "\n")
+                for row in range(self._heuristic_table.rowCount()):
+                    cols = []
+                    for col in range(self._heuristic_table.columnCount()):
+                        item = self._heuristic_table.item(row, col)
+                        txt = item.text() if item else ""
+                        txt = txt.replace("\t", " ").replace("\r", " ").replace("\n", " ")
+                        cols.append(txt)
+                    f.write("\t".join(cols) + "\n")
+            QMessageBox.information(
+                self,
+                _("Export TSV"),
+                _("Exported {n} row(s) to:\n{path}").format(
+                    n=self._heuristic_table.rowCount(), path=path
+                ),
+            )
+        except Exception as e:
+            QMessageBox.warning(self, _("Export TSV"), _("Could not export TSV:\n{err}").format(err=str(e)))
