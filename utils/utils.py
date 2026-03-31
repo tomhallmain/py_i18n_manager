@@ -21,6 +21,35 @@ class Utils:
     CJK_LANGUAGE_CODES = {'zh', 'ja', 'ko'}
     CJK_SCRIPT_CODES = {'hang', 'hani', 'hans', 'hant', 'hira', 'jpan', 'kana', 'kore'}
 
+    # BCP 47 script subtags (ISO 15924) that imply the locale string is *not* Latin-primary.
+    # Includes CJK scripts from :data:`CJK_SCRIPT_CODES` (Hans, Hant, Jpan, Kore, …).
+    # If ``latn`` appears explicitly, :meth:`is_non_latin_script_locale` returns False.
+    _NON_LATIN_SCRIPT_SUBTAGS = frozenset({
+        'cyrl', 'arab', 'grek', 'hebr', 'thai', 'geor', 'armn', 'deva', 'beng', 'guru', 'gujr',
+        'orya', 'taml', 'telu', 'knda', 'mlym', 'sinh', 'thaa', 'tibt', 'mong', 'ethi', 'khmr',
+        'laoo', 'mymr',
+    }).union(CJK_SCRIPT_CODES)
+
+    # ISO 639-1 language codes whose *default* writing system in typical apps is not Latin.
+    # CJK language codes are unified via :data:`CJK_LANGUAGE_CODES` (zh, ja, ko).
+    # Deliberately excludes Polish (pl), Turkish (tr), Vietnamese (vi), Indonesian (id), etc.
+    _NON_LATIN_PRIMARY_LANGUAGE_CODES = frozenset({
+        # Cyrillic (and related defaults)
+        'ru', 'uk', 'bg', 'be', 'mk', 'sr', 'kk', 'ky', 'tg', 'mn', 'ce',
+        # Arabic script
+        'ar', 'fa', 'ur', 'ps', 'ug', 'sd',
+        # Greek, Hebrew, Thai
+        'el', 'he', 'th',
+        # Caucasus / other alphabets
+        'ka', 'hy',
+        # South Asian (Indic scripts)
+        'hi', 'bn', 'ta', 'te', 'ml', 'kn', 'gu', 'pa', 'or', 'as', 'ne', 'mr', 'si',
+        # SE / Himalayan
+        'km', 'lo', 'my', 'bo', 'dz',
+        # Ethiopic, Thaana
+        'am', 'ti', 'dv',
+    }).union(CJK_LANGUAGE_CODES)
+
     @staticmethod
     def extract_substring(text, pattern):
         result = re.search(pattern, text)    
@@ -446,5 +475,37 @@ class Utils:
         for part in locale_parts[1:]:
             if part.lower() in Utils.CJK_SCRIPT_CODES:
                 return True
+        return False
+
+    @staticmethod
+    def is_non_latin_script_locale(locale: str) -> bool:
+        """True if the locale typically uses a non-Latin primary script (quality heuristics).
+
+        Uses explicit BCP 47 script subtags when present: ``_Latn`` / ``-Latn`` forces False;
+        subtags in :data:`_NON_LATIN_SCRIPT_SUBTAGS` (Cyrillic, Arabic, CJK scripts such as
+        ``Hans`` / ``Jpan`` / ``Kore``, …) force True. Otherwise the language subtag is matched
+        against :data:`_NON_LATIN_PRIMARY_LANGUAGE_CODES` (includes CJK via
+        :data:`CJK_LANGUAGE_CODES`).
+
+        Latin-alphabet languages (Polish, Turkish, Indonesian, …) are excluded from the
+        language-code list (other than CJK).
+        """
+        if not locale:
+            return False
+
+        parts = [p.lower() for p in locale.replace('-', '_').split('_') if p]
+        if not parts:
+            return False
+
+        if 'latn' in parts:
+            return False
+        for p in parts[1:]:
+            if p in Utils._NON_LATIN_SCRIPT_SUBTAGS:
+                return True
+
+        lang = parts[0]
+        if lang in Utils._NON_LATIN_PRIMARY_LANGUAGE_CODES:
+            return True
+
         return False
 

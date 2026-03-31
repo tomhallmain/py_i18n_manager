@@ -206,6 +206,7 @@ class QualityHeuristicKind(str, Enum):
 
     IDENTICAL_TO_DEFAULT = "identical_to_default"
     LATIN_IN_CJK_LOCALE = "latin_in_cjk_locale"
+    LATIN_MIXED_SCRIPT_IN_NON_LATIN_LOCALE = "latin_mixed_script_in_non_latin_locale"
     HIGH_ENGLISH_RATIO = "high_english_ratio"
 
     @classmethod
@@ -220,7 +221,13 @@ class QualityHeuristicKind(str, Enum):
         if self is QualityHeuristicKind.IDENTICAL_TO_DEFAULT:
             return _("Translation equals default locale text.")
         if self is QualityHeuristicKind.LATIN_IN_CJK_LOCALE:
-            return _("Latin letter run (4+ chars) inside a CJK locale string.")
+            return _(
+                "Latin letter run (4+ chars) in a locale that primarily uses a non-Latin script."
+            )
+        if self is QualityHeuristicKind.LATIN_MIXED_SCRIPT_IN_NON_LATIN_LOCALE:
+            return _(
+                "Mixed-script leakage: Latin letters appear inside otherwise non-Latin text."
+            )
         if self is QualityHeuristicKind.HIGH_ENGLISH_RATIO:
             return _("English token ratio above threshold (heuristic not yet enabled).")
         raise AssertionError(f"unhandled heuristic: {self!r}")
@@ -229,7 +236,9 @@ class QualityHeuristicKind(str, Enum):
         if self is QualityHeuristicKind.IDENTICAL_TO_DEFAULT:
             return _("Identical to default")
         if self is QualityHeuristicKind.LATIN_IN_CJK_LOCALE:
-            return _("Latin in CJK locale")
+            return _("Latin in non-Latin locale")
+        if self is QualityHeuristicKind.LATIN_MIXED_SCRIPT_IN_NON_LATIN_LOCALE:
+            return _("Mixed-script Latin leakage")
         if self is QualityHeuristicKind.HIGH_ENGLISH_RATIO:
             return _("High English ratio")
         raise AssertionError(f"unhandled heuristic: {self!r}")

@@ -473,14 +473,23 @@ class TranslationGroup():
         return invalid_cjk_locales
 
     def collect_quality_review_findings(
-        self, default_locale: str, locales: List[str], excluded_msgids: Set[str]
+        self,
+        default_locale: str,
+        locales: List[str],
+        excluded_msgids: Set[str],
+        latin_ignore_patterns: tuple[str, ...] = tuple(),
     ) -> list:
         """Run advisory quality checks for this group (see :mod:`i18n.translation_quality_review`)."""
         from i18n.translation_quality_review import collect_findings_for_group
 
         if self.key.msgid in excluded_msgids:
             return []
-        return collect_findings_for_group(self, default_locale, locales)
+        return collect_findings_for_group(
+            self,
+            default_locale,
+            locales,
+            latin_ignore_patterns=latin_ignore_patterns,
+        )
 
     def has_translation_changes(self, other: 'TranslationGroup') -> bool:
         """Compare this translation group with another to check if translations have changed.

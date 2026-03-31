@@ -53,6 +53,12 @@ class I18NManagerBase(ABC):
             return frozenset(self.settings_manager.get_quality_review_excluded_msgids(self._directory))
         return frozenset()
 
+    def get_quality_review_latin_ignore_patterns(self) -> tuple[str, ...]:
+        """Regex patterns ignored by the Latin-in-CJK heuristic for this project."""
+        if self.settings_manager:
+            return tuple(self.settings_manager.get_quality_review_latin_ignore_patterns(self._directory))
+        return tuple()
+
     def _total_locales_for_statistics(self, results: TranslationManagerResults) -> int:
         """How many locales to report on ``results`` (bundle managers use ``self.locales``)."""
         if self.locales:
@@ -77,6 +83,7 @@ class I18NManagerBase(ABC):
                 self.locales,
                 self.default_locale,
                 self.get_quality_review_excluded_msgids(),
+                self.get_quality_review_latin_ignore_patterns(),
             )
         else:
             results.invalid_groups = self.get_invalid_translations()

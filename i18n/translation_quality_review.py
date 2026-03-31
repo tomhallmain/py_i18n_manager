@@ -27,7 +27,10 @@ from .translation_group import TranslationGroup, TranslationKey
 
 
 def collect_findings_for_group(
-    group: TranslationGroup, default_locale: str, locales: List[str]
+    group: TranslationGroup,
+    default_locale: str,
+    locales: List[str],
+    latin_ignore_patterns: Sequence[str] = (),
 ) -> List[QualityReviewFinding]:
     """Return advisory findings for one translation group (built-in heuristics only)."""
     findings: List[QualityReviewFinding] = []
@@ -42,7 +45,9 @@ def collect_findings_for_group(
         if not text or not text.strip():
             continue
         tstrip = text.strip()
-        if base and tstrip == base:
+        if base and tstrip == base and not _is_allowed_identical_to_english_default(
+            default_locale, loc, tstrip, latin_ignore_patterns
+        ):
             h = QualityHeuristicKind.IDENTICAL_TO_DEFAULT
             findings.append(
                 QualityReviewFinding(
@@ -52,26 +57,234 @@ def collect_findings_for_group(
                     signal=h,
                 )
             )
-        if Utils.is_cjk_locale(loc) and _has_significant_latin_run(tstrip):
-            h = QualityHeuristicKind.LATIN_IN_CJK_LOCALE
-            findings.append(
-                QualityReviewFinding(
-                    key_msgid=mid,
-                    key_context=ctx,
-                    locale=loc,
-                    signal=h,
+        if Utils.is_non_latin_script_locale(loc):
+            if _has_significant_latin_run(tstrip, latin_ignore_patterns):
+                h = QualityHeuristicKind.LATIN_IN_CJK_LOCALE
+                findings.append(
+                    QualityReviewFinding(
+                        key_msgid=mid,
+                        key_context=ctx,
+                        locale=loc,
+                        signal=h,
+                    )
                 )
-            )
+            elif _has_mixed_script_latin_leakage(tstrip, latin_ignore_patterns):
+                h = QualityHeuristicKind.LATIN_MIXED_SCRIPT_IN_NON_LATIN_LOCALE
+                findings.append(
+                    QualityReviewFinding(
+                        key_msgid=mid,
+                        key_context=ctx,
+                        locale=loc,
+                        signal=h,
+                    )
+                )
 
     findings.extend(_findings_high_english_ratio_stub(group, default_locale, locales))
     return findings
 
 
 _LATIN_RUN = re.compile(r"[A-Za-z]{4,}")
+_LATIN_CHAR = re.compile(r"[A-Za-z]")
+_CURLY_BRACE_SEGMENT = re.compile(r"\{[^{}]*\}")
+_MARKUP_TAG_SEGMENT = re.compile(r"</?[A-Za-z][^>]*>")
+_EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
+    "de": frozenset(
+        {
+            "AM/PM",
+            "api",
+            "email",
+            "e-mail",
+            "emoji",
+            "id",
+            "json",
+            "minute",
+            "name",
+            "navigation",
+            "plan",
+            "status",
+            "url",
+            "version",
+            "xml",
+        }
+    ),
+    "fr": frozenset(
+        {
+            "absent",
+            "action",
+            "actions",
+            "alliance",
+            "alliances",
+            "api",
+            "avatar",
+            "date",
+            "description",
+            "descriptions",
+            "document",
+            "documentation",
+            "documents",
+            "email",
+            "e-mail",
+            "emoji",
+            "format",
+            "id",
+            "json",
+            "menu",
+            "messages",
+            "messsage",
+            "minute",
+            "minutes",
+            "navigation",
+            "note",
+            "notes",
+            "notification",
+            "notifications",
+            "page",
+            "pages",
+            "participant",
+            "participants",
+            "plan",
+            "status",
+            "total",
+            "url",
+            "version",
+            "vote",
+            "votes",
+            "xml",
+        }
+    ),
+    "es": frozenset(
+        {
+            "api",
+            "email",
+            "e-mail",
+            "emoji",
+            "error",
+            "general",
+            "id",
+            "json",
+            "no",
+            "url",
+            "xml",
+        }
+    ),
+    "it": frozenset(
+        {
+            "AM/PM",
+            "api",
+            "email",
+            "e-mail",
+            "emoji",
+            "id",
+            "json",
+            "no",
+            "password",
+            "status",
+            "url",
+            "xml",
+        }
+    ),
+    "pt": frozenset(
+        {
+            "AM/PM",
+            "api",
+            "email",
+            "e-mail",
+            "emoji",
+            "id",
+            "json",
+            "no",
+        }
+    ),
+}
 
 
-def _has_significant_latin_run(text: str) -> bool:
-    return bool(_LATIN_RUN.search(text))
+def _base_language(locale: str) -> str:
+    if not locale:
+        return ""
+    return locale.replace("-", "_").split("_", 1)[0].strip().lower()
+
+
+def _is_allowed_identical_to_english_default(
+    default_locale: str,
+    locale: str,
+    text: str,
+    latin_ignore_patterns: Sequence[str] = (),
+) -> bool:
+    if _base_language(default_locale) != "en":
+        return False
+    allowed = _EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE.get(_base_language(locale), frozenset())
+    normalized = (text or "").strip().lower()
+    if normalized in allowed:
+        return True
+
+    # Ignore placeholder-like segments (e.g. "{name}", "{count}") and markup tags.
+    scrubbed = text or ""
+    prev = None
+    while scrubbed != prev:
+        prev = scrubbed
+        scrubbed = _CURLY_BRACE_SEGMENT.sub("", scrubbed)
+    scrubbed = _MARKUP_TAG_SEGMENT.sub("", scrubbed)
+
+    # Allow if user-configured Latin-ignore patterns account for all Latin characters.
+    scrubbed_without_patterns = _apply_latin_ignore_patterns(scrubbed, latin_ignore_patterns)
+    if not _LATIN_CHAR.search(scrubbed_without_patterns):
+        return True
+
+    # Allow if the only remaining Latin content is from accepted shared terms.
+    for term in sorted(allowed, key=len, reverse=True):
+        scrubbed_without_patterns = re.sub(
+            rf"\b{re.escape(term)}\b",
+            "",
+            scrubbed_without_patterns,
+            flags=re.IGNORECASE,
+        )
+    return not _LATIN_CHAR.search(scrubbed_without_patterns)
+
+
+def _apply_latin_ignore_patterns(text: str, patterns: Sequence[str]) -> str:
+    scrubbed = text
+    for pat in patterns:
+        p = (pat or "").strip()
+        if not p:
+            continue
+        try:
+            scrubbed = re.sub(p, "", scrubbed)
+        except re.error:
+            # Invalid user regex should not break quality review.
+            continue
+    return scrubbed
+
+
+def _contains_non_latin_letter(text: str) -> bool:
+    for ch in text:
+        if ch.isalpha() and not ("A" <= ch <= "Z" or "a" <= ch <= "z"):
+            return True
+    return False
+
+
+def _has_significant_latin_run(text: str, latin_ignore_patterns: Sequence[str] = ()) -> bool:
+    # Ignore placeholder-like segments (e.g. "{name}", "{count}") and markup tags.
+    scrubbed = text
+    prev = None
+    while scrubbed != prev:
+        prev = scrubbed
+        scrubbed = _CURLY_BRACE_SEGMENT.sub("", scrubbed)
+    scrubbed = _MARKUP_TAG_SEGMENT.sub("", scrubbed)
+    scrubbed = _apply_latin_ignore_patterns(scrubbed, latin_ignore_patterns)
+    return bool(_LATIN_RUN.search(scrubbed))
+
+
+def _has_mixed_script_latin_leakage(
+    text: str, latin_ignore_patterns: Sequence[str] = ()
+) -> bool:
+    scrubbed = text
+    prev = None
+    while scrubbed != prev:
+        prev = scrubbed
+        scrubbed = _CURLY_BRACE_SEGMENT.sub("", scrubbed)
+    scrubbed = _MARKUP_TAG_SEGMENT.sub("", scrubbed)
+    scrubbed = _apply_latin_ignore_patterns(scrubbed, latin_ignore_patterns)
+    return bool(_LATIN_CHAR.search(scrubbed)) and _contains_non_latin_letter(scrubbed)
 
 
 def _findings_high_english_ratio_stub(
@@ -87,6 +300,7 @@ def collect_project_quality_findings(
     locales: Sequence[str],
     default_locale: str,
     excluded_msgids: AbstractSet[str] = frozenset(),
+    latin_ignore_patterns: Sequence[str] = (),
 ) -> TranslationQualityFindings:
     """Scan the full in-memory catalog for built-in advisory signals."""
     loc_list = list(locales)
@@ -94,7 +308,12 @@ def collect_project_quality_findings(
     rows: List[QualityReviewFinding] = []
     for group in translations.values():
         rows.extend(
-            group.collect_quality_review_findings(default_locale, loc_list, excluded)
+            group.collect_quality_review_findings(
+                default_locale,
+                loc_list,
+                excluded,
+                tuple(latin_ignore_patterns),
+            )
         )
     return TranslationQualityFindings(findings=rows)
 

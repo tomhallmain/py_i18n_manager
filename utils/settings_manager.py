@@ -403,6 +403,18 @@ class SettingsManager:
         cleaned = [dict(x) for x in rules if isinstance(x, dict)]
         return self.save_project_setting(project_path, "quality_review_custom_rules", cleaned)
 
+    def get_quality_review_latin_ignore_patterns(self, project_path: str) -> list[str]:
+        """Regex patterns to remove before Latin-in-CJK heuristic evaluation."""
+        raw = self.get_project_setting(project_path, "quality_review_latin_ignore_patterns", [])
+        if not isinstance(raw, list):
+            return []
+        return [str(x).strip() for x in raw if isinstance(x, str) and str(x).strip()]
+
+    def save_quality_review_latin_ignore_patterns(self, project_path: str, patterns: list[str]) -> bool:
+        """Persist regex ignore patterns for the Latin-in-CJK heuristic."""
+        cleaned = sorted({str(x).strip() for x in patterns if isinstance(x, str) and str(x).strip()})
+        return self.save_project_setting(project_path, "quality_review_latin_ignore_patterns", cleaned)
+
     def get_quality_review_llm_max_catalog_tokens(self, project_path: str) -> int:
         """Max estimated tokens per catalog batch for LLM review (conservative for local / small context)."""
         v = self.get_project_setting(project_path, "quality_review_llm_max_catalog_tokens")
