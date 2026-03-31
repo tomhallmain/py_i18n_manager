@@ -159,10 +159,18 @@ class I18NManager(I18NManagerBase):
         if new_project_type != self._project_type:
             logger.info(f"Project type changed from {self._project_type.value} to {new_project_type.value}, recreating manager")
             self._project_type = new_project_type
-            # Get current locales and intro_details from existing manager if available
-            locales = getattr(self._manager, 'locales', None)
+            # Keep intro metadata, but do not carry locales across projects.
+            # Reusing locales here can leak stale locales from the previously loaded
+            # project (especially when switching project types) and produce false
+            # outstanding/missing-locale results in the UI.
             intro_details = getattr(self._manager, 'intro_details', None)
-            self._manager = self._create_manager(new_project_type, directory, locales, intro_details, self.settings_manager)
+            self._manager = self._create_manager(
+                new_project_type,
+                directory,
+                None,
+                intro_details,
+                self.settings_manager,
+            )
         else:
             # Same project type, just update the directory
             self._manager.set_directory(directory)
