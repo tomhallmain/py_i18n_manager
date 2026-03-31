@@ -366,6 +366,99 @@ class TestInvalidCharacterSet(unittest.TestCase):
         self.assertIn("de", invalid)  # CJK-heavy text in non-CJK locale
         self.assertIn("ko", invalid)  # Korean locale with non-Korean CJK-heavy text
 
+    def test_group_shared_token_in_all_locales_is_suppressed_when_scripts_diverse(self):
+        values = {
+            "de": "LoRA Tags",
+            "ru": "Теги LoRA",
+            "ja": "LoRAタグ",
+            "ko": "LoRA 태그",
+            "zh": "LoRA 标签",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        for locale in ("ru", "ja", "ko", "zh"):
+            self.assertNotIn(locale, invalid)
+
+    def test_group_lora_shared_across_all_locales_is_excluded_from_consideration(self):
+        values = {
+            "de": "LoRA-Stichworte",
+            "es": "Etiquetas LoRA",
+            "fr": "Etiquettes LoRA",
+            "ja": "LoRAタグ",
+            "ko": "LoRA 태그",
+            "pt": "Etiquetas LoRA",
+            "ru": "Теги LoRA",
+            "zh": "LoRA 标签",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        self.assertEqual([], invalid)
+
+    def test_group_ipadapter_shared_across_all_locales_is_excluded_from_consideration(self):
+        values = {
+            "de": "Dateien IPAdapter",
+            "es": "Archivos IPAdapter",
+            "fr": "Fichiers IPAdapter",
+            "ja": "IPAdapter ファイル",
+            "ko": "IPAdapter 파일",
+            "pt": "Ficheiros IPAdapter",
+            "ru": "Файлы IPAdapter",
+            "zh": "IPAdapter 文件",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        self.assertEqual([], invalid)
+
+    def test_group_identical_latin_only_values_are_not_invalid_character_set(self):
+        values = {
+            "de": "LoRA",
+            "es": "LoRA",
+            "fr": "LoRA",
+            "ja": "LoRA",
+            "ko": "LoRA",
+            "pt": "LoRA",
+            "ru": "LoRA",
+            "zh": "LoRA",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        self.assertEqual([], invalid)
+
+    def test_group_uniform_lora_tags_is_not_invalid_when_any_locale_expects_script(self):
+        values = {
+            "de": "LoRA Tags",
+            "ru": "LoRA Tags",
+            "ja": "LoRA Tags",
+            "ko": "LoRA Tags",
+            "zh": "LoRA Tags",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        self.assertEqual([], invalid)
+
+    def test_group_partial_shared_token_does_not_suppress_invalid_locale(self):
+        values = {
+            "de": "SD Workflows",
+            "ru": "SD Workflows",
+            "ja": "ワークフローを実行",
+            "ko": "SD Workflow",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        # Token is not shared by all locales; invalid findings should remain.
+        self.assertIn("ru", invalid)
+        self.assertIn("ko", invalid)
+
+    def test_group_shared_token_still_flags_real_locale_script_mismatch(self):
+        values = {
+            "de": "SD-Workflows ausfuhren",
+            "es": "Ejecutar flujos de trabajo SD",
+            "fr": "Executer les flux de travail SD",
+            "ja": "SDワークフローを実行",
+            "ko": "SDワークフロー 실행",
+            "pt": "Executar fluxos de trabalho SD",
+            "ru": "Запуск рабочих процессов SD",
+            "zh": "运行SD工作流",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        # Shared "SD" token appears in all locales and should be suppressed,
+        # but Korean text still contains dominant Japanese script and must remain invalid.
+        self.assertIn("ko", invalid)
+
 
 if __name__ == "__main__":
     unittest.main()

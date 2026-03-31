@@ -6,13 +6,19 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtWidgets import QApplication, QMessageBox
+try:
+    from PyQt6.QtWidgets import QApplication, QMessageBox
+    _HAS_PYQT6 = True
+except Exception:
+    QApplication = None
+    QMessageBox = None
+    _HAS_PYQT6 = False
 
 from test_utils import isolated_settings_and_cache_env
-from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 from utils.settings_manager import SettingsManager
 
 
+@unittest.skipUnless(_HAS_PYQT6, "PyQt6 not installed in this environment")
 class TestUiSmoke(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -55,6 +61,8 @@ class TestUiSmoke(unittest.TestCase):
             window.deleteLater()
 
     def test_exclusions_dialog_restores_defaults_without_user_cache_touch(self):
+        from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
+
         mgr = SettingsManager()
         self.assertEqual(str(mgr.settings_file), self.settings_path)
         project_path = "C:/tmp/ui-smoke-project"

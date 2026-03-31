@@ -214,6 +214,61 @@ class InvalidCharacterSetAnalyzer:
         return {expected_script}
 
     @classmethod
+    def _has_expected_script_representation(cls, locale: str, text: str) -> bool:
+        expected_script = cls._locale_expected_script(locale)
+        allowed = cls._allowed_script_families(expected_script)
+        for ch in text:
+            family = cls._character_script_family(ch)
+            if family and family in allowed:
+                return True
+        return False
+
+    @staticmethod
+    def _extract_ascii_word_tokens(text: str) -> set[str]:
+        if not text:
+            return set()
+        # Focus on compact ASCII words/acronyms often reused intentionally across locales.
+        return {m.group(0).casefold() for m in re.finditer(r"[A-Za-z][A-Za-z0-9]{1,31}", text)}
+
+    @classmethod
+    def _build_shared_token_ignore_patterns(
+        cls,
+        scrubbed_by_locale: Dict[str, str],
+    ) -> tuple[str, ...]:
+        token_sets = [cls._extract_ascii_word_tokens(text) for text in scrubbed_by_locale.values()]
+        if not token_sets:
+            return tuple()
+        shared = set.intersection(*token_sets)
+        if not shared:
+            return tuple()
+        # Keep suppression narrow to reusable fragments (acronyms/tech tokens),
+        # while allowing practical product/component names like "IPAdapter".
+        shared = {tok for tok in shared if 2 <= len(tok) <= 16}
+        if not shared:
+            return tuple()
+        # Use ASCII-token boundaries so tokens still match next to non-ASCII script chars
+        # (e.g. "LoRAタグ", "тег-LoRA", etc.).
+        return tuple(
+            rf"(?i)(?<![A-Za-z0-9_]){re.escape(tok)}(?![A-Za-z0-9_])"
+            for tok in sorted(shared)
+        )
+
+    @classmethod
+    def _is_uniform_latin_only_group(cls, scrubbed_by_locale: Dict[str, str]) -> bool:
+        normalized_values = {
+            (text or "").strip().casefold() for text in scrubbed_by_locale.values()
+        }
+        if len(normalized_values) != 1:
+            return False
+        only_value = next(iter(normalized_values), "")
+        if not only_value:
+            return False
+        ratios = cls._script_family_ratios(only_value)
+        if not ratios:
+            return False
+        return set(ratios.keys()).issubset({"latin"})
+
+    @classmethod
     def analyze_locale(
         cls,
         locale: str,
@@ -262,8 +317,41 @@ class InvalidCharacterSetAnalyzer:
         threshold_ratio: float = DEFAULT_THRESHOLD_RATIO,
         ignore_patterns: Sequence[str] = (),
     ) -> List[str]:
+        return cls.find_invalid_locales_for_group(
+            values_by_locale,
+            threshold_ratio=threshold_ratio,
+            ignore_patterns=ignore_patterns,
+        )
+
+    @classmethod
+    def find_invalid_locales_for_group(
+        cls,
+        values_by_locale: Dict[str, str],
+        threshold_ratio: float = DEFAULT_THRESHOLD_RATIO,
+        ignore_patterns: Sequence[str] = (),
+    ) -> List[str]:
+        scrubbed_by_locale: Dict[str, str] = {}
+        represented_expected_scripts: set[str] = set()
+        for locale, raw_text in values_by_locale.items():
+            scrubbed = scrub_dynamic_segments(raw_text or "")
+            scrubbed = cls._apply_ignore_patterns(scrubbed, ignore_patterns)
+            scrubbed_by_locale[locale] = scrubbed
+            if cls._has_expected_script_representation(locale, scrubbed):
+                represented_expected_scripts.add(cls._locale_expected_script(locale))
+
+        # If every locale has the same Latin-only text, keep this as a quality-review
+        # concern (e.g., identical-to-default) and avoid surfacing as invalid character set.
+        if cls._is_uniform_latin_only_group(scrubbed_by_locale):
+            return []
+
+        shared_token_patterns: tuple[str, ...] = tuple()
+        # Only suppress shared unexpected parts when locale-specific scripts are truly represented.
+        if len(represented_expected_scripts) >= 2:
+            shared_token_patterns = cls._build_shared_token_ignore_patterns(scrubbed_by_locale)
+
+        merged_ignore_patterns = tuple(ignore_patterns) + shared_token_patterns
         invalid: List[str] = []
         for locale, text in values_by_locale.items():
-            if cls.analyze_locale(locale, text, threshold_ratio, ignore_patterns):
+            if cls.analyze_locale(locale, text, threshold_ratio, merged_ignore_patterns):
                 invalid.append(locale)
         return invalid
