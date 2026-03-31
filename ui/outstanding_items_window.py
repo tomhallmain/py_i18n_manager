@@ -1102,9 +1102,6 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         try:
             logger.debug("Starting save changes process...")
             
-            # Store current column widths
-            column_widths = [self.table.columnWidth(i) for i in range(self.table.columnCount())]
-            
             # First, ensure translation service is cleaned up
             if hasattr(self, 'translation_service'):
                 logger.debug("Cleaning up translation service...")
@@ -1128,11 +1125,9 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             
             # Collect all changes first, grouped by locale
             changes_by_locale = {}
-            rows_to_remove = []
             
             for row in range(self.table.rowCount()):
                 key = self._get_key_from_row(row)
-                row_complete = True
                 
                 for col in range(1, self.table.columnCount()):
                     locale = self.table.horizontalHeaderItem(col).text()
@@ -1151,14 +1146,6 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                                 for matched_key in matched_keys:
                                     if matched_key != key:  # Don't duplicate the representative
                                         changes_by_locale[locale].append((matched_key, new_value))
-                        else:
-                            row_complete = False
-                            if len(item.text()) > 0:
-                                logger.warn(f"Empty translation with spaces for {key} in {locale}")
-                
-                # If all cells in this row have translations, mark it for removal
-                if row_complete:
-                    rows_to_remove.append(row)
             
             # Emit one batch per locale
             logger.debug(f"Emitting batches for {len(changes_by_locale)} locales...")
@@ -1170,28 +1157,16 @@ class OutstandingItemsWindow(BaseTranslationWindow):
 
             # If this save contains only key deletions (no text edits), flush queued deletions now.
             parent = self.parent()
-            if (
-                not changes_by_locale
-                and parent
-                and hasattr(parent, "pending_deletions")
-                and parent.pending_deletions
-                and hasattr(parent, "process_batched_updates")
-            ):
-                logger.debug("Save triggered with pending deletions only; processing batched updates now.")
-                parent.process_batched_updates()
-            
-            # Remove completed rows in reverse order to maintain correct indices
-            for row in sorted(rows_to_remove, reverse=True):
-                self.table.removeRow(row)
+            if parent and hasattr(parent, "process_batched_updates"):
+                logger.debug(
+                    "Outstanding save complete; closing window and immediately processing batched updates."
+                )
+                self.close()
+                QTimer.singleShot(0, parent.process_batched_updates)
+                return
 
-            # Re-run validation and repopulate table with any still-invalid entries.
+            # Fallback path when parent cannot process updates: keep previous in-window behavior.
             has_items = self.load_data(self.translations, self.locales, skip_duplicate_prompt=True)
-            
-            # Restore column widths
-            for i, width in enumerate(column_widths):
-                self.table.setColumnWidth(i, width)
-            
-            # Close the dialog only when no outstanding items remain after revalidation.
             if not has_items:
                 logger.debug("No remaining outstanding translations; closing window.")
                 self.close()

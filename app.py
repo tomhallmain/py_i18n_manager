@@ -5,7 +5,7 @@ from typing import Optional
 
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, 
                             QHBoxLayout, QPushButton, QLabel, QFileDialog, 
-                            QTextEdit, QTabWidget, QMessageBox, QFrame)
+                            QTextEdit, QTabWidget, QMessageBox, QFrame, QProgressDialog)
 from PyQt6.QtCore import Qt, QTimer
 
 from i18n.i18n_manager import I18NManager
@@ -55,6 +55,9 @@ class MainWindow(SmartMainWindow):
         self.quality_review_window = None
         self.all_translations_window = None
         self.i18n_manager = None  # Store I18NManager instance
+        self.worker = None
+        self._task_running = False
+        self._task_progress_dialog = None
 
         # Initialize debounce timer for translation updates
         self.update_timer = QTimer()
@@ -299,6 +302,7 @@ class MainWindow(SmartMainWindow):
     def update_button_states(self):
         has_project = self.current_project is not None
         has_translations = self.i18n_manager is not None and self.i18n_manager.translations is not None
+        is_running = self._task_running
         
         # Get project type to determine if compilation is relevant
         project_type = None
@@ -306,7 +310,7 @@ class MainWindow(SmartMainWindow):
             project_type = self.settings_manager.get_project_type_as_type(self.current_project)
         
         # Compile Translations button - only enabled for Python projects (MO files are gettext-specific)
-        compile_enabled = has_project and project_type == ProjectType.PYTHON
+        compile_enabled = has_project and project_type == ProjectType.PYTHON and not is_running
         self.create_mo_btn.setEnabled(compile_enabled)
         
         if not compile_enabled and has_project and project_type:
@@ -322,18 +326,52 @@ class MainWindow(SmartMainWindow):
             # Clear tooltip for enabled state
             self.create_mo_btn.setToolTip("")
         
-        self.check_status_btn.setEnabled(has_project)
-        self.update_po_btn.setEnabled(has_project)
-        self.show_outstanding_btn.setEnabled(has_project and has_translations)
-        self.quality_review_btn.setEnabled(has_project and has_translations)
-        self.quality_exclusions_btn.setEnabled(has_project)
-        self.show_all_btn.setEnabled(has_project and has_translations)
-        self.write_default_btn.setEnabled(has_project and has_translations)
-        self.generate_pot_btn.setEnabled(has_project and has_translations)
-        self.find_untranslated_btn.setEnabled(has_project and has_translations)
-        self.cross_project_btn.setEnabled(has_project)
-        self.bulk_pot_btn.setEnabled(True)  # Always enabled as it works across all projects
-        self.modify_project_btn.setEnabled(has_project)
+        self.check_status_btn.setEnabled(has_project and not is_running)
+        self.update_po_btn.setEnabled(has_project and not is_running)
+        self.show_outstanding_btn.setEnabled(has_project and has_translations and not is_running)
+        self.quality_review_btn.setEnabled(has_project and has_translations and not is_running)
+        self.quality_exclusions_btn.setEnabled(has_project and not is_running)
+        self.show_all_btn.setEnabled(has_project and has_translations and not is_running)
+        self.write_default_btn.setEnabled(has_project and has_translations and not is_running)
+        self.generate_pot_btn.setEnabled(has_project and has_translations and not is_running)
+        self.find_untranslated_btn.setEnabled(has_project and has_translations and not is_running)
+        self.cross_project_btn.setEnabled(has_project and not is_running)
+        self.bulk_pot_btn.setEnabled(not is_running)  # Cross-project actions can race with active loads
+        self.modify_project_btn.setEnabled(has_project and not is_running)
+
+    def _set_task_running(self, running: bool):
+        self._task_running = running
+        self.update_button_states()
+
+    def _show_task_progress_dialog(self, action: TranslationAction):
+        if self._task_progress_dialog:
+            self._task_progress_dialog.close()
+            self._task_progress_dialog.deleteLater()
+            self._task_progress_dialog = None
+
+        messages = {
+            TranslationAction.CHECK_STATUS: _("Loading translation project..."),
+            TranslationAction.WRITE_PO_FILES: _("Updating translation files..."),
+            TranslationAction.WRITE_MO_FILES: _("Compiling translation files..."),
+            TranslationAction.GENERATE_POT: _("Syncing base translation files..."),
+            TranslationAction.QUALITY_REVIEW: _("Running quality review..."),
+        }
+        dialog = QProgressDialog(messages.get(action, _("Running translation task...")), "", 0, 0, self)
+        dialog.setWindowTitle(_("Please wait"))
+        dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        dialog.setMinimumDuration(0)
+        dialog.setAutoClose(False)
+        dialog.setAutoReset(False)
+        dialog.setCancelButton(None)
+        dialog.show()
+        self._task_progress_dialog = dialog
+
+    def _hide_task_progress_dialog(self):
+        if not self._task_progress_dialog:
+            return
+        self._task_progress_dialog.close()
+        self._task_progress_dialog.deleteLater()
+        self._task_progress_dialog = None
 
     def run_translation_task(self, action: TranslationAction = TranslationAction.CHECK_STATUS):
         """Run a translation task with the specified action.
@@ -345,8 +383,15 @@ class MainWindow(SmartMainWindow):
             logger.warning("No project selected, cannot run translation task")
             QMessageBox.warning(self, "Error", "Please select a project first")
             return
+
+        if self._task_running:
+            logger.debug("Ignoring translation task request because one is already running")
+            return
             
         logger.debug(f"Starting translation task with action: {action.name}, modified locales: {self.pending_updates.keys()}")
+        self.stats_widget.set_loading_state()
+        self._show_task_progress_dialog(action)
+        self._set_task_running(True)
         
         # Get intro details from config
         intro_details = self.settings_manager.get_intro_details()
@@ -370,45 +415,44 @@ class MainWindow(SmartMainWindow):
         self.worker.translations_ready.connect(self.handle_translations_ready)
         self.worker.start()
         
-        # Disable buttons while task is running
-        self.update_button_states()
-        
     def handle_task_finished(self, results: TranslationManagerResults):
         """Handle completion of a translation task."""
         logger.debug(f"Translation task finished - action: {results.action.name}, success: {results.action_successful}")
-        self.update_button_states()
-        
-        # Clear modified locales after task is complete
-        self.pending_updates.clear()
-        
-        if not results.action_successful:
-            error_msg = "Task completed with warnings or errors:\n\n" + results.error_message
-            logger.warning(f"Translation task completed with errors: {error_msg}")
-            QMessageBox.warning(self, "Warning", error_msg)
+        try:
+            # Clear modified locales after task is complete
+            self.pending_updates.clear()
 
-            # TODO maybe implement this with other condition: if not self.needs_project_setup()            
-            # # If this was a status check and it failed, remove the project from recent projects
-            # if results.action == TranslationAction.CHECK_STATUS:
-            #     logger.warning(f"Status check failed for project {self.current_project}, removing from recent projects")
-            #     self.handle_project_removal(self.current_project)
+            if not results.action_successful:
+                error_msg = "Task completed with warnings or errors:\n\n" + results.error_message
+                logger.warning(f"Translation task completed with errors: {error_msg}")
+                QMessageBox.warning(self, "Warning", error_msg)
 
-        # Check if project needs setup
-        if self.needs_project_setup():
-            logger.debug("Project needs setup, showing setup window")
-            self.show_project_setup()
-            return
+                # TODO maybe implement this with other condition: if not self.needs_project_setup()            
+                # # If this was a status check and it failed, remove the project from recent projects
+                # if results.action == TranslationAction.CHECK_STATUS:
+                #     logger.warning(f"Status check failed for project {self.current_project}, removing from recent projects")
+                #     self.handle_project_removal(self.current_project)
 
-        # Handle translation results
-        self.handle_translation_results(results)
+            # Use worker results directly; avoid re-running manage_translations on UI thread.
+            if self.needs_project_setup(results):
+                logger.debug("Project needs setup, showing setup window")
+                self.show_project_setup()
+                return
 
-        # If outstanding window is open, refresh it from the latest validation state.
-        if (self.outstanding_window and self.outstanding_window.isVisible() and
-                self.i18n_manager and self.i18n_manager.translations and self.locales):
-            self.outstanding_window.load_data(
-                self.i18n_manager.translations,
-                self.locales,
-                skip_duplicate_prompt=True,
-            )
+            # Handle translation results
+            self.handle_translation_results(results)
+
+            # If outstanding window is open, refresh it from the latest validation state.
+            if (self.outstanding_window and self.outstanding_window.isVisible() and
+                    self.i18n_manager and self.i18n_manager.translations and self.locales):
+                self.outstanding_window.load_data(
+                    self.i18n_manager.translations,
+                    self.locales,
+                    skip_duplicate_prompt=True,
+                )
+        finally:
+            self._hide_task_progress_dialog()
+            self._set_task_running(False)
 
     def handle_translations_ready(self, translations, locales):
         """Handle when translations are ready to be displayed."""
@@ -542,6 +586,11 @@ class MainWindow(SmartMainWindow):
         if not self.pending_updates and not self.pending_deletions:
             return
 
+        # Avoid callback churn/deadlock-like behavior while Outstanding window is visible.
+        # Close now and let the user reopen manually if needed.
+        if self.outstanding_window and self.outstanding_window.isVisible():
+            self.outstanding_window.close()
+
         # Deletions affect all locale files, so force all locales into modified set.
         if self.pending_deletions and self.locales:
             for locale in self.locales:
@@ -634,7 +683,7 @@ class MainWindow(SmartMainWindow):
             # Clear stats and translations
             self.locales = None
             self.i18n_manager = None
-            self.stats_widget.update_stats(0, 0, 0)
+            self.stats_widget.clear_stats()
             # Clear status text
             self.status_text.clear()
 
@@ -720,13 +769,17 @@ class MainWindow(SmartMainWindow):
             logger.error(error_msg)
             QMessageBox.critical(self, "Error", error_msg)
 
-    def needs_project_setup(self):
+    def needs_project_setup(self, results: Optional[TranslationManagerResults] = None):
         """Check if the project needs initial setup."""
+        if results is not None:
+            return results.needs_setup()
+
         if not self.i18n_manager:
             return False
-        
-        results = self.i18n_manager.manage_translations()
-        return results.needs_setup()
+
+        # Fallback path when no recent worker results are available.
+        fallback_results = self.i18n_manager.manage_translations()
+        return fallback_results.needs_setup()
 
     def show_project_setup(self):
         """Show the project setup window."""
