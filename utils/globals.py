@@ -222,11 +222,11 @@ class QualityHeuristicKind(str, Enum):
             return _("Translation equals default locale text.")
         if self is QualityHeuristicKind.LATIN_IN_CJK_LOCALE:
             return _(
-                "Latin letter run (4+ chars) in a locale that primarily uses a non-Latin script."
+                "Latin word/run (2+ chars) in a locale that primarily uses a non-Latin script."
             )
         if self is QualityHeuristicKind.LATIN_MIXED_SCRIPT_IN_NON_LATIN_LOCALE:
             return _(
-                "Mixed-script leakage: Latin letters appear inside otherwise non-Latin text."
+                "Mixed-script leakage: a single Latin character appears inside non-Latin text or as a lone token."
             )
         if self is QualityHeuristicKind.HIGH_ENGLISH_RATIO:
             return _("English token ratio above threshold (heuristic not yet enabled).")

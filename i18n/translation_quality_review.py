@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import math
 import re
+import unicodedata
 from typing import AbstractSet, Dict, List, Optional, Sequence, TYPE_CHECKING
 
 from utils.globals import QualityHeuristicKind
+from utils.logging_setup import get_logger
 from utils.utils import Utils
 
 if TYPE_CHECKING:
@@ -24,6 +26,46 @@ from .invalid_translation_groups import QualityReviewFinding, TranslationQuality
 from .translation_group import TranslationGroup, TranslationKey
 
 
+
+
+logger = get_logger("translation_quality_review")
+_DEBUG_MIXED_SCRIPT_PROBE = ""
+_DEBUG_MIXED_SCRIPT_KEY = ""
+
+
+def _should_debug_probe(mid: str, text: str) -> bool:
+    if (mid or "").strip() != _DEBUG_MIXED_SCRIPT_KEY:
+        return False
+    hay = (text or "").casefold()
+    if _DEBUG_MIXED_SCRIPT_PROBE.casefold() in hay:
+        return True
+    # Common confusable variant from current debugging examples.
+    return "если вы сбросите mfa, еe можно снова настроить".casefold() in hay
+
+
+def _debug_heuristic_probe(mid: str, loc: str, tstrip: str, latin_ignore_patterns: Sequence[str]) -> None:
+    if not _should_debug_probe(mid, tstrip):
+        return
+    run_hit = _has_significant_latin_run(tstrip, latin_ignore_patterns)
+    mixed_hit = _has_mixed_script_latin_leakage(tstrip, latin_ignore_patterns)
+    scrubbed = tstrip
+    prev = None
+    while scrubbed != prev:
+        prev = scrubbed
+        scrubbed = _CURLY_BRACE_SEGMENT.sub("", scrubbed)
+    scrubbed = _MARKUP_TAG_SEGMENT.sub("", scrubbed)
+    scrubbed = _apply_latin_ignore_patterns(scrubbed, latin_ignore_patterns)
+    logger.warning(
+        "[QUALITY-DEBUG] key=%r locale=%r non_latin_locale=%s run_hit=%s mixed_hit=%s ignore_patterns=%r text=%r scrubbed=%r",
+        mid,
+        loc,
+        Utils.is_non_latin_script_locale(loc),
+        run_hit,
+        mixed_hit,
+        list(latin_ignore_patterns),
+        tstrip,
+        scrubbed,
+    )
 
 
 def collect_findings_for_group(
@@ -45,6 +87,9 @@ def collect_findings_for_group(
         if not text or not text.strip():
             continue
         tstrip = text.strip()
+        # DEBUG PROBE DISABLED (keep helper method for quick future investigations):
+        # if _base_language(loc) == "ru":
+        #     _debug_heuristic_probe(mid, loc, tstrip, latin_ignore_patterns)
         if base and tstrip == base and not _is_allowed_identical_to_english_default(
             default_locale, loc, tstrip, latin_ignore_patterns
         ):
@@ -68,7 +113,7 @@ def collect_findings_for_group(
                         signal=h,
                     )
                 )
-            elif _has_mixed_script_latin_leakage(tstrip, latin_ignore_patterns):
+            if _has_mixed_script_latin_leakage(tstrip, latin_ignore_patterns):
                 h = QualityHeuristicKind.LATIN_MIXED_SCRIPT_IN_NON_LATIN_LOCALE
                 findings.append(
                     QualityReviewFinding(
@@ -83,8 +128,6 @@ def collect_findings_for_group(
     return findings
 
 
-_LATIN_RUN = re.compile(r"[A-Za-z]{4,}")
-_LATIN_CHAR = re.compile(r"[A-Za-z]")
 _CURLY_BRACE_SEGMENT = re.compile(r"\{[^{}]*\}")
 _MARKUP_TAG_SEGMENT = re.compile(r"</?[A-Za-z][^>]*>")
 _EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
@@ -227,7 +270,7 @@ def _is_allowed_identical_to_english_default(
 
     # Allow if user-configured Latin-ignore patterns account for all Latin characters.
     scrubbed_without_patterns = _apply_latin_ignore_patterns(scrubbed, latin_ignore_patterns)
-    if not _LATIN_CHAR.search(scrubbed_without_patterns):
+    if not _contains_latin_letter(scrubbed_without_patterns):
         return True
 
     # Allow if the only remaining Latin content is from accepted shared terms.
@@ -238,7 +281,7 @@ def _is_allowed_identical_to_english_default(
             scrubbed_without_patterns,
             flags=re.IGNORECASE,
         )
-    return not _LATIN_CHAR.search(scrubbed_without_patterns)
+    return not _contains_latin_letter(scrubbed_without_patterns)
 
 
 def _apply_latin_ignore_patterns(text: str, patterns: Sequence[str]) -> str:
@@ -255,9 +298,72 @@ def _apply_latin_ignore_patterns(text: str, patterns: Sequence[str]) -> str:
     return scrubbed
 
 
+def _is_latin_char(ch: str) -> bool:
+    if not ch or not ch.isalpha():
+        return False
+    return "LATIN" in unicodedata.name(ch, "")
+
+
+def _contains_latin_letter(text: str) -> bool:
+    for ch in text:
+        if _is_latin_char(ch):
+            return True
+    return False
+
+
 def _contains_non_latin_letter(text: str) -> bool:
     for ch in text:
-        if ch.isalpha() and not ("A" <= ch <= "Z" or "a" <= ch <= "z"):
+        if ch.isalpha() and not _is_latin_char(ch):
+            return True
+    return False
+
+
+def _has_latin_sequence(text: str, minimum_length: int) -> bool:
+    run = 0
+    for ch in text:
+        if _is_latin_char(ch):
+            run += 1
+            if run >= minimum_length:
+                return True
+        else:
+            run = 0
+    return False
+
+
+def _is_non_latin_alpha(ch: str) -> bool:
+    return ch.isalpha() and not _is_latin_char(ch)
+
+
+def _has_single_latin_char_embedded_in_non_latin_word(text: str) -> bool:
+    """True for typo-like leakage in non-Latin text.
+
+    Matches either:
+    - one Latin char directly between non-Latin letters, or
+    - a single-letter Latin token (e.g. ``c``), including when separated by spaces/punctuation.
+    """
+    if len(text) < 1:
+        return False
+
+    for i, ch in enumerate(text):
+        if not _is_latin_char(ch):
+            continue
+        left = text[i - 1] if i > 0 else ""
+        right = text[i + 1] if i + 1 < len(text) else ""
+        # Embedded typo: Latin between non-Latin letters.
+        if _is_non_latin_alpha(left) and _is_non_latin_alpha(right):
+            return True
+        # Boundary typo: single Latin char touching non-Latin on either side.
+        if _is_non_latin_alpha(left) or _is_non_latin_alpha(right):
+            # Ensure this Latin char is not part of a longer Latin run.
+            if not _is_latin_char(left) and not _is_latin_char(right):
+                return True
+    # Also catch isolated one-letter Latin tokens surrounded by non-Latin or separators.
+    for i, ch in enumerate(text):
+        if not _is_latin_char(ch):
+            continue
+        left = text[i - 1] if i > 0 else ""
+        right = text[i + 1] if i + 1 < len(text) else ""
+        if not _is_latin_char(left) and not _is_latin_char(right):
             return True
     return False
 
@@ -271,7 +377,10 @@ def _has_significant_latin_run(text: str, latin_ignore_patterns: Sequence[str] =
         scrubbed = _CURLY_BRACE_SEGMENT.sub("", scrubbed)
     scrubbed = _MARKUP_TAG_SEGMENT.sub("", scrubbed)
     scrubbed = _apply_latin_ignore_patterns(scrubbed, latin_ignore_patterns)
-    return bool(_LATIN_RUN.search(scrubbed))
+    # Catch longer Latin runs and short Latin sequences (e.g. "GM", "ee"),
+    # including when adjacent to non-Latin letters.
+    # after placeholder/tag/pattern scrubbing.
+    return _has_latin_sequence(scrubbed, 2)
 
 
 def _has_mixed_script_latin_leakage(
@@ -284,7 +393,9 @@ def _has_mixed_script_latin_leakage(
         scrubbed = _CURLY_BRACE_SEGMENT.sub("", scrubbed)
     scrubbed = _MARKUP_TAG_SEGMENT.sub("", scrubbed)
     scrubbed = _apply_latin_ignore_patterns(scrubbed, latin_ignore_patterns)
-    return bool(_LATIN_CHAR.search(scrubbed)) and _contains_non_latin_letter(scrubbed)
+    if not _contains_latin_letter(scrubbed):
+        return False
+    return _has_single_latin_char_embedded_in_non_latin_word(scrubbed)
 
 
 def _findings_high_english_ratio_stub(

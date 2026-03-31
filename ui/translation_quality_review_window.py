@@ -173,7 +173,7 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         layout.addWidget(
             QLabel(
                 _(
-                    "Built-in checks: non-Latin-script locales with long Latin runs and a separate mixed-script Latin-leakage signal; translations identical "
+                    "Built-in checks: non-Latin-script locales with Latin words/runs and a separate mixed-script Latin-leakage signal; translations identical "
                     "to the default locale. Respects exclusions from the Exclusions tab. "
                     "(English-ratio heuristic reserved.)"
                 )
@@ -254,6 +254,12 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         )
         self._run_heuristic_btn.clicked.connect(self._on_run_heuristic_analysis)
         row.addWidget(self._run_heuristic_btn)
+        self._unicode_help_btn = QPushButton(_("IDE glyph highlight help"))
+        self._unicode_help_btn.setToolTip(
+            _("Explain why IDE character highlighting can differ from script heuristics.")
+        )
+        self._unicode_help_btn.clicked.connect(self._on_unicode_highlight_help)
+        row.addWidget(self._unicode_help_btn)
         self._export_filtered_btn = QPushButton(_("Export filtered TSV…"))
         self._export_filtered_btn.setToolTip(
             _("Export the currently filtered rows from this table to a TSV file.")
@@ -1165,3 +1171,31 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             )
         except Exception as e:
             QMessageBox.warning(self, _("Export TSV"), _("Could not export TSV:\n{err}").format(err=str(e)))
+
+    def _on_unicode_highlight_help(self) -> None:
+        QMessageBox.information(
+            self,
+            _("IDE glyph highlight help"),
+            _(
+                "Your IDE may highlight visually confusable Unicode glyphs (for security / typo prevention), "
+                "which is separate from this app's script heuristics. A highlighted character is not always "
+                "wrong for the target language."
+            ) + "\n\n" +
+            _(  
+                "Important: this highlighting can look inconsistent in non-English translation text and may not "
+                "match language expectations. If something looks suspicious, trust Unicode code points and script "
+                "names (for example, U+0435 CYRILLIC SMALL LETTER IE vs U+0065 LATIN SMALL LETTER E), not visual shape."
+            ) + "\n\n" +
+            _(
+                "For more details see the test method `test_codepoint_clarity_for_confusables` in `tests/test_translation_quality_review.py`."
+            ) + "\n\n" +
+            _(
+                "In Cursor/VS Code the confusable character highlighting is controlled by editor.unicodeHighlight settings, especially:\n"
+                "- editor.unicodeHighlight.ambiguousCharacters\n"
+                "- editor.unicodeHighlight.allowedLocales\n"
+                "- editor.unicodeHighlight.allowedCharacters"
+            ) + "\n\n" +
+            _(
+                "Quality Review findings are based on actual Unicode script values loaded from translation files."
+            ),
+        )
