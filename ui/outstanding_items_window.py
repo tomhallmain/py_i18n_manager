@@ -785,6 +785,36 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         extras = sorted([loc for loc in locales_set if loc not in self.locales])
         return ", ".join(ordered + extras)
 
+    @staticmethod
+    def _sanitize_export_text(value):
+        return str(value or "").replace("\t", " ").replace("\r", " ").replace("\n", " ")
+
+    @staticmethod
+    def _truncate_export_text(value, max_len=280):
+        text = str(value or "")
+        if len(text) <= max_len:
+            return text
+        return text[: max_len - 3] + "..."
+
+    @staticmethod
+    def _escape_markdown(value):
+        text = str(value or "")
+        text = text.replace("\\", "\\\\")
+        text = text.replace("|", "\\|")
+        text = text.replace("\r", " ").replace("\n", " ")
+        return text
+
+    def _format_locale_value_pairs(self, group, locales_set):
+        if not locales_set:
+            return ""
+        ordered = [loc for loc in self.locales if loc in locales_set]
+        extras = sorted([loc for loc in locales_set if loc not in self.locales])
+        values = []
+        for locale in ordered + extras:
+            raw = group.get_translation(locale) or ""
+            values.append(f"{locale}={self._sanitize_export_text(raw)}")
+        return " | ".join(values)
+
     def export_outstanding_to_tsv(self):
         """Export current outstanding rows and invalid locale buckets to a TSV file."""
         if not self._current_invalid_groups:
@@ -794,6 +824,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         default_locale = config_manager.get('translation.default_locale', 'en')
         headers = [
             "Translation Key",
+            "Default Locale Value",
             "Defined without Error",
             "Missing",
             "Invalid Unicode",
@@ -801,9 +832,13 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             "Invalid Leading Space",
             "Invalid Newline",
             "Invalid Character Set",
+            "Invalid Locale Values",
         ]
+        markdown_headers = [h for h in headers if h != "Invalid Locale Values"]
 
         lines = ["\t".join(headers)]
+        markdown_rows = []
+        markdown_details = []
 
         for _key, (invalid_locales, group) in self._current_invalid_groups.items():
             # Keep Invalid Unicode aligned with current outstanding UI behavior
@@ -824,18 +859,21 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 | invalid_character_set
             )
 
+            default_value = group.get_translation(default_locale) or ""
             defined_without_error = set()
             for locale in self.locales:
                 value = group.get_translation(locale)
                 if value and value.strip() and locale not in all_error_locales:
                     defined_without_error.add(locale)
             # Default locale is often not in self.locales list from header filtering in this window.
-            default_value = group.get_translation(default_locale)
             if default_value and default_value.strip() and default_locale not in all_error_locales:
                 defined_without_error.add(default_locale)
 
+            invalid_locale_values = self._format_locale_value_pairs(group, all_error_locales)
+            invalid_locale_values_tsv = self._truncate_export_text(invalid_locale_values)
             row_values = [
                 group.key.msgid,
+                default_value,
                 self._format_locale_list(defined_without_error),
                 self._format_locale_list(missing),
                 self._format_locale_list(invalid_unicode),
@@ -843,10 +881,38 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 self._format_locale_list(invalid_leading_space),
                 self._format_locale_list(invalid_newline),
                 self._format_locale_list(invalid_character_set),
+                invalid_locale_values_tsv,
             ]
             # Keep TSV shape stable (no tabs/newlines in cell content)
-            safe_values = [str(v).replace("\t", " ").replace("\r", " ").replace("\n", " ") for v in row_values]
+            safe_values = [self._sanitize_export_text(v) for v in row_values]
             lines.append("\t".join(safe_values))
+
+            markdown_rows.append(
+                {
+                    "Translation Key": group.key.msgid,
+                    "Default Locale Value": default_value,
+                    "Defined without Error": self._format_locale_list(defined_without_error),
+                    "Missing": self._format_locale_list(missing),
+                    "Invalid Unicode": self._format_locale_list(invalid_unicode),
+                    "Invalid Braces": self._format_locale_list(invalid_braces),
+                    "Invalid Leading Space": self._format_locale_list(invalid_leading_space),
+                    "Invalid Newline": self._format_locale_list(invalid_newline),
+                    "Invalid Character Set": self._format_locale_list(invalid_character_set),
+                }
+            )
+            markdown_details.append(
+                {
+                    "key": group.key.msgid,
+                    "default": default_value,
+                    "missing": missing,
+                    "invalid_unicode": invalid_unicode,
+                    "invalid_braces": invalid_braces,
+                    "invalid_leading_space": invalid_leading_space,
+                    "invalid_newline": invalid_newline,
+                    "invalid_character_set": invalid_character_set,
+                    "group": group,
+                }
+            )
 
         default_name = os.path.join(self.project_path or "", "outstanding_translation_keys.tsv")
         dialog_result = QFileDialog.getSaveFileName(
@@ -862,12 +928,49 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         try:
             with open(file_path, 'w', encoding='utf-8', newline='\n') as f:
                 f.write("\n".join(lines) + "\n")
+
+            md_path = os.path.splitext(file_path)[0] + ".md"
+            with open(md_path, "w", encoding="utf-8", newline="\n") as f:
+                f.write("# Outstanding Translation Export\n\n")
+                f.write("| " + " | ".join(markdown_headers) + " |\n")
+                f.write("|" + "|".join(["---"] * len(markdown_headers)) + "|\n")
+                for row in markdown_rows:
+                    f.write(
+                        "| "
+                        + " | ".join(
+                            self._escape_markdown(row.get(header, ""))
+                            for header in markdown_headers
+                            )
+                        + " |\n"
+                    )
+                f.write("\n## Invalid Issue Details\n\n")
+                for detail in markdown_details:
+                    f.write(f"### {self._escape_markdown(detail['key'])}\n")
+                    f.write(f"- Default locale value: {self._escape_markdown(detail['default'])}\n")
+                    category_rows = [
+                        ("Missing locales", detail["missing"]),
+                        ("Invalid Unicode locales", detail["invalid_unicode"]),
+                        ("Invalid braces locales", detail["invalid_braces"]),
+                        ("Invalid leading-space locales", detail["invalid_leading_space"]),
+                        ("Invalid newline locales", detail["invalid_newline"]),
+                        ("Invalid character-set locales", detail["invalid_character_set"]),
+                    ]
+                    for label, locales_set in category_rows:
+                        if locales_set:
+                            f.write(
+                                f"- {label}: {self._escape_markdown(self._format_locale_list(locales_set))}\n"
+                            )
+                    f.write(
+                        f"- Invalid locale values: {self._escape_markdown(self._format_locale_value_pairs(detail['group'], detail['missing'] | detail['invalid_unicode'] | detail['invalid_braces'] | detail['invalid_leading_space'] | detail['invalid_newline'] | detail['invalid_character_set']))}\n\n"
+                    )
+
             QMessageBox.information(
                 self,
                 _("Export Complete"),
-                _("Exported {count} outstanding key(s) to:\n{path}").format(
+                _("Exported {count} outstanding key(s) to:\n{path}\n\nMarkdown companion:\n{md_path}").format(
                     count=len(self._current_invalid_groups),
-                    path=file_path
+                    path=file_path,
+                    md_path=md_path,
                 ),
             )
         except Exception as e:
