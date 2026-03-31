@@ -6,6 +6,7 @@ import os
 
 from lib.multi_display import SmartDialog
 from ui.locale_selection_window import LocaleSelectionWindow, validate_locale_code
+from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 from utils.globals import ProjectType
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
@@ -149,12 +150,23 @@ class SetupTranslationProjectWindow(SmartDialog):
         
         save_btn = QPushButton(_("Save Configuration"))
         save_btn.clicked.connect(self.save_configuration)
+        exclusions_btn = QPushButton(_("Heuristic Exclusions"))
+        exclusions_btn.clicked.connect(self.open_quality_exclusions)
         cancel_btn = QPushButton(_("Cancel"))
         cancel_btn.clicked.connect(self.reject)
         
         button_layout.addWidget(save_btn)
+        button_layout.addWidget(exclusions_btn)
         button_layout.addWidget(cancel_btn)
         layout.addLayout(button_layout)
+
+    def open_quality_exclusions(self) -> None:
+        dialog = QualityReviewExclusionsDialog(
+            project_path=self.project_dir,
+            settings_manager=self.settings_manager,
+            parent=self,
+        )
+        dialog.exec()
         
     def load_existing_locales(self):
         """Load existing locales from the project directory."""

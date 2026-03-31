@@ -17,6 +17,7 @@ from ui.app_style import AppStyle
 from ui.bulk_pot_analysis_window import BulkPotAnalysisWindow
 from ui.cross_project_analysis_window import CrossProjectAnalysisWindow
 from ui.outstanding_items_window import OutstandingItemsWindow
+from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 from ui.recent_projects_dialog import RecentProjectsDialog
 from ui.setup_translation_project_window import SetupTranslationProjectWindow
 from ui.stats_widget import StatsWidget
@@ -137,6 +138,7 @@ class MainWindow(SmartMainWindow):
         self.show_all_btn = QPushButton(_("Show All Translations"))
         self.show_outstanding_btn = QPushButton(_("Show Outstanding Items"))
         self.quality_review_btn = QPushButton(_("Translation Quality Review"))
+        self.quality_exclusions_btn = QPushButton(_("Heuristic Exclusions"))
         self.find_untranslated_btn = QPushButton(_("Find Untranslated"))
 
         self.check_status_btn.clicked.connect(lambda: self.run_translation_task())
@@ -144,6 +146,7 @@ class MainWindow(SmartMainWindow):
         self.show_all_btn.clicked.connect(self.show_all_translations)
         self.show_outstanding_btn.clicked.connect(self.show_outstanding_items)
         self.quality_review_btn.clicked.connect(self.show_translation_quality_review)
+        self.quality_exclusions_btn.clicked.connect(self.show_quality_exclusions)
         self.find_untranslated_btn.clicked.connect(self.find_untranslated_strings)
 
         first_row_layout.addWidget(self.check_status_btn)
@@ -151,6 +154,7 @@ class MainWindow(SmartMainWindow):
         first_row_layout.addWidget(self.show_all_btn)
         first_row_layout.addWidget(self.show_outstanding_btn)
         first_row_layout.addWidget(self.quality_review_btn)
+        first_row_layout.addWidget(self.quality_exclusions_btn)
         first_row_layout.addWidget(self.find_untranslated_btn)
 
         # Second row of buttons
@@ -322,6 +326,7 @@ class MainWindow(SmartMainWindow):
         self.update_po_btn.setEnabled(has_project)
         self.show_outstanding_btn.setEnabled(has_project and has_translations)
         self.quality_review_btn.setEnabled(has_project and has_translations)
+        self.quality_exclusions_btn.setEnabled(has_project)
         self.show_all_btn.setEnabled(has_project and has_translations)
         self.write_default_btn.setEnabled(has_project and has_translations)
         self.generate_pot_btn.setEnabled(has_project and has_translations)
@@ -475,6 +480,34 @@ class MainWindow(SmartMainWindow):
         self.quality_review_window.show()
         self.quality_review_window.raise_()
         self.quality_review_window.activateWindow()
+
+    def show_quality_exclusions(self):
+        if not self.current_project:
+            QMessageBox.warning(self, _("Error"), _("Please select a project first"))
+            return
+        dialog = QualityReviewExclusionsDialog(
+            project_path=self.current_project,
+            settings_manager=self.settings_manager,
+            parent=self,
+        )
+        dialog.settings_saved.connect(self._on_quality_exclusions_saved)
+        dialog.exec()
+
+    def _on_quality_exclusions_saved(self):
+        if self.quality_review_window and self.quality_review_window.isVisible():
+            self.quality_review_window.refresh_placeholder_lists()
+        if (
+            self.outstanding_window
+            and self.outstanding_window.isVisible()
+            and self.i18n_manager
+            and self.i18n_manager.translations
+            and self.locales
+        ):
+            self.outstanding_window.load_data(
+                self.i18n_manager.translations,
+                self.locales,
+                skip_duplicate_prompt=True,
+            )
 
     def handle_translation_update(self, locale, changes):
         """Handle batched translation updates from the outstanding items window.

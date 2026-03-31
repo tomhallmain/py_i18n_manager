@@ -4,11 +4,16 @@ import unittest
 from pathlib import Path
 
 if "polib" not in sys.modules:
-    fake_polib = types.ModuleType("polib")
+    sys.modules["polib"] = types.ModuleType("polib")
 
+fake_polib = sys.modules["polib"]
+
+if not hasattr(fake_polib, "POEntry"):
     class _POEntry:
         pass
+    fake_polib.POEntry = _POEntry
 
+if not hasattr(fake_polib, "POFile"):
     class _POFile(list):
         metadata = {}
 
@@ -17,14 +22,12 @@ if "polib" not in sys.modules:
 
         def save_as_mofile(self, *args, **kwargs):
             return None
-
-    def _pofile(*args, **kwargs):
-        return _POFile()
-
-    fake_polib.POEntry = _POEntry
     fake_polib.POFile = _POFile
+
+if not hasattr(fake_polib, "pofile"):
+    def _pofile(*args, **kwargs):
+        return fake_polib.POFile()
     fake_polib.pofile = _pofile
-    sys.modules["polib"] = fake_polib
 
 from i18n.i18n_manager import I18NManager
 from i18n.translation_manager_results import TranslationAction
@@ -45,6 +48,12 @@ class _FakeSettingsManager:
 
     def get_project_default_locale(self, _project_path: str) -> str:
         return "en"
+
+    def get_quality_review_excluded_msgids(self, _project_path: str):
+        return []
+
+    def get_quality_review_script_ignore_patterns(self, _project_path: str):
+        return []
 
 
 class TestProjectSwitchLocaleRegression(unittest.TestCase):

@@ -13,6 +13,7 @@ from PyQt6.QtGui import QAction
 from i18n.translation_group import TranslationGroup, TranslationKey
 from ui.app_style import AppStyle
 from ui.base_translation_window import BaseTranslationWindow
+from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 from utils.config import config_manager
 from utils.globals import TranslationStatus, TranslationFilter
 from utils.translations import I18N
@@ -103,9 +104,16 @@ class AllTranslationsWindow(BaseTranslationWindow):
         self.unicode_toggle = QCheckBox(_("Show Escaped Unicode"))
         self.unicode_toggle.setChecked(self.show_escaped)
         self.unicode_toggle.stateChanged.connect(self.toggle_unicode_display)
+
+        self.exclusions_btn = QPushButton(_("Heuristic Exclusions"))
+        self.exclusions_btn.clicked.connect(self.open_quality_exclusions)
+        self.exclusions_btn.setToolTip(
+            _("Manage msgid exclusions and ignore regex patterns for this project.")
+        )
         
         button_layout.addWidget(save_btn)
         button_layout.addWidget(close_btn)
+        button_layout.addWidget(self.exclusions_btn)
         button_layout.addWidget(self.unicode_toggle)
         layout.addLayout(button_layout)
         
@@ -154,6 +162,13 @@ class AllTranslationsWindow(BaseTranslationWindow):
         self.table.setRowCount(len(translations))
         
         # Fill in data (key is always TranslationKey)
+        ignore_patterns = tuple(
+            self.settings_manager.get_quality_review_script_ignore_patterns(
+                self.project_path
+            )
+            if getattr(self, "project_path", None)
+            else ()
+        )
         for row, (key, group) in enumerate(translations.items()):
             msgid_item = QTableWidgetItem(group.key.msgid)
             msgid_item.setData(Qt.ItemDataRole.UserRole, key)
@@ -161,7 +176,9 @@ class AllTranslationsWindow(BaseTranslationWindow):
             self.table.setItem(row, 0, msgid_item)
 
             # Get invalid translations once per row
-            invalid_locales = group.get_invalid_translations(locales)
+            invalid_locales = group.get_invalid_translations(
+                locales, ignore_patterns=ignore_patterns
+            )
 
             # Add translations for each locale
             for col, locale in enumerate(locales, 1):
@@ -182,8 +199,8 @@ class AllTranslationsWindow(BaseTranslationWindow):
                     cell_statuses.add(TranslationStatus.INVALID_LEADING_SPACE)
                 if locale in invalid_locales.invalid_newline_locales:
                     cell_statuses.add(TranslationStatus.INVALID_NEWLINE)
-                if locale in invalid_locales.invalid_cjk_locales:
-                    cell_statuses.add(TranslationStatus.INVALID_CJK)
+                if locale in invalid_locales.invalid_character_set_locales:
+                    cell_statuses.add(TranslationStatus.INVALID_CHARACTER_SET)
 
                 # Store status in cache
                 self.status_cache[(row, col)] = cell_statuses
@@ -437,6 +454,19 @@ class AllTranslationsWindow(BaseTranslationWindow):
         """Clear the search box and reset the filter to show all items."""
         self.search_box.clear()
         self.filter_table()
+
+    def open_quality_exclusions(self):
+        dialog = QualityReviewExclusionsDialog(
+            project_path=getattr(self, "project_path", None),
+            settings_manager=self.settings_manager,
+            parent=self,
+        )
+        dialog.settings_saved.connect(self._reload_after_exclusions_saved)
+        dialog.exec()
+
+    def _reload_after_exclusions_saved(self):
+        if self.all_translations is not None and self.all_locales is not None:
+            self.load_data(self.all_translations, self.all_locales)
 
     def _row_for_translation_key(self, key: TranslationKey) -> int:
         """Logical row index whose first column carries ``key`` in UserRole, or ``-1``."""

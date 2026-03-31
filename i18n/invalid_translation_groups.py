@@ -53,7 +53,7 @@ class InvalidTranslationGroups:
     invalid_brace_locale_groups: List[Tuple[TranslationKey, List[str]]] = field(default_factory=list)
     invalid_leading_space_locale_groups: List[Tuple[TranslationKey, List[str]]] = field(default_factory=list)
     invalid_newline_locale_groups: List[Tuple[TranslationKey, List[str]]] = field(default_factory=list)
-    invalid_cjk_locale_groups: List[Tuple[TranslationKey, List[str]]] = field(default_factory=list)
+    invalid_character_set_locale_groups: List[Tuple[TranslationKey, List[str]]] = field(default_factory=list)
     
     @property
     def has_errors(self) -> bool:
@@ -65,7 +65,7 @@ class InvalidTranslationGroups:
                 len(self.invalid_brace_locale_groups) > 0 or
                 len(self.invalid_leading_space_locale_groups) > 0 or
                 len(self.invalid_newline_locale_groups) > 0 or
-                len(self.invalid_cjk_locale_groups) > 0)
+                len(self.invalid_character_set_locale_groups) > 0)
 
     def get_total_errors(self) -> Dict[str, int]:
         """Get a count of all error types."""
@@ -77,7 +77,7 @@ class InvalidTranslationGroups:
             'invalid_braces': sum(len(locales) for _, locales in self.invalid_brace_locale_groups),
             'invalid_leading_spaces': sum(len(locales) for _, locales in self.invalid_leading_space_locale_groups),
             'invalid_newlines': sum(len(locales) for _, locales in self.invalid_newline_locale_groups),
-            'invalid_cjk': sum(len(locales) for _, locales in self.invalid_cjk_locale_groups)
+            'invalid_character_set': sum(len(locales) for _, locales in self.invalid_character_set_locale_groups),
         }
 
     def get_invalid_locales(self) -> List[str]:
@@ -88,6 +88,6 @@ class InvalidTranslationGroups:
                     set(loc for _, locs in self.invalid_brace_locale_groups for loc in locs) |
                     set(loc for _, locs in self.invalid_leading_space_locale_groups for loc in locs) |
                     set(loc for _, locs in self.invalid_newline_locale_groups for loc in locs) |
-                    set(loc for _, locs in self.invalid_cjk_locale_groups for loc in locs))
+                    set(loc for _, locs in self.invalid_character_set_locale_groups for loc in locs))
 
 

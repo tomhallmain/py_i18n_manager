@@ -4,8 +4,8 @@ from typing import List, Set
 
 from polib import POEntry
 
+from .invalid_character_set import InvalidCharacterSetAnalyzer
 from utils.config import config_manager
-from utils.utils import Utils
 
 @dataclass
 class InvalidTranslationGroupLocales:
@@ -16,7 +16,7 @@ class InvalidTranslationGroupLocales:
     invalid_brace_locales: List[str] = field(default_factory=list)
     invalid_leading_space_locales: List[str] = field(default_factory=list)
     invalid_newline_locales: List[str] = field(default_factory=list)
-    invalid_cjk_locales: List[str] = field(default_factory=list)
+    invalid_character_set_locales: List[str] = field(default_factory=list)
     
     @property
     def has_errors(self) -> bool:
@@ -27,7 +27,7 @@ class InvalidTranslationGroupLocales:
                 len(self.invalid_brace_locales) > 0 or
                 len(self.invalid_leading_space_locales) > 0 or
                 len(self.invalid_newline_locales) > 0 or
-                len(self.invalid_cjk_locales) > 0)
+                len(self.invalid_character_set_locales) > 0)
     
     def get_total_errors(self) -> dict[str, int]:
         """Get a count of all error types."""
@@ -38,7 +38,7 @@ class InvalidTranslationGroupLocales:
             'invalid_braces': len(self.invalid_brace_locales),
             'invalid_leading_spaces': len(self.invalid_leading_space_locales),
             'invalid_newlines': len(self.invalid_newline_locales),
-            'invalid_cjk': len(self.invalid_cjk_locales)
+            'invalid_character_set': len(self.invalid_character_set_locales),
         }
     
     def get_invalid_locales(self) -> List[str]:
@@ -49,7 +49,7 @@ class InvalidTranslationGroupLocales:
                     set(self.invalid_brace_locales) |
                     set(self.invalid_leading_space_locales) |
                     set(self.invalid_newline_locales) |
-                    set(self.invalid_cjk_locales))
+                    set(self.invalid_character_set_locales))
 
 def escape_unicode(s):
     """Convert a string to ASCII-encoded Unicode format for PO files.
@@ -453,24 +453,31 @@ class TranslationGroup():
                 
         return invalid_newline_locales
 
-    def get_invalid_cjk_locales(self, threshold_percentage=0):
-        """Get locales with mostly CJK characters for non-CJK locale codes.
+    def get_invalid_character_set_locales(
+        self,
+        threshold_percentage=40,
+        ignore_patterns: tuple[str, ...] = tuple(),
+    ):
+        """Get locales whose text script profile mismatches locale expectations.
 
         Args:
-            threshold_percentage (int): Minimum CJK percentage to treat as invalid.
+            threshold_percentage (int): Percentage threshold used by character-set checks.
 
         Returns:
-            list: Locales that exceed the CJK ratio threshold but are not CJK-associated.
+            list: Locales flagged by character-set mismatch rules.
         """
-        invalid_cjk_locales = []
+        threshold = max(0, min(100, int(threshold_percentage))) / 100.0
+        return InvalidCharacterSetAnalyzer.find_invalid_locales(
+            self.values,
+            threshold,
+            ignore_patterns=ignore_patterns,
+        )
 
-        for locale, translation in self.values.items():
-            if Utils.is_cjk_locale(locale):
-                continue
-            if Utils.get_cjk_character_ratio(translation, threshold_percentage):
-                invalid_cjk_locales.append(locale)
-
-        return invalid_cjk_locales
+    # Backward-compat alias for existing callers while naming migrates.
+    def get_invalid_non_latin_locales_for_latin_locales(
+        self, threshold_percentage=40, ignore_patterns: tuple[str, ...] = tuple()
+    ):
+        return self.get_invalid_character_set_locales(threshold_percentage, ignore_patterns)
 
     def collect_quality_review_findings(
         self,
@@ -571,7 +578,11 @@ class TranslationGroup():
 
         return fixed
 
-    def get_invalid_translations(self, locales) -> InvalidTranslationGroupLocales:
+    def get_invalid_translations(
+        self,
+        locales,
+        ignore_patterns: tuple[str, ...] = tuple(),
+    ) -> InvalidTranslationGroupLocales:
         """Get all invalid translation locales for this group.
         
         Returns:
@@ -584,5 +595,7 @@ class TranslationGroup():
         invalid_locales.invalid_brace_locales = self.get_invalid_brace_locales()
         invalid_locales.invalid_leading_space_locales = self.get_invalid_leading_space_locales()
         invalid_locales.invalid_newline_locales = self.get_invalid_newline_locales()
-        invalid_locales.invalid_cjk_locales = self.get_invalid_cjk_locales()
+        invalid_locales.invalid_character_set_locales = self.get_invalid_character_set_locales(
+            ignore_patterns=ignore_patterns
+        )
         return invalid_locales

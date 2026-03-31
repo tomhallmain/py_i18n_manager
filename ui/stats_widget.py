@@ -138,16 +138,16 @@ class StatsWidget(QWidget):
         invalid_newline_layout.addWidget(self.invalid_newline_value)
         stats_layout.addLayout(invalid_newline_layout)
 
-        # Invalid CJK translations
-        invalid_cjk_layout = QVBoxLayout()
-        self.invalid_cjk_label = QLabel(_("Invalid CJK:"))
-        self.invalid_cjk_value = QLabel("0")
-        self.invalid_cjk_value.setStyleSheet(
+        # Invalid character-set profile for locale expectation
+        invalid_character_set_layout = QVBoxLayout()
+        self.invalid_character_set_label = QLabel(_("Invalid Character Set:"))
+        self.invalid_character_set_value = QLabel("0")
+        self.invalid_character_set_value.setStyleSheet(
             f"font-size: 16px; font-weight: bold; color: {self.colors['warning']};"
         )
-        invalid_cjk_layout.addWidget(self.invalid_cjk_label)
-        invalid_cjk_layout.addWidget(self.invalid_cjk_value)
-        stats_layout.addLayout(invalid_cjk_layout)
+        invalid_character_set_layout.addWidget(self.invalid_character_set_label)
+        invalid_character_set_layout.addWidget(self.invalid_character_set_value)
+        stats_layout.addLayout(invalid_character_set_layout)
         
         # Stale translations
         stale_translations_layout = QVBoxLayout()
@@ -182,7 +182,7 @@ class StatsWidget(QWidget):
         invalid_braces_count = 0
         invalid_leading_space_count = 0
         invalid_newline_count = 0
-        invalid_cjk_count = 0
+        invalid_character_set_count = 0
         stale_count = 0
         if results.invalid_groups:
             invalid_groups = results.invalid_groups
@@ -192,7 +192,9 @@ class StatsWidget(QWidget):
             invalid_braces_count = sum(len(locales) for _, locales in invalid_groups.invalid_brace_locale_groups)
             invalid_leading_space_count = sum(len(locales) for _, locales in invalid_groups.invalid_leading_space_locale_groups)
             invalid_newline_count = sum(len(locales) for _, locales in invalid_groups.invalid_newline_locale_groups)
-            invalid_cjk_count = sum(len(locales) for _, locales in invalid_groups.invalid_cjk_locale_groups)
+            invalid_character_set_count = sum(
+                len(locales) for _, locales in invalid_groups.invalid_character_set_locale_groups
+            )
             stale_count = len(invalid_groups.not_in_base)
 
         logger.debug(f"Calculated stats - total_translations: {total_translations}, "
@@ -248,13 +250,13 @@ class StatsWidget(QWidget):
         else:
             self.invalid_newline_value.setText(f"{invalid_newline_count}")
 
-        # Update invalid CJK with color
-        if invalid_cjk_count == 0:
-            self.invalid_cjk_value.setText(
-                f'<span style="color: {self.colors["success"]};">{invalid_cjk_count}</span>'
+        # Update invalid character-set count with color
+        if invalid_character_set_count == 0:
+            self.invalid_character_set_value.setText(
+                f'<span style="color: {self.colors["success"]};">{invalid_character_set_count}</span>'
             )
         else:
-            self.invalid_cjk_value.setText(f"{invalid_cjk_count}")
+            self.invalid_character_set_value.setText(f"{invalid_character_set_count}")
             
         # Update stale translations with color
         if stale_count == 0:

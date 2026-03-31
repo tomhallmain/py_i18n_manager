@@ -223,6 +223,8 @@ class TranslationManagerResults:
                 lines.append(f"- Invalid Leading Spaces: {error_counts['invalid_leading_spaces']}")
             if error_counts['invalid_newlines']:
                 lines.append(f"- Invalid Newlines: {error_counts['invalid_newlines']}")
+            if error_counts['invalid_character_set']:
+                lines.append(f"- Invalid Character Set: {error_counts['invalid_character_set']}")
 
         if self.quality_findings and self.quality_findings.has_findings:
             lines.append(

@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from utils.settings_manager import SettingsManager
 
 from .invalid_translation_groups import QualityReviewFinding, TranslationQualityFindings
+from .text_scrub import scrub_dynamic_segments
 from .translation_group import TranslationGroup, TranslationKey
 
 
@@ -48,12 +49,7 @@ def _debug_heuristic_probe(mid: str, loc: str, tstrip: str, latin_ignore_pattern
         return
     run_hit = _has_significant_latin_run(tstrip, latin_ignore_patterns)
     mixed_hit = _has_mixed_script_latin_leakage(tstrip, latin_ignore_patterns)
-    scrubbed = tstrip
-    prev = None
-    while scrubbed != prev:
-        prev = scrubbed
-        scrubbed = _CURLY_BRACE_SEGMENT.sub("", scrubbed)
-    scrubbed = _MARKUP_TAG_SEGMENT.sub("", scrubbed)
+    scrubbed = scrub_dynamic_segments(tstrip)
     scrubbed = _apply_latin_ignore_patterns(scrubbed, latin_ignore_patterns)
     logger.warning(
         "[QUALITY-DEBUG] key=%r locale=%r non_latin_locale=%s run_hit=%s mixed_hit=%s ignore_patterns=%r text=%r scrubbed=%r",
@@ -128,8 +124,6 @@ def collect_findings_for_group(
     return findings
 
 
-_CURLY_BRACE_SEGMENT = re.compile(r"\{[^{}]*\}")
-_MARKUP_TAG_SEGMENT = re.compile(r"</?[A-Za-z][^>]*>")
 _EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
     "de": frozenset(
         {
@@ -278,13 +272,8 @@ def _is_allowed_identical_to_english_default(
     if normalized in allowed:
         return True
 
-    # Ignore placeholder-like segments (e.g. "{name}", "{count}") and markup tags.
-    scrubbed = text or ""
-    prev = None
-    while scrubbed != prev:
-        prev = scrubbed
-        scrubbed = _CURLY_BRACE_SEGMENT.sub("", scrubbed)
-    scrubbed = _MARKUP_TAG_SEGMENT.sub("", scrubbed)
+    # Ignore placeholder-like segments and markup tags.
+    scrubbed = scrub_dynamic_segments(text or "")
 
     # Allow if user-configured Latin-ignore patterns account for all Latin characters.
     scrubbed_without_patterns = _apply_latin_ignore_patterns(scrubbed, latin_ignore_patterns)
@@ -387,13 +376,8 @@ def _has_single_latin_char_embedded_in_non_latin_word(text: str) -> bool:
 
 
 def _has_significant_latin_run(text: str, latin_ignore_patterns: Sequence[str] = ()) -> bool:
-    # Ignore placeholder-like segments (e.g. "{name}", "{count}") and markup tags.
-    scrubbed = text
-    prev = None
-    while scrubbed != prev:
-        prev = scrubbed
-        scrubbed = _CURLY_BRACE_SEGMENT.sub("", scrubbed)
-    scrubbed = _MARKUP_TAG_SEGMENT.sub("", scrubbed)
+    # Ignore placeholder-like segments and markup tags.
+    scrubbed = scrub_dynamic_segments(text)
     scrubbed = _apply_latin_ignore_patterns(scrubbed, latin_ignore_patterns)
     # Catch longer Latin runs and short Latin sequences (e.g. "GM", "ee"),
     # including when adjacent to non-Latin letters.
@@ -404,12 +388,7 @@ def _has_significant_latin_run(text: str, latin_ignore_patterns: Sequence[str] =
 def _has_mixed_script_latin_leakage(
     text: str, latin_ignore_patterns: Sequence[str] = ()
 ) -> bool:
-    scrubbed = text
-    prev = None
-    while scrubbed != prev:
-        prev = scrubbed
-        scrubbed = _CURLY_BRACE_SEGMENT.sub("", scrubbed)
-    scrubbed = _MARKUP_TAG_SEGMENT.sub("", scrubbed)
+    scrubbed = scrub_dynamic_segments(text)
     scrubbed = _apply_latin_ignore_patterns(scrubbed, latin_ignore_patterns)
     if not _contains_latin_letter(scrubbed):
         return False

@@ -13,7 +13,6 @@ The heuristic tab reuses :func:`ui.base_translation_window.create_frozen_transla
 
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING, Any, Optional, Set
 
 from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
@@ -46,6 +45,7 @@ from i18n.llm_catalog_review import CatalogLlmReviewResult
 from i18n.translation_group import TranslationKey
 from i18n.translation_manager_results import TranslationAction, TranslationManagerResults
 from ui.base_translation_window import BaseTranslationWindow, create_frozen_translation_table
+from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 from utils.translations import I18N
 from workers.translation_worker import TranslationWorker
 
@@ -163,7 +163,6 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
 
         self._tabs.addTab(self._build_heuristic_tab(), _("Possible issues"))
         self._tabs.addTab(self._build_rules_tab(), _("Business rules"))
-        self._tabs.addTab(self._build_exclusions_tab(), _("Exclusions"))
         self._tabs.addTab(self._build_llm_tab(), _("LLM review"))
 
     def _build_heuristic_tab(self) -> QWidget:
@@ -174,7 +173,7 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             QLabel(
                 _(
                     "Built-in checks: non-Latin-script locales with Latin words/runs and a separate mixed-script Latin-leakage signal; translations identical "
-                    "to the default locale. Respects exclusions from the Exclusions tab. "
+                    "to the default locale. Respects project exclusions and ignore patterns. "
                     "(English-ratio heuristic reserved.)"
                 )
             )
@@ -266,6 +265,12 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         )
         self._export_filtered_btn.clicked.connect(self._on_export_filtered_tsv)
         row.addWidget(self._export_filtered_btn)
+        self._manage_exclusions_btn = QPushButton(_("Heuristic exclusions..."))
+        self._manage_exclusions_btn.setToolTip(
+            _("Manage excluded msgids and ignore regex patterns for this project.")
+        )
+        self._manage_exclusions_btn.clicked.connect(self._open_exclusions_dialog)
+        row.addWidget(self._manage_exclusions_btn)
         row.addStretch()
         layout.addLayout(row)
 
@@ -315,55 +320,18 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
 
         return page
 
-    def _build_exclusions_tab(self) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(page)
-
-        layout.addWidget(
-            QLabel(
-                _(
-                    "Msgids excluded from heuristic and custom-rule checks (saved per project). "
-                    "Re-run heuristic analysis to refresh the Possible issues table after changes."
-                )
-            )
+    def _open_exclusions_dialog(self) -> None:
+        dlg = QualityReviewExclusionsDialog(
+            project_path=self.project_path,
+            settings_manager=self.settings_manager,
+            parent=self,
         )
+        dlg.settings_saved.connect(self._on_exclusions_saved)
+        dlg.exec()
 
-        self._exclusions_list = QListWidget()
-        self._exclusions_list.itemSelectionChanged.connect(self._update_exclusions_buttons)
-        layout.addWidget(self._exclusions_list, stretch=1)
-
-        ex_row = QHBoxLayout()
-        self._add_exclusion_btn = QPushButton(_("Add key…"))
-        self._remove_exclusion_btn = QPushButton(_("Remove"))
-        self._add_exclusion_btn.clicked.connect(self._on_add_exclusion)
-        self._remove_exclusion_btn.clicked.connect(self._on_remove_exclusion)
-        ex_row.addWidget(self._add_exclusion_btn)
-        ex_row.addWidget(self._remove_exclusion_btn)
-        ex_row.addStretch()
-        layout.addLayout(ex_row)
-
-        layout.addWidget(
-            QLabel(
-                _(
-                    "Regex patterns ignored by the Latin-in-CJK heuristic (matched text is removed before checking)."
-                )
-            )
-        )
-        self._latin_patterns_list = QListWidget()
-        self._latin_patterns_list.itemSelectionChanged.connect(self._update_exclusions_buttons)
-        layout.addWidget(self._latin_patterns_list, stretch=1)
-
-        pat_row = QHBoxLayout()
-        self._add_latin_pattern_btn = QPushButton(_("Add pattern…"))
-        self._remove_latin_pattern_btn = QPushButton(_("Remove pattern"))
-        self._add_latin_pattern_btn.clicked.connect(self._on_add_latin_pattern)
-        self._remove_latin_pattern_btn.clicked.connect(self._on_remove_latin_pattern)
-        pat_row.addWidget(self._add_latin_pattern_btn)
-        pat_row.addWidget(self._remove_latin_pattern_btn)
-        pat_row.addStretch()
-        layout.addLayout(pat_row)
-
-        return page
+    def _on_exclusions_saved(self) -> None:
+        self._refresh_lists_from_settings()
+        self._update_settings_dependent_controls()
 
     def _build_llm_tab(self) -> QWidget:
         page = QWidget()
@@ -412,26 +380,20 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             self._add_rule_btn,
             self._edit_rule_btn,
             self._remove_rule_btn,
-            self._add_exclusion_btn,
-            self._remove_exclusion_btn,
-            self._add_latin_pattern_btn,
-            self._remove_latin_pattern_btn,
+            self._manage_exclusions_btn,
         ):
             b.setEnabled(can)
         if not can:
             tip = _("Select a project with settings support.")
             for b in (
                 self._add_rule_btn,
-                self._add_exclusion_btn,
-                self._add_latin_pattern_btn,
+                self._manage_exclusions_btn,
             ):
                 b.setToolTip(tip)
         else:
             self._add_rule_btn.setToolTip("")
-            self._add_exclusion_btn.setToolTip("")
-            self._add_latin_pattern_btn.setToolTip("")
+            self._manage_exclusions_btn.setToolTip("")
         self._update_rules_buttons()
-        self._update_exclusions_buttons()
         has_mgr = self._i18n_manager is not None
         self._run_rules_btn.setEnabled(has_mgr and bool(self._custom_rules))
         has_catalog = has_mgr and bool(self._i18n_manager.translations)
@@ -448,14 +410,6 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         sel = self._rules_list.currentItem() is not None
         self._edit_rule_btn.setEnabled(sel)
         self._remove_rule_btn.setEnabled(sel)
-
-    def _update_exclusions_buttons(self) -> None:
-        if not self._can_edit_settings():
-            self._remove_exclusion_btn.setEnabled(False)
-            self._remove_latin_pattern_btn.setEnabled(False)
-            return
-        self._remove_exclusion_btn.setEnabled(self._exclusions_list.currentItem() is not None)
-        self._remove_latin_pattern_btn.setEnabled(self._latin_patterns_list.currentItem() is not None)
 
     def set_project_path(self, project_path: Optional[str]) -> None:
         self.project_path = project_path
@@ -479,8 +433,6 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         self._latin_ignore_patterns = set()
         self._custom_rules = []
         if not self.project_path or not self.settings_manager:
-            self._populate_exclusions_list_widget()
-            self._populate_latin_patterns_list_widget()
             self._populate_rules_list_widget()
             return
 
@@ -488,23 +440,13 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             self.settings_manager.get_quality_review_excluded_msgids(self.project_path)
         )
         self._latin_ignore_patterns = set(
-            self.settings_manager.get_quality_review_latin_ignore_patterns(self.project_path)
+            self.settings_manager.get_quality_review_script_ignore_patterns(
+                self.project_path
+            )
         )
         raw_rules = self.settings_manager.get_quality_review_custom_rules(self.project_path)
         self._custom_rules = [dict(r) for r in raw_rules if isinstance(r, dict)]
-        self._populate_exclusions_list_widget()
-        self._populate_latin_patterns_list_widget()
         self._populate_rules_list_widget()
-
-    def _populate_exclusions_list_widget(self) -> None:
-        self._exclusions_list.clear()
-        for mid in sorted(self._excluded_msgids):
-            self._exclusions_list.addItem(mid)
-
-    def _populate_latin_patterns_list_widget(self) -> None:
-        self._latin_patterns_list.clear()
-        for pat in sorted(self._latin_ignore_patterns):
-            self._latin_patterns_list.addItem(pat)
 
     def _populate_rules_list_widget(self) -> None:
         self._rules_list.clear()
@@ -517,136 +459,12 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             item.setToolTip(desc or name)
             self._rules_list.addItem(item)
 
-    def _save_exclusions(self) -> bool:
-        if not self._can_edit_settings():
-            return False
-        ordered = sorted(self._excluded_msgids)
-        return self.settings_manager.save_quality_review_excluded_msgids(
-            self.project_path, ordered
-        )
-
     def _save_custom_rules(self) -> bool:
         if not self._can_edit_settings():
             return False
         return self.settings_manager.save_quality_review_custom_rules(
             self.project_path, list(self._custom_rules)
         )
-
-    def _save_latin_ignore_patterns(self) -> bool:
-        if not self._can_edit_settings():
-            return False
-        return self.settings_manager.save_quality_review_latin_ignore_patterns(
-            self.project_path, sorted(self._latin_ignore_patterns)
-        )
-
-    def _on_add_exclusion(self) -> None:
-        if not self._can_edit_settings():
-            return
-        text, ok = QInputDialog.getText(
-            self,
-            _("Add exclusion"),
-            _("Translation msgid to exclude:"),
-        )
-        if not ok:
-            return
-        mid = (text or "").strip()
-        if not mid:
-            return
-        if mid in self._excluded_msgids:
-            QMessageBox.information(
-                self,
-                _("Already excluded"),
-                _("This msgid is already in the exclusion list."),
-            )
-            return
-        self._excluded_msgids.add(mid)
-        if not self._save_exclusions():
-            self._excluded_msgids.discard(mid)
-            QMessageBox.warning(self, _("Error"), _("Could not save exclusions."))
-            return
-        self._populate_exclusions_list_widget()
-
-    def _on_remove_exclusion(self) -> None:
-        if not self._can_edit_settings():
-            return
-        item = self._exclusions_list.currentItem()
-        if not item:
-            return
-        mid = item.text().strip()
-        reply = QMessageBox.question(
-            self,
-            _("Remove exclusion"),
-            _("Stop excluding this msgid?\n\n{mid}").format(mid=mid),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-        self._excluded_msgids.discard(mid)
-        if not self._save_exclusions():
-            self._excluded_msgids.add(mid)
-            QMessageBox.warning(self, _("Error"), _("Could not save exclusions."))
-            return
-        self._populate_exclusions_list_widget()
-
-    def _on_add_latin_pattern(self) -> None:
-        if not self._can_edit_settings():
-            return
-        text, ok = QInputDialog.getText(
-            self,
-            _("Add Latin-ignore pattern"),
-            _("Regex pattern to ignore in Latin-in-CJK heuristic:"),
-        )
-        if not ok:
-            return
-        pat = (text or "").strip()
-        if not pat:
-            return
-        try:
-            re.compile(pat)
-        except re.error as e:
-            QMessageBox.warning(
-                self,
-                _("Invalid pattern"),
-                _("Regex error: {err}").format(err=str(e)),
-            )
-            return
-        if pat in self._latin_ignore_patterns:
-            QMessageBox.information(
-                self,
-                _("Already added"),
-                _("This pattern is already in the ignore list."),
-            )
-            return
-        self._latin_ignore_patterns.add(pat)
-        if not self._save_latin_ignore_patterns():
-            self._latin_ignore_patterns.discard(pat)
-            QMessageBox.warning(self, _("Error"), _("Could not save patterns."))
-            return
-        self._populate_latin_patterns_list_widget()
-
-    def _on_remove_latin_pattern(self) -> None:
-        if not self._can_edit_settings():
-            return
-        item = self._latin_patterns_list.currentItem()
-        if not item:
-            return
-        pat = item.text().strip()
-        reply = QMessageBox.question(
-            self,
-            _("Remove pattern"),
-            _("Stop ignoring this regex pattern?\n\n{pat}").format(pat=pat),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-        self._latin_ignore_patterns.discard(pat)
-        if not self._save_latin_ignore_patterns():
-            self._latin_ignore_patterns.add(pat)
-            QMessageBox.warning(self, _("Error"), _("Could not save patterns."))
-            return
-        self._populate_latin_patterns_list_widget()
 
     def _prompt_rule_fields(
         self, title: str, name_default: str = "", desc_default: str = ""

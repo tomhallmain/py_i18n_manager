@@ -41,6 +41,18 @@ python app.py
 2. Select a project directory containing a locale directory and translation files (PO files)
 3. Use the interface to check status, update files, and manage translations
 
+## Running Tests
+
+- Run all tests:
+```bash
+python -m unittest discover -s tests -p "test_*.py"
+```
+
+- Run one specific test file (example):
+```bash
+python -m unittest discover -s tests -p "test_invalid_non_latin_ratio.py"
+```
+
 ## Write Policy by Project Type
 
 The manager writes translation files according to the detected project type. In all cases, it is recommended to keep changes under version control and review diffs after write operations.

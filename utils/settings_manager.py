@@ -15,6 +15,20 @@ logger = get_logger("settings_manager")
 class SettingsManager:
     MAX_RECENT_PROJECTS = 10
     DEFAULT_LLM_CJK_REJECT_THRESHOLD_PERCENTAGE = 30
+    DEFAULT_QUALITY_REVIEW_SCRIPT_IGNORE_PATTERNS = [
+        r"(?i)\bCSV\b",
+        r"(?i)\bHTML\b",
+        r"(?i)\bJSON\b",
+        r"(?i)\bXML\b",
+        r"(?i)\bYAML\b",
+        r"(?i)\bSQL\b",
+        r"(?i)\bUTC\b",
+        r"(?i)\bAPI\b",
+        r"(?i)\bURL\b",
+        r"(?i)\bHTTP\b",
+        r"(?i)\bHTTPS\b",
+        r"(?i)\bID\b",
+    ]
 
     # Conservative default for local / low-context models: catalog slice only (system + reply live outside).
     DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS = 2400
@@ -22,6 +36,48 @@ class SettingsManager:
     def __init__(self):
         self.settings_file = Path.home() / '.i18n_manager' / 'settings.json'
         self.settings_file.parent.mkdir(parents=True, exist_ok=True)
+        self._migrate_settings_schema()
+
+    def _migrate_settings_schema(self) -> None:
+        """Migrate legacy settings keys to current schema."""
+        if not self.settings_file.exists():
+            return
+        try:
+            with open(self.settings_file, "r", encoding="utf-8") as f:
+                settings = json.load(f)
+            if not isinstance(settings, dict):
+                return
+            project_settings = settings.get("project_settings")
+            if not isinstance(project_settings, dict):
+                return
+
+            changed = False
+            for _project_path, cfg in project_settings.items():
+                if not isinstance(cfg, dict):
+                    continue
+
+                old_patterns_key = "quality_review_latin_ignore_patterns"
+                new_patterns_key = "quality_review_script_ignore_patterns"
+                old_init_key = "quality_review_latin_ignore_patterns_initialized"
+                new_init_key = "quality_review_script_ignore_patterns_initialized"
+
+                if old_patterns_key in cfg:
+                    if new_patterns_key not in cfg:
+                        cfg[new_patterns_key] = cfg[old_patterns_key]
+                    del cfg[old_patterns_key]
+                    changed = True
+
+                if old_init_key in cfg:
+                    if new_init_key not in cfg:
+                        cfg[new_init_key] = cfg[old_init_key]
+                    del cfg[old_init_key]
+                    changed = True
+
+            if changed:
+                with open(self.settings_file, "w", encoding="utf-8") as f:
+                    json.dump(settings, f, indent=4)
+        except Exception as e:
+            logger.warning("Could not migrate settings schema: %s", e)
 
     def load_last_project(self) -> Optional[str]:
         """Load the last selected project path from settings.
@@ -403,17 +459,74 @@ class SettingsManager:
         cleaned = [dict(x) for x in rules if isinstance(x, dict)]
         return self.save_project_setting(project_path, "quality_review_custom_rules", cleaned)
 
-    def get_quality_review_latin_ignore_patterns(self, project_path: str) -> list[str]:
-        """Regex patterns to remove before Latin-in-CJK heuristic evaluation."""
-        raw = self.get_project_setting(project_path, "quality_review_latin_ignore_patterns", [])
+    def get_quality_review_script_ignore_patterns(self, project_path: str) -> list[str]:
+        """Regex patterns removed before script-based quality/character-set checks."""
+        self._ensure_quality_review_script_ignore_patterns_seeded(project_path)
+        raw = self.get_project_setting(project_path, "quality_review_script_ignore_patterns", [])
         if not isinstance(raw, list):
             return []
         return [str(x).strip() for x in raw if isinstance(x, str) and str(x).strip()]
 
-    def save_quality_review_latin_ignore_patterns(self, project_path: str, patterns: list[str]) -> bool:
-        """Persist regex ignore patterns for the Latin-in-CJK heuristic."""
+    def save_quality_review_script_ignore_patterns(self, project_path: str, patterns: list[str]) -> bool:
+        """Persist regex ignore patterns for script-based checks."""
         cleaned = sorted({str(x).strip() for x in patterns if isinstance(x, str) and str(x).strip()})
-        return self.save_project_setting(project_path, "quality_review_latin_ignore_patterns", cleaned)
+        ok_patterns = self.save_project_setting(
+            project_path, "quality_review_script_ignore_patterns", cleaned
+        )
+        ok_marker = self.save_project_setting(
+            project_path, "quality_review_script_ignore_patterns_initialized", True
+        )
+        return ok_patterns and ok_marker
+
+    @classmethod
+    def get_default_quality_review_script_ignore_patterns(cls) -> list[str]:
+        """Default regex patterns seeded per project for false-positive reduction."""
+        return list(cls.DEFAULT_QUALITY_REVIEW_SCRIPT_IGNORE_PATTERNS)
+
+    def reset_quality_review_script_ignore_patterns_to_defaults(self, project_path: str) -> bool:
+        """Reset project ignore patterns to defaults."""
+        return self.save_quality_review_script_ignore_patterns(
+            project_path, self.get_default_quality_review_script_ignore_patterns()
+        )
+
+    def _ensure_quality_review_script_ignore_patterns_seeded(self, project_path: str) -> None:
+        """Seed per-project ignore patterns once; user edits remain authoritative afterwards."""
+        initialized = bool(
+            self.get_project_setting(
+                project_path, "quality_review_script_ignore_patterns_initialized", False
+            )
+        )
+        if initialized:
+            return
+        existing = self.get_project_setting(project_path, "quality_review_script_ignore_patterns")
+        if not isinstance(existing, list):
+            # One-time migration path from old key naming.
+            existing = self.get_project_setting(
+                project_path, "quality_review_latin_ignore_patterns"
+            )
+        if isinstance(existing, list) and existing:
+            cleaned = sorted(
+                {
+                    str(x).strip()
+                    for x in existing
+                    if isinstance(x, str) and str(x).strip()
+                }
+            )
+            self.save_project_setting(
+                project_path, "quality_review_script_ignore_patterns", cleaned
+            )
+            self.save_project_setting(
+                project_path, "quality_review_script_ignore_patterns_initialized", True
+            )
+            return
+        self.save_project_setting(
+            project_path,
+            "quality_review_script_ignore_patterns",
+            self.get_default_quality_review_script_ignore_patterns(),
+        )
+        self.save_project_setting(
+            project_path, "quality_review_script_ignore_patterns_initialized", True
+        )
 
     def get_quality_review_llm_max_catalog_tokens(self, project_path: str) -> int:
         """Max estimated tokens per catalog batch for LLM review (conservative for local / small context)."""

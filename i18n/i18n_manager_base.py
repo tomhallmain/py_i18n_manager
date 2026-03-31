@@ -50,13 +50,19 @@ class I18NManagerBase(ABC):
     def get_quality_review_excluded_msgids(self) -> frozenset:
         """Msgids excluded from heuristic quality review for this project (see SettingsManager)."""
         if self.settings_manager:
-            return frozenset(self.settings_manager.get_quality_review_excluded_msgids(self._directory))
+            return frozenset(
+                self.settings_manager.get_quality_review_excluded_msgids(self._directory)
+            )
         return frozenset()
 
-    def get_quality_review_latin_ignore_patterns(self) -> tuple[str, ...]:
-        """Regex patterns ignored by the Latin-in-CJK heuristic for this project."""
+    def get_quality_review_script_ignore_patterns(self) -> tuple[str, ...]:
+        """Regex patterns ignored by script-based quality/character-set checks for this project."""
         if self.settings_manager:
-            return tuple(self.settings_manager.get_quality_review_latin_ignore_patterns(self._directory))
+            return tuple(
+                self.settings_manager.get_quality_review_script_ignore_patterns(
+                    self._directory
+                )
+            )
         return tuple()
 
     def _total_locales_for_statistics(self, results: TranslationManagerResults) -> int:
@@ -83,7 +89,7 @@ class I18NManagerBase(ABC):
                 self.locales,
                 self.default_locale,
                 self.get_quality_review_excluded_msgids(),
-                self.get_quality_review_latin_ignore_patterns(),
+                self.get_quality_review_script_ignore_patterns(),
             )
         else:
             results.invalid_groups = self.get_invalid_translations()
@@ -211,6 +217,7 @@ class I18NManagerBase(ABC):
         """
         invalid_groups = InvalidTranslationGroups()
 
+        character_set_ignore_patterns = self.get_quality_review_script_ignore_patterns()
         for key, group in self.translations.items():
             if not group.is_in_base:
                 # Only report not_in_base if we haven't written to all locales yet
@@ -247,10 +254,12 @@ class I18NManagerBase(ABC):
                 if invalid_newline_locales:
                     invalid_groups.invalid_newline_locale_groups.append((key, invalid_newline_locales))
 
-                # Check for invalid CJK in non-CJK locales
-                invalid_cjk_locales = group.get_invalid_cjk_locales()
-                if invalid_cjk_locales:
-                    invalid_groups.invalid_cjk_locale_groups.append((key, invalid_cjk_locales))
+                # Check for character-set mismatches relative to locale expectations.
+                invalid_character_set_locales = group.get_invalid_character_set_locales(
+                    ignore_patterns=character_set_ignore_patterns
+                )
+                if invalid_character_set_locales:
+                    invalid_groups.invalid_character_set_locale_groups.append((key, invalid_character_set_locales))
 
         return invalid_groups
 
@@ -318,8 +327,8 @@ class I18NManagerBase(ABC):
             print(f"Invalid newlines: \"{key}\" in locales: {invalid_locales}")
             one_invalid_translation_found = True
 
-        for key, invalid_locales in invalid_groups.invalid_cjk_locale_groups:
-            print(f"Invalid CJK content: \"{key}\" in locales: {invalid_locales}")
+        for key, invalid_locales in invalid_groups.invalid_character_set_locale_groups:
+            print(f"Invalid character set: \"{key}\" in locales: {invalid_locales}")
             one_invalid_translation_found = True
 
         if not one_invalid_translation_found:

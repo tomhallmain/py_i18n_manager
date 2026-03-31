@@ -18,6 +18,7 @@ from utils.settings_manager import SettingsManager
 from utils.translations import I18N
 from ui.base_translation_window import BaseTranslationWindow
 from ui.llm_settings_dialog import LLMSettingsDialog
+from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 
 _ = I18N._
 
@@ -291,6 +292,12 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.llm_settings_btn.clicked.connect(self.open_llm_settings)
         self.llm_settings_btn.setToolTip(_("Configure LLM translation prompt template"))
 
+        self.exclusions_btn = QPushButton(_("Heuristic Exclusions"))
+        self.exclusions_btn.clicked.connect(self.open_quality_exclusions)
+        self.exclusions_btn.setToolTip(
+            _("Manage msgid exclusions and ignore regex patterns for this project.")
+        )
+
         self.export_tsv_btn = QPushButton(_("Export Outstanding TSV"))
         self.export_tsv_btn.clicked.connect(self.export_outstanding_to_tsv)
         self.export_tsv_btn.setToolTip(_("Export outstanding keys and invalid locale buckets to TSV"))
@@ -308,6 +315,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         button_layout.addWidget(self.translate_all_argos_btn)
         button_layout.addWidget(self.translate_all_llm_btn)
         button_layout.addWidget(self.llm_settings_btn)
+        button_layout.addWidget(self.exclusions_btn)
         button_layout.addWidget(self.export_tsv_btn)
         button_layout.addWidget(save_btn)
         button_layout.addWidget(close_btn)
@@ -631,8 +639,22 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         dialog = LLMSettingsDialog(project_path=self.project_path, parent=self)
         dialog.settings_saved.connect(self.reload_translation_service_settings)
         dialog.exec()
+
+    def open_quality_exclusions(self):
+        """Open shared exclusions dialog for heuristic/script checks."""
+        dialog = QualityReviewExclusionsDialog(
+            project_path=self.project_path,
+            settings_manager=self.settings_manager,
+            parent=self,
+        )
+        dialog.settings_saved.connect(self._reload_after_exclusions_saved)
+        dialog.exec()
+
+    def _reload_after_exclusions_saved(self):
+        if hasattr(self, "translations") and hasattr(self, "locales"):
+            self.load_data(self.translations, self.locales, skip_duplicate_prompt=True)
         
-    def _detect_duplicate_values(self, translations, locales):
+    def _detect_duplicate_values(self, translations, locales, ignore_patterns=()):
         """Detect duplicate translation values in the default locale.
         
         Returns:
@@ -662,7 +684,9 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         for key, group in translations.items():
             if not group.is_in_base:
                 continue
-            invalid_locales = group.get_invalid_translations(locales)
+            invalid_locales = group.get_invalid_translations(
+                locales, ignore_patterns=ignore_patterns
+            )
             if invalid_locales.has_errors:
                 outstanding_keys.add(key)
         
@@ -776,7 +800,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             "Invalid Braces",
             "Invalid Leading Space",
             "Invalid Newline",
-            "Invalid CJK",
+            "Invalid Character Set",
         ]
 
         lines = ["\t".join(headers)]
@@ -789,7 +813,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             invalid_braces = set(invalid_locales.invalid_brace_locales)
             invalid_leading_space = set(invalid_locales.invalid_leading_space_locales)
             invalid_newline = set(invalid_locales.invalid_newline_locales)
-            invalid_cjk = set(invalid_locales.invalid_cjk_locales)
+            invalid_character_set = set(invalid_locales.invalid_character_set_locales)
 
             all_error_locales = (
                 missing
@@ -797,7 +821,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 | invalid_braces
                 | invalid_leading_space
                 | invalid_newline
-                | invalid_cjk
+                | invalid_character_set
             )
 
             defined_without_error = set()
@@ -818,7 +842,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 self._format_locale_list(invalid_braces),
                 self._format_locale_list(invalid_leading_space),
                 self._format_locale_list(invalid_newline),
-                self._format_locale_list(invalid_cjk),
+                self._format_locale_list(invalid_character_set),
             ]
             # Keep TSV shape stable (no tabs/newlines in cell content)
             safe_values = [str(v).replace("\t", " ").replace("\r", " ").replace("\n", " ") for v in row_values]
@@ -884,18 +908,30 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         # Set dynamic column widths based on number of locales
         self.set_dynamic_column_widths(len(display_locales))
 
+        ignore_patterns = tuple(
+            self.settings_manager.get_quality_review_script_ignore_patterns(
+                self.project_path
+            )
+            if getattr(self, "project_path", None)
+            else ()
+        )
+
         # Find all translations with missing or invalid entries (key = translations dict key)
         all_invalid_groups = {}
         for key, group in translations.items():
             if not group.is_in_base:
                 continue
 
-            invalid_locales = group.get_invalid_translations(locales)
+            invalid_locales = group.get_invalid_translations(
+                locales, ignore_patterns=ignore_patterns
+            )
             if invalid_locales.has_errors:
                 all_invalid_groups[key] = (invalid_locales, group)
 
         # Detect duplicate values
-        existing_to_outstanding_matches, outstanding_duplicates = self._detect_duplicate_values(translations, locales)
+        existing_to_outstanding_matches, outstanding_duplicates = self._detect_duplicate_values(
+            translations, locales, ignore_patterns=ignore_patterns
+        )
 
         # Ask user once, then reuse the last choice for silent refreshes.
         combine_reply = "no"
@@ -945,7 +981,9 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                     if not group.is_in_base:
                         continue
 
-                    invalid_locales = group.get_invalid_translations(locales)
+                    invalid_locales = group.get_invalid_translations(
+                        locales, ignore_patterns=ignore_patterns
+                    )
                     if invalid_locales.has_errors:
                         all_invalid_groups[key] = (invalid_locales, group)
                 
@@ -1031,7 +1069,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 elif (locale in invalid_locales.invalid_brace_locales or
                       locale in invalid_locales.invalid_leading_space_locales or
                       locale in invalid_locales.invalid_newline_locales or
-                      locale in invalid_locales.invalid_cjk_locales):
+                      locale in invalid_locales.invalid_character_set_locales):
                     item.setBackground(style_color)
                     if locale in invalid_locales.invalid_brace_locales:
                         tooltip_parts.append(TranslationStatus.INVALID_BRACES.get_translated_value())
@@ -1039,8 +1077,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                         tooltip_parts.append(TranslationStatus.INVALID_LEADING_SPACE.get_translated_value())
                     if locale in invalid_locales.invalid_newline_locales:
                         tooltip_parts.append(TranslationStatus.INVALID_NEWLINE.get_translated_value())
-                    if locale in invalid_locales.invalid_cjk_locales:
-                        tooltip_parts.append(TranslationStatus.INVALID_CJK.get_translated_value())
+                    if locale in invalid_locales.invalid_character_set_locales:
+                        tooltip_parts.append(TranslationStatus.INVALID_CHARACTER_SET.get_translated_value())
 
                 if tooltip_parts:
                     item.setToolTip("\n".join(tooltip_parts))
