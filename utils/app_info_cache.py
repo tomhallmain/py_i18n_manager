@@ -12,11 +12,20 @@ logger = get_logger(__name__)
 
 class AppInfoCache:
     # TODO: Move all SettingsManager functionality to this class
-    JSON_LOC = os.path.join(os.path.dirname(os.path.abspath(os.path.dirname(__file__))), "app_info_cache.json")
+    DEFAULT_JSON_LOC = os.path.join(
+        os.path.dirname(os.path.abspath(os.path.dirname(__file__))),
+        "app_info_cache.json",
+    )
+    JSON_LOC = os.environ.get("PY_I18N_MANAGER_APP_INFO_CACHE_PATH", DEFAULT_JSON_LOC)
     INFO_KEY = "info"
     NUM_BACKUPS = 4  # Number of backup files to maintain
 
     def __init__(self):
+        override_path = os.environ.get("PY_I18N_MANAGER_APP_INFO_CACHE_PATH", "").strip()
+        if override_path:
+            # Ensure both class-level and instance-level path follow test/runtime override.
+            AppInfoCache.JSON_LOC = override_path
+            self.JSON_LOC = override_path
         self._lock = threading.RLock()
         self._cache = {AppInfoCache.INFO_KEY: {}}
         self.load()

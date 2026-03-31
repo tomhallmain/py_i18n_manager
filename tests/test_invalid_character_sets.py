@@ -15,9 +15,14 @@ from i18n.translation_group import TranslationGroup
 from i18n.invalid_character_set import (
     InvalidCharacterSetAnalyzer,
 )
+from test_utils import get_default_script_ignore_patterns
 
 
 class TestInvalidCharacterSet(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.default_ignore_patterns = get_default_script_ignore_patterns()
+
     def test_analyzer_accepts_expanded_language_family_samples(self):
         accepted_cases = [
             ("ru", "Привет мир"),
@@ -230,6 +235,36 @@ class TestInvalidCharacterSet(unittest.TestCase):
         )
         self.assertFalse(has_issue)
 
+    def test_analyzer_allows_key_combo_after_ignore_patterns(self):
+        text = "Ctrl+Shift+P"
+        self.assertTrue(InvalidCharacterSetAnalyzer.analyze_locale("ru", text))
+        has_issue = InvalidCharacterSetAnalyzer.analyze_locale(
+            "ru",
+            text,
+            ignore_patterns=self.default_ignore_patterns,
+        )
+        self.assertFalse(has_issue)
+
+    def test_analyzer_allows_ok_style_acronyms_after_ignore_patterns(self):
+        text = "OK FAQ ETA"
+        self.assertTrue(InvalidCharacterSetAnalyzer.analyze_locale("ru", text))
+        has_issue = InvalidCharacterSetAnalyzer.analyze_locale(
+            "ru",
+            text,
+            ignore_patterns=self.default_ignore_patterns,
+        )
+        self.assertFalse(has_issue)
+
+    def test_analyzer_allows_common_file_extensions_after_ignore_patterns(self):
+        text = ".json .zip .csv"
+        self.assertTrue(InvalidCharacterSetAnalyzer.analyze_locale("ru", text))
+        has_issue = InvalidCharacterSetAnalyzer.analyze_locale(
+            "ru",
+            text,
+            ignore_patterns=self.default_ignore_patterns,
+        )
+        self.assertFalse(has_issue)
+
     def test_flags_latin_locale_when_non_latin_letters_dominate(self):
         group = TranslationGroup("sample.key", is_in_base=True)
         group.add_translation("en", "Sample text")
@@ -294,6 +329,17 @@ class TestInvalidCharacterSet(unittest.TestCase):
         invalid = group.get_invalid_character_set_locales(
             threshold_percentage=40,
             ignore_patterns=(r"(?i)\bCSV\b", r"(?i)\bHTML\b", r"(?i)\bJSON\b"),
+        )
+        self.assertNotIn("ru", invalid)
+
+    def test_group_character_set_respects_key_combo_ignore_pattern(self):
+        group = TranslationGroup("sample.key", is_in_base=True)
+        group.add_translation("en", "Sample text")
+        group.add_translation("ru", "Cmd+Shift+P")
+
+        invalid = group.get_invalid_character_set_locales(
+            threshold_percentage=40,
+            ignore_patterns=self.default_ignore_patterns,
         )
         self.assertNotIn("ru", invalid)
 

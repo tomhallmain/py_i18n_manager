@@ -22,6 +22,14 @@ class TestQualityReviewExclusionsSettings(unittest.TestCase):
         self.assertTrue(patterns)
         self.assertIn(r"(?i)\bCSV\b", patterns)
         self.assertIn(r"(?i)\bHTML\b", patterns)
+        self.assertIn(
+            r"(?i)\b(?:Ctrl|Cmd|Shift)(?:(?:\+Shift)?\+[A-Za-z])?\b",
+            patterns,
+        )
+        self.assertIn(
+            r"(?i)\.(?:json|yml|yaml|xml|csv|tsv|txt|log|md|pdf|png|jpe?g|gif|webp|svg|mp3|mp4|wav|zip|tar|gz|7z|exe|msi|dmg|apk|ipa|js|ts|jsx|tsx|py|rb|java|kt|go|rs|c|cpp|h|hpp|ini|cfg|conf|toml|lock|sql)\b",
+            patterns,
+        )
 
         with open(self.mgr.settings_file, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -41,6 +49,15 @@ class TestQualityReviewExclusionsSettings(unittest.TestCase):
         loaded = self.mgr.get_quality_review_script_ignore_patterns(self.project_path)
         self.assertIn(r"(?i)\bCSV\b", loaded)
         self.assertNotIn(r"(?i)\bSKU\b", loaded)
+
+    def test_save_patterns_normalizes_strips_and_deduplicates(self):
+        ok = self.mgr.save_quality_review_script_ignore_patterns(
+            self.project_path,
+            ["  (?i)\\bAPI\\b  ", r"(?i)\bAPI\b", "", "   ", r"(?i)\bJSON\b"],
+        )
+        self.assertTrue(ok)
+        loaded = self.mgr.get_quality_review_script_ignore_patterns(self.project_path)
+        self.assertEqual([r"(?i)\bAPI\b", r"(?i)\bJSON\b"], loaded)
 
     def test_migrates_legacy_latin_pattern_keys(self):
         legacy = {

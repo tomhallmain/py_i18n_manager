@@ -16,25 +16,30 @@ class SettingsManager:
     MAX_RECENT_PROJECTS = 10
     DEFAULT_LLM_CJK_REJECT_THRESHOLD_PERCENTAGE = 30
     DEFAULT_QUALITY_REVIEW_SCRIPT_IGNORE_PATTERNS = [
+        # Keyboard shortcuts / key combos (e.g. Ctrl+S, Cmd+Shift+P).
+        r"(?i)\b(?:Ctrl|Cmd|Shift)(?:(?:\+Shift)?\+[A-Za-z])?\b",
+        # Common UX acknowledgements and short acronyms often left untranslated.
+        r"(?i)\b(?:OK|FAQ|ETA|TBD|FYI|ASAP)\b",
+        # Common technical acronyms often kept in English.
+        r"(?i)\b(?:API|SDK|CLI|GUI|UI|UX|CPU|GPU|RAM|DNS|TCP|UDP|HTTP|HTTPS|URL|URI|SQL|UTC|ID)\b",
         r"(?i)\bCSV\b",
         r"(?i)\bHTML\b",
         r"(?i)\bJSON\b",
         r"(?i)\bXML\b",
         r"(?i)\bYAML\b",
-        r"(?i)\bSQL\b",
-        r"(?i)\bUTC\b",
-        r"(?i)\bAPI\b",
-        r"(?i)\bURL\b",
-        r"(?i)\bHTTP\b",
-        r"(?i)\bHTTPS\b",
-        r"(?i)\bID\b",
+        # Common file extensions.
+        r"(?i)\.(?:json|yml|yaml|xml|csv|tsv|txt|log|md|pdf|png|jpe?g|gif|webp|svg|mp3|mp4|wav|zip|tar|gz|7z|exe|msi|dmg|apk|ipa|js|ts|jsx|tsx|py|rb|java|kt|go|rs|c|cpp|h|hpp|ini|cfg|conf|toml|lock|sql)\b",
     ]
 
     # Conservative default for local / low-context models: catalog slice only (system + reply live outside).
     DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS = 2400
     
     def __init__(self):
-        self.settings_file = Path.home() / '.i18n_manager' / 'settings.json'
+        override_path = os.environ.get("PY_I18N_MANAGER_SETTINGS_PATH", "").strip()
+        if override_path:
+            self.settings_file = Path(override_path)
+        else:
+            self.settings_file = Path.home() / '.i18n_manager' / 'settings.json'
         self.settings_file.parent.mkdir(parents=True, exist_ok=True)
         self._migrate_settings_schema()
 
