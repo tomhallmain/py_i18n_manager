@@ -247,6 +247,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self._min_key_column_width = KEY_COLUMN_MIN_WIDTH
         self._last_combine_duplicates_choice = "no"
         self._current_invalid_groups = {}
+        self._pending_prefill_changes_by_locale = {}
 
         self.setup_properties()
         self.setup_ui()
@@ -257,6 +258,29 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self._translation_worker = None
         self._translation_thread = None
         self._progress_dialog = None
+
+    def _record_prefill_change(self, locale, key, value):
+        per_locale = self._pending_prefill_changes_by_locale.setdefault(locale, {})
+        per_locale[key] = value
+
+    def _iter_pending_prefill_changes(self):
+        for locale, key_to_value in self._pending_prefill_changes_by_locale.items():
+            yield locale, list(key_to_value.items())
+
+    def _pending_prefill_update_count(self):
+        return sum(len(key_to_value) for key_to_value in self._pending_prefill_changes_by_locale.values())
+
+    def _update_prefill_notice(self):
+        count = self._pending_prefill_update_count()
+        if count <= 0:
+            self.prefill_notice_label.hide()
+            return
+        self.prefill_notice_label.setText(
+            _(
+                "Pending duplicate-prefill updates: {count}. These may include keys not currently visible in the table and will be saved."
+            ).format(count=count)
+        )
+        self.prefill_notice_label.show()
 
     def closeEvent(self, event):
         """Handle cleanup when the window is closed."""
@@ -321,6 +345,12 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         button_layout.addWidget(close_btn)
         button_layout.addWidget(self.unicode_toggle)
         layout.addLayout(button_layout)
+
+        self.prefill_notice_label = QLabel("")
+        self.prefill_notice_label.setWordWrap(True)
+        self.prefill_notice_label.setStyleSheet("color: #d4a017; font-weight: bold;")
+        self.prefill_notice_label.hide()
+        layout.addWidget(self.prefill_notice_label)
         
         # Table for translations
         self.table = self.setup_table()
@@ -998,6 +1028,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.locales = locales
         logger.debug("Resetting duplicate groups at start of load_data")
         self.outstanding_duplicate_groups = {}  # Reset duplicate groups
+        self._pending_prefill_changes_by_locale = {}
+        self._update_prefill_notice()
 
         # Get default locale and exclude it from the list
         default_locale = config_manager.get('translation.default_locale', 'en')
@@ -1063,9 +1095,14 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                         # Copy translations from existing to outstanding for all non-default locales
                         for locale in display_locales:
                             if locale in existing_group.values and existing_group.values[locale].strip():
-                                outstanding_group.add_translation(locale, existing_group.values[locale])
-                                logger.debug(f"Pre-filled {outstanding_key} in {locale} from {existing_key}")
-                                pre_filled_keys.add(outstanding_key)
+                                new_value = existing_group.values[locale]
+                                old_value = outstanding_group.get_translation(locale) or ""
+                                outstanding_group.add_translation(locale, new_value)
+                                if new_value != old_value:
+                                    self._record_prefill_change(locale, outstanding_key, new_value)
+                                    logger.debug(f"Pre-filled {outstanding_key} in {locale} from {existing_key}")
+                                    pre_filled_keys.add(outstanding_key)
+                self._update_prefill_notice()
                 
                 # Track outstanding duplicates - we'll show only one of each group
                 for default_value, duplicate_keys in outstanding_duplicates.items():
@@ -1111,12 +1148,15 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 # If all outstanding translations were resolved by pre-filling, show success dialog
                 if len(all_invalid_groups) == 0:
                     resolved_count = len(pre_filled_keys)
+                    queued_prefill_updates = sum(
+                        len(changes) for _, changes in self._iter_pending_prefill_changes()
+                    )
                     QMessageBox.information(
                         self,
                         _("All Translations Resolved"),
                         f"All outstanding translation(s) were automatically filled from existing translations with matching default values.\n\n"
                         f"Resolved {resolved_count} outstanding translation key(s). No outstanding translations remain.\n\n"
-                        f"⚠️ Please remember to run a Translation Update to save the duplicate translations.",
+                        f"Queued {queued_prefill_updates} pre-filled locale update(s) for save.",
                         QMessageBox.StandardButton.Ok
                     )
                     # Return False to indicate no items to display
@@ -1204,6 +1244,19 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         """Save changes to the translations."""
         try:
             logger.debug("Starting save changes process...")
+            pending_prefill_count = self._pending_prefill_update_count()
+            if pending_prefill_count > 0:
+                reply = QMessageBox.question(
+                    self,
+                    _("Save includes hidden duplicate-prefill updates"),
+                    _(
+                        "This save will also persist {count} pre-filled duplicate update(s), including keys that may not be visible in the current table.\n\nContinue?"
+                    ).format(count=pending_prefill_count),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes,
+                )
+                if reply != QMessageBox.StandardButton.Yes:
+                    return
             
             # First, ensure translation service is cleaned up
             if hasattr(self, 'translation_service'):
@@ -1251,11 +1304,23 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                                         changes_by_locale[locale].append((matched_key, new_value))
             
             # Emit one batch per locale
-            logger.debug(f"Emitting batches for {len(changes_by_locale)} locales...")
-            for i, (locale, changes) in enumerate(changes_by_locale.items()):
+            merged_changes_by_locale = {}
+            for locale, changes in changes_by_locale.items():
+                merged_changes_by_locale[locale] = {key: value for key, value in changes}
+            for locale, changes in self._iter_pending_prefill_changes():
+                key_to_value = merged_changes_by_locale.setdefault(locale, {})
+                for key, value in changes:
+                    # If user edited same key in table, keep explicit table edit.
+                    key_to_value.setdefault(key, value)
+            self._pending_prefill_changes_by_locale = {}
+            self._update_prefill_notice()
+
+            logger.debug(f"Emitting batches for {len(merged_changes_by_locale)} locales...")
+            for i, (locale, key_to_value) in enumerate(merged_changes_by_locale.items()):
+                changes = list(key_to_value.items())
                 logger.debug(f"Emitting batch of {len(changes)} updates for locale {locale}")
                 self.translation_updated.emit(locale, changes)
-                if i < len(changes_by_locale) - 1:  # Don't sleep after the last one
+                if i < len(merged_changes_by_locale) - 1:  # Don't sleep after the last one
                     QThread.msleep(100)  # 100ms delay between locales
 
             # If this save contains only key deletions (no text edits), flush queued deletions now.
