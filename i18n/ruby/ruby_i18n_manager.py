@@ -48,6 +48,7 @@ from ..translation_manager_results import TranslationManagerResults, Translation
 from ..invalid_translation_groups import InvalidTranslationGroups
 from ..i18n_manager_base import I18NManagerBase
 from .file_structure_manager import FileStructureManager
+from .i18n_tasks_missing_sync import sync_base_from_missing
 
 from utils.logging_setup import get_logger
 from utils.utils import Utils
@@ -1657,7 +1658,10 @@ msgstr ""
         """Generate or update base locale data for Ruby/Rails projects.
 
         When a ``Gemfile`` exists at the project root, runs
-        ``bundle exec i18n-tasks add-missing`` (same role as extracting a POT for Python).
+        ``bundle exec i18n-tasks missing`` and merges keys missing in every locale
+        (reported as Locale ``all``) into the base locale YAML files per
+        ``config/i18n-tasks.yml`` ``data.write`` routing—without ``add-missing``,
+        so existing file comments and formatting are preserved where possible.
 
         Without a Gemfile, falls back to ensuring default locale YAML structure exists.
 
@@ -1669,14 +1673,14 @@ msgstr ""
             project_root = self._get_project_root()
             gemfile = os.path.join(project_root, "Gemfile")
             if os.path.isfile(gemfile):
-                logger.info("Running bundle exec i18n-tasks add-missing")
-                ok, msg = self._run_i18n_tasks_add_missing()
-                if not ok:
-                    self._last_generate_base_error = msg
-                    logger.error(f"i18n-tasks add-missing failed: {msg}")
+                logger.info("Syncing base locale from i18n-tasks missing (pattern_router)")
+                result = sync_base_from_missing(project_root)
+                if not result.success:
+                    self._last_generate_base_error = result.message
+                    logger.error(f"i18n-tasks missing sync failed: {result.message}")
                     return False
-                if msg:
-                    logger.info(f"i18n-tasks add-missing output:\n{msg}")
+                if result.message:
+                    logger.info(result.message)
                 return True
 
             # No Gemfile: ensure default locale structure (legacy behavior)
