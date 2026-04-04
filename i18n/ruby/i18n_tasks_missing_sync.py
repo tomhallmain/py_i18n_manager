@@ -29,6 +29,23 @@ from .yaml_parser_utils import RUAMEL_AVAILABLE, merge_dotted_keys_into_locale_f
 logger = get_logger("i18n_tasks_missing_sync")
 
 
+def is_i18n_tasks_missing_report_output(text: str) -> bool:
+    """Return True if ``text`` looks like ``bundle exec i18n-tasks missing`` report output.
+
+    The gem often exits non-zero when any keys are missing (CI-style). It may also print
+    unrelated lines to stderr (e.g. maintainer notices); parsing uses stdout when possible.
+    """
+    if not (text and text.strip()):
+        return False
+    if "Missing translations" in text:
+        return True
+    for line in text.splitlines()[:60]:
+        s = line.strip()
+        if s.startswith("|") and "Locale" in line and "Key" in line:
+            return True
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Data
 # ---------------------------------------------------------------------------
@@ -86,7 +103,13 @@ def run_i18n_tasks_missing(project_root: str) -> tuple[bool, str]:
     """Run ``bundle exec i18n-tasks missing`` in ``project_root``.
 
     Returns:
-        ``(success, combined_stdout_stderr)`` — on failure, message explains the error.
+        ``(success, text_to_parse)``. On success, ``text_to_parse`` is usually **stdout**
+        so stderr noise (gem banners, etc.) is not mixed into the table parser.
+
+    Note:
+        ``i18n-tasks missing`` commonly returns a **non-zero exit code** when there are
+        missing keys; that is still a successful run for our purposes if the report table
+        is present (see :func:`is_i18n_tasks_missing_report_output`).
     """
     bundle_exe = _resolve_bundle_executable()
     if not bundle_exe:
@@ -122,9 +145,39 @@ def run_i18n_tasks_missing(project_root: str) -> tuple[bool, str]:
     out = (completed.stdout or "").strip()
     err = (completed.stderr or "").strip()
     combined = "\n".join(x for x in (out, err) if x)
-    if completed.returncode != 0:
-        return False, combined or f"Exit code {completed.returncode}"
-    return True, combined
+
+    if completed.returncode == 0:
+        return True, out if out else combined
+
+    # Non-zero: often "missing keys exist" (exit 1). Treat as success if we got a real report.
+    if is_i18n_tasks_missing_report_output(out):
+        logger.info(
+            "i18n-tasks missing exited with code %s but produced a report on stdout "
+            "(normal when keys are missing). Ignoring exit code.",
+            completed.returncode,
+        )
+        return True, out
+    if is_i18n_tasks_missing_report_output(combined):
+        logger.info(
+            "i18n-tasks missing exited with code %s but produced a parseable report. Ignoring exit code.",
+            completed.returncode,
+        )
+        return True, combined
+    if is_i18n_tasks_missing_report_output(err):
+        logger.info(
+            "i18n-tasks missing exited with code %s; report found on stderr. Ignoring exit code.",
+            completed.returncode,
+        )
+        return True, err
+
+    tail = combined if combined else err or out
+    if tail and len(tail) > 2500:
+        tail = tail[:2500] + "\n... (truncated)"
+    msg = (
+        f"i18n-tasks missing failed (exit {completed.returncode})."
+        + (f"\n{tail}" if tail else "")
+    )
+    return False, msg
 
 
 # ---------------------------------------------------------------------------

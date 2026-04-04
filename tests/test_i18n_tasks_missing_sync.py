@@ -4,12 +4,50 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
-from i18n.ruby.i18n_tasks_missing_sync import MissingRow, parse_i18n_tasks_missing_table
+from i18n.ruby.i18n_tasks_missing_sync import (
+    MissingRow,
+    is_i18n_tasks_missing_report_output,
+    parse_i18n_tasks_missing_table,
+    run_i18n_tasks_missing,
+)
 from i18n.ruby.i18n_tasks_pattern_router import (
     load_i18n_tasks_config,
     path_for_key_pattern_router,
 )
+
+
+class TestI18nTasksMissingReportDetection(unittest.TestCase):
+    def test_detects_header_line_and_missing_translations_title(self):
+        self.assertTrue(is_i18n_tasks_missing_report_output("Missing translations (12) | i18n-tasks\n"))
+        table = "| Locale | Key | Value |\n| all | k | v |\n"
+        self.assertTrue(is_i18n_tasks_missing_report_output(table))
+
+    def test_rejects_empty_and_random_stderr(self):
+        self.assertFalse(is_i18n_tasks_missing_report_output(""))
+        self.assertFalse(is_i18n_tasks_missing_report_output("Some political banner text\n"))
+
+
+class TestRunI18nTasksMissingExitCode(unittest.TestCase):
+    @patch("i18n.ruby.i18n_tasks_missing_sync._resolve_bundle_executable")
+    @patch("i18n.ruby.i18n_tasks_missing_sync.subprocess.run")
+    def test_exit_1_with_table_on_stdout_is_success_stdout_only(
+        self, mock_run, mock_bundle
+    ):
+        mock_bundle.return_value = "bundle"
+        table = (
+            "| Locale | Key | Value |\n"
+            "| all | admin.x | src |\n"
+        )
+        mock_run.return_value = Mock(
+            returncode=1,
+            stdout=table,
+            stderr="Unrelated stderr banner\n",
+        )
+        ok, text = run_i18n_tasks_missing("/tmp/project")
+        self.assertTrue(ok)
+        self.assertEqual(text.strip(), table.strip())
 
 
 class TestI18nTasksMissingSync(unittest.TestCase):

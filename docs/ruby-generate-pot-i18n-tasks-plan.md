@@ -88,7 +88,7 @@ Implementation will need a **small router** in Python that mirrors “first matc
 
 - In the **new `i18n/ruby/` module**, add a function to run `bundle exec i18n-tasks missing` with the same subprocess conventions as today’s Bundler helpers (`cwd=project_root`, `I18N_MANAGER_BUNDLE`, `I18N_MANAGER_PATH_EXTRA`, timeout, encoding). Optionally share env resolution by importing minimal helpers from `ruby_i18n_manager` or by moving `_resolve_bundle_executable` / `_bundle_subprocess_env` to a tiny shared `i18n/ruby/bundle_util.py` only if duplication is painful—prefer the new module staying self-contained where practical.
 - Command: `bundle exec i18n-tasks missing`.
-- Treat non-zero exit code as failure (return structured error text for the manager to store in `_last_generate_base_error`).
+- Treat non-zero exit code as failure **only** if no parseable report was produced — `i18n-tasks missing` often exits non-zero when keys are missing; in that case the table is still valid. Prefer stdout for parsing; stderr may contain gem banners.
 
 ### Phase 2 — Parse `missing` table output
 
