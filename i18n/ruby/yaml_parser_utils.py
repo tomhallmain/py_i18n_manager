@@ -307,6 +307,9 @@ def merge_dotted_keys_into_locale_file(
 
     Creates the file with a minimal ``base_locale`` tree if missing.
 
+    New mapping keys are **appended** (insertion order); there is **no** alphabetical sort.
+    See ``tests/test_yaml_parser_utils.py`` (key order assertions).
+
     Returns:
         ``(added, skipped_existing)``.
     """

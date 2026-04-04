@@ -1273,6 +1273,7 @@ msgstr ""
         else:
             # Single-part key, put in application.yml or en.yml
             return os.path.join(locale_dir, "application.yml")
+
     def write_locale_po_file(self, locale):
         """Legacy method name - redirects to write_locale_yaml_files().
         
