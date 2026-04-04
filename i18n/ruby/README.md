@@ -227,21 +227,17 @@ Rails convention requires quoted string values to prevent YAML from interpreting
 
 - `_detect_locale_directory()`: Detect `config/locales` vs `locale` vs `locales`
 - `_determine_yaml_file_path()`: Heuristic file path from translation key
-- `_add_to_nested_dict()`: Add translation to nested dictionary structure
+- `utils.nested_mapping.add_to_nested_dict()` / `remove_from_nested_dict()` / `resolve_nested_dict_key()`: Dot-notation nested dict helpers (YAML bool-key tolerant)
 
 ### YAML Processing
 
 - `_extract_translation_keys()`: Recursively extract keys from nested YAML
 - `_get_nested_value()`: Get value from nested dict using dot-notation key
-- `_custom_yaml_dump()`: Smart YAML dumper (ruamel.yaml or PyYAML)
-- `_ruamel_yaml_dump()`: ruamel.yaml dumper with comment preservation
-- `_pyyaml_dump()`: PyYAML fallback dumper
+- `_custom_yaml_dump()`: Smart YAML dumper (ruamel.yaml or PyYAML); see `yaml_parser_utils.py` for `ruamel_yaml_dump` / `pyyaml_dump` helpers
 
-### String Quoting
+### String Quoting (see `yaml_parser_utils.py`)
 
-- `_quote_string_values()`: Quote strings in plain dicts
-- `_quote_string_values_in_place()`: Quote strings in ruamel.yaml structures
-- `_merge_ruamel_data()`: Merge data while preserving ruamel.yaml structure
+- `quote_string_values()` / `quote_string_values_in_place()` / `merge_ruamel_data()`
 
 ## Gotchas and Edge Cases
 

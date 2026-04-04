@@ -27,6 +27,7 @@ from .yaml_parser_utils import (
 )
 
 from utils.logging_setup import get_logger
+from utils.nested_mapping import add_to_nested_dict, remove_from_nested_dict
 from utils.utils import Utils
 
 logger = get_logger("ruby_i18n_manager")
@@ -271,7 +272,7 @@ class RubyI18NManager(I18NManagerBase):
 
         removed_count = 0
         for deleted_key in self.pending_deleted_keys:
-            if self._remove_from_nested_dict(locale_data, deleted_key):
+            if remove_from_nested_dict(locale_data, deleted_key):
                 removed_count += 1
 
         if removed_count:
@@ -1082,8 +1083,8 @@ msgstr ""
                 
                 # Add/update translation in nested structure
                 # The key format is like "views.tasks.index.select_project"
-                # _add_to_nested_dict will overwrite if the key already exists, preventing duplicates
-                self._add_to_nested_dict(translations_by_file[file_path], key_str, value)
+                # add_to_nested_dict will overwrite if the key already exists, preventing duplicates
+                add_to_nested_dict(translations_by_file[file_path], key_str, value)
             
             # For non-default locales, ensure all files from default locale are created/updated
             # This ensures file structure parity: all locales have the same files as the default locale
@@ -1146,7 +1147,7 @@ msgstr ""
                                     value = ""  # Use empty string instead of skipping
                                 
                                 # Add/update this key in the file (will overwrite existing if present)
-                                self._add_to_nested_dict(translations_by_file[target_file], key_str, value)
+                                add_to_nested_dict(translations_by_file[target_file], key_str, value)
                         
                         files_created_for_parity.append(target_file)
                 
@@ -1162,7 +1163,7 @@ msgstr ""
                 deleted_count = 0
                 for file_path, data in translations_by_file.items():
                     for deleted_key in self.pending_deleted_keys:
-                        if self._remove_from_nested_dict(data, deleted_key):
+                        if remove_from_nested_dict(data, deleted_key):
                             deleted_count += 1
                 if deleted_count:
                     logger.info(
@@ -1272,104 +1273,6 @@ msgstr ""
         else:
             # Single-part key, put in application.yml or en.yml
             return os.path.join(locale_dir, "application.yml")
-    
-    def _add_to_nested_dict(self, data: dict, key: str, value: str):
-        """Add a value to a nested dictionary using dot-notation key.
-        
-        Preserves existing nested structure - only updates the specific key,
-        doesn't overwrite the entire nested dict.
-        
-        Args:
-            data: Dictionary to add to
-            key: Dot-notation key (e.g., "tasks.form.title")
-            value: Value to set
-        """
-        parts = key.split('.')
-        current = data
-        
-        # Navigate/create nested structure
-        for part in parts[:-1]:
-            if part not in current:
-                current[part] = {}
-            elif not isinstance(current[part], dict):
-                # If the path exists but isn't a dict, convert it
-                # This shouldn't happen in normal cases, but be safe
-                current[part] = {}
-            current = current[part]
-        
-        # Set the final value (this will update existing or create new)
-        current[parts[-1]] = value
-
-    def _resolve_nested_dict_key(self, mapping: dict, part: str):
-        """Resolve a nested mapping key, handling YAML bool key variants.
-
-        Supports matching keys that may appear as:
-        - "True"/"False" strings
-        - "true"/"false" strings
-        - bool True/False (from YAML coercion)
-        """
-        if part in mapping:
-            return part
-
-        wanted = str(part)
-        wanted_lower = wanted.lower()
-        bool_like = wanted_lower in {"true", "false"}
-
-        # Exact string repr match first
-        for existing_key in mapping.keys():
-            if str(existing_key) == wanted:
-                return existing_key
-
-        # For bool-like tokens, accept case/typing variants.
-        if bool_like:
-            for existing_key in mapping.keys():
-                if str(existing_key).lower() == wanted_lower:
-                    return existing_key
-                if isinstance(existing_key, bool):
-                    if existing_key and wanted_lower == "true":
-                        return existing_key
-                    if (not existing_key) and wanted_lower == "false":
-                        return existing_key
-
-        return None
-
-    def _remove_from_nested_dict(self, data: dict, key: str) -> bool:
-        """Remove a dot-notation key from a nested dictionary in-place.
-
-        Returns:
-            bool: True if a value was removed, False otherwise.
-        """
-        if not isinstance(data, dict):
-            return False
-
-        parts = key.split(".")
-        current = data
-        parents = []
-
-        for part in parts[:-1]:
-            resolved_part = self._resolve_nested_dict_key(current, part)
-            if resolved_part is None or not isinstance(current[resolved_part], dict):
-                return False
-            parents.append((current, resolved_part))
-            current = current[resolved_part]
-
-        leaf = parts[-1]
-        resolved_leaf = self._resolve_nested_dict_key(current, leaf)
-        if resolved_leaf is None:
-            return False
-
-        del current[resolved_leaf]
-
-        # Cleanup empty parent dictionaries bottom-up.
-        for parent, parent_key in reversed(parents):
-            child = parent.get(parent_key)
-            if isinstance(child, dict) and not child:
-                del parent[parent_key]
-            else:
-                break
-
-        return True
-    
     def write_locale_po_file(self, locale):
         """Legacy method name - redirects to write_locale_yaml_files().
         
