@@ -1,40 +1,32 @@
 """Sync base locale YAML from `i18n-tasks missing` output (without `add-missing`).
 
-Runs ``bundle exec i18n-tasks missing``, parses the CLI table, routes keys using
-``config/i18n-tasks.yml`` ``data.write`` rules (``pattern_router``), and merges new
-keys into existing locale files with ruamel.yaml when available so comments and
-formatting are preserved as much as possible.
+Runs ``bundle exec i18n-tasks missing``, parses the CLI table, routes keys via
+``i18n_tasks_pattern_router``, and merges new keys using ``yaml_parser_utils`` so
+ruamel settings match :class:`~i18n.ruby.ruby_i18n_manager.RubyI18nManager`.
 
-``RubyI18nManager.generate_pot_file()`` should call :func:`sync_base_from_missing`
-for Gemfile projects instead of ``i18n-tasks add-missing``.
+``RubyI18nManager.generate_pot_file()`` calls :func:`sync_base_from_missing` for Gemfile projects.
 """
 
 from __future__ import annotations
 
-import fnmatch
 import os
 import re
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import Any, Optional
-
-import yaml
+from typing import Optional
 
 from utils.logging_setup import get_logger
 
+from .i18n_tasks_pattern_router import (
+    find_i18n_tasks_config_path,
+    load_i18n_tasks_config,
+    path_for_key_pattern_router,
+)
+from .yaml_parser_utils import RUAMEL_AVAILABLE, merge_dotted_keys_into_locale_file
+
 logger = get_logger("i18n_tasks_missing_sync")
-
-try:
-    from ruamel.yaml import YAML as RuamelYAML
-    from ruamel.yaml.scalarstring import DoubleQuotedScalarString
-
-    RUAMEL_AVAILABLE = True
-except ImportError:
-    RuamelYAML = None  # type: ignore[misc, assignment]
-    DoubleQuotedScalarString = None  # type: ignore[misc, assignment]
-    RUAMEL_AVAILABLE = False
 
 
 # ---------------------------------------------------------------------------
@@ -52,15 +44,6 @@ class MissingRow:
     def is_missing_in_all_locales(self) -> bool:
         """True when the key is not defined in any locale (Locale column is ``all``)."""
         return self.locale_column.strip() == "all"
-
-
-@dataclass
-class I18nTasksConfig:
-    """Subset of ``config/i18n-tasks.yml`` needed for routing."""
-
-    base_locale: str
-    router: Optional[str]
-    data_write: list[Any]
 
 
 @dataclass
@@ -148,6 +131,7 @@ def run_i18n_tasks_missing(project_root: str) -> tuple[bool, str]:
 # Parse `missing` table
 # ---------------------------------------------------------------------------
 
+
 def parse_i18n_tasks_missing_table(output: str) -> list[MissingRow]:
     """Parse ASCII table rows from ``i18n-tasks missing`` stdout.
 
@@ -160,10 +144,8 @@ def parse_i18n_tasks_missing_table(output: str) -> list[MissingRow]:
         if not line.startswith("|"):
             continue
         if re.match(r"^\|\s*[\-+]", line):
-            # Separator like |---| — skip
             continue
         parts = [p.strip() for p in line.split("|")]
-        # parts[0] and parts[-1] are empty from leading/trailing |
         inner = [p for p in parts if p != ""]
         if len(inner) < 2:
             continue
@@ -176,232 +158,11 @@ def parse_i18n_tasks_missing_table(output: str) -> list[MissingRow]:
     return rows
 
 
-# ---------------------------------------------------------------------------
-# Load i18n-tasks config & pattern_router
-# ---------------------------------------------------------------------------
-
-
-def find_i18n_tasks_config_path(project_root: str) -> Optional[str]:
-    """Return path to ``config/i18n-tasks.yml`` or ``config/i18n-tasks.yaml`` if present."""
-    for name in ("i18n-tasks.yml", "i18n-tasks.yaml"):
-        p = os.path.join(project_root, "config", name)
-        if os.path.isfile(p):
-            return p
-    return None
-
-
-def load_i18n_tasks_config(config_path: str) -> I18nTasksConfig:
-    """Load routing-related fields from an i18n-tasks config file."""
-    with open(config_path, encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
-    if not isinstance(raw, dict):
-        raise ValueError(f"Invalid i18n-tasks config (expected mapping): {config_path}")
-    base_locale = str(raw.get("base_locale") or "en")
-    data_block = raw.get("data") or {}
-    if not isinstance(data_block, dict):
-        data_block = {}
-    write_rules = data_block.get("write")
-    if write_rules is None:
-        write_rules = []
-    if not isinstance(write_rules, list):
-        write_rules = []
-    router = data_block.get("router")
-    if router is None:
-        router = raw.get("router")
-    return I18nTasksConfig(
-        base_locale=base_locale,
-        router=str(router) if router is not None else None,
-        data_write=write_rules,
-    )
-
-
-def substitute_locale_in_template(template: str, locale: str) -> str:
-    """Replace ``%{locale}`` in a path template (i18n-tasks style)."""
-    return template.replace("%{locale}", locale)
-
-
-def path_for_key_pattern_router(dotted_key: str, base_locale: str, write_rules: list[Any]) -> Optional[str]:
-    """Resolve relative path for ``dotted_key`` using ``data.write`` (pattern_router semantics).
-
-    First matching ``[glob, path_template]`` wins; if none match, the last bare string
-    rule in ``write_rules`` is used as catch-all (same order as i18n-tasks).
-    """
-    default_template: Optional[str] = None
-    for rule in write_rules:
-        if isinstance(rule, str):
-            default_template = rule
-            continue
-        if isinstance(rule, (list, tuple)) and len(rule) == 2:
-            pattern, tmpl = rule[0], rule[1]
-            if isinstance(pattern, str) and isinstance(tmpl, str):
-                if fnmatch.fnmatch(dotted_key, pattern):
-                    return substitute_locale_in_template(tmpl, base_locale)
-    if default_template:
-        return substitute_locale_in_template(default_template, base_locale)
-    return None
-
-
-# ---------------------------------------------------------------------------
-# Merge keys into YAML (ruamel round-trip)
-# ---------------------------------------------------------------------------
-
-
-def _empty_placeholder_value() -> Any:
-    if RUAMEL_AVAILABLE and DoubleQuotedScalarString is not None:
-        return DoubleQuotedScalarString("")
-    return ""
-
-
-def _ensure_locale_root(data: Any, base_locale: str) -> Any:
-    """Ensure top-level ``base_locale`` key exists on a CommentedMap or dict."""
-    if data is None:
-        return None
-    if hasattr(data, "get") and hasattr(data, "__setitem__"):
-        if base_locale not in data:
-            if RUAMEL_AVAILABLE:
-                try:
-                    from ruamel.yaml.comments import CommentedMap
-
-                    data[base_locale] = CommentedMap()
-                except Exception:
-                    data[base_locale] = {}
-            else:
-                data[base_locale] = {}
-        return data[base_locale]
-    return None
-
-
-def _navigate_or_create(parent: Any, parts: list[str]) -> tuple[Any, bool]:
-    """Navigate ``parts`` (excluding leaf); create CommentedMap/dict nodes as needed.
-
-    Returns ``(parent_of_leaf, created_any)``.
-    """
-    created = False
-    current = parent
-    for part in parts[:-1]:
-        if current is None:
-            return None, created
-        nxt = current.get(part) if hasattr(current, "get") else None
-        if nxt is None:
-            try:
-                from ruamel.yaml.comments import CommentedMap
-            except ImportError:
-                CommentedMap = dict  # type: ignore[misc, assignment]
-            if RuamelYAML is not None:
-                try:
-                    nxt = CommentedMap()
-                except Exception:
-                    nxt = {}
-            else:
-                nxt = {}
-            current[part] = nxt
-            created = True
-        elif not hasattr(nxt, "get"):
-            return None, created
-        current = nxt
-    return current, created
-
-
-def _leaf_exists(parent: Any, leaf: str) -> bool:
-    if parent is None or not hasattr(parent, "get"):
-        return False
-    return leaf in parent and parent.get(leaf) is not None
-
-
-def _set_dotted_key_under_locale(
-    locale_root: Any,
-    dotted_key: str,
-    *,
-    skip_if_leaf_exists: bool = True,
-) -> bool:
-    """Insert ``dotted_key`` with an empty placeholder value under ``locale_root``.
-
-    Returns True if a new leaf was added.
-    """
-    parts = [p for p in dotted_key.split(".") if p]
-    if not parts:
-        return False
-    parent, _ = _navigate_or_create(locale_root, parts)
-    if parent is None:
-        return False
-    leaf = parts[-1]
-    if skip_if_leaf_exists and _leaf_exists(parent, leaf):
-        return False
-    parent[leaf] = _empty_placeholder_value()
-    return True
-
-
-def _load_yaml_ruamel(path: str) -> tuple[Any, Any]:
-    """Load YAML with round-trip loader. Returns ``(ryaml, data)``."""
-    if not RUAMEL_AVAILABLE or RuamelYAML is None:
-        raise RuntimeError("ruamel.yaml is required for i18n-tasks missing sync")
-    ryaml = RuamelYAML()
-    ryaml.preserve_quotes = True
-    with open(path, encoding="utf-8") as f:
-        data = ryaml.load(f)
-    return ryaml, data
-
-
-def _merge_keys_into_file(
-    project_root: str,
-    rel_path: str,
-    base_locale: str,
-    dotted_keys: list[str],
-) -> tuple[int, int, int]:
-    """Merge keys that map to ``rel_path`` (relative to project root).
-
-    Returns:
-        ``(added, skipped_existing, skipped_unrouted)`` — unrouted unused here (always 0).
-    """
-    abs_path = os.path.normpath(os.path.join(project_root, rel_path.replace("/", os.sep)))
-    added = 0
-    skipped = 0
-
-    if not os.path.isfile(abs_path):
-        parent = os.path.dirname(abs_path)
-        if parent:
-            os.makedirs(parent, exist_ok=True)
-        if not RUAMEL_AVAILABLE or RuamelYAML is None:
-            raise RuntimeError("ruamel.yaml is required for i18n-tasks missing sync")
-        from ruamel.yaml.comments import CommentedMap
-
-        ryaml = RuamelYAML()
-        data: Any = CommentedMap()
-        lr = _ensure_locale_root(data, base_locale)
-        if lr is None:
-            raise RuntimeError(f"Could not create locale root for {base_locale!r} in {abs_path}")
-        for dk in dotted_keys:
-            if _set_dotted_key_under_locale(lr, dk, skip_if_leaf_exists=True):
-                added += 1
-            else:
-                skipped += 1
-        with open(abs_path, "w", encoding="utf-8") as f:
-            ryaml.dump(data, f)
-        return added, skipped, 0
-
-    ryaml, data = _load_yaml_ruamel(abs_path)
-    if data is None:
-        from ruamel.yaml.comments import CommentedMap
-
-        data = CommentedMap()
-    lr = _ensure_locale_root(data, base_locale)
-    if lr is None:
-        raise RuntimeError(f"Could not resolve locale root {base_locale!r} in {abs_path}")
-    for dk in dotted_keys:
-        if _set_dotted_key_under_locale(lr, dk, skip_if_leaf_exists=True):
-            added += 1
-        else:
-            skipped += 1
-    with open(abs_path, "w", encoding="utf-8") as f:
-        ryaml.dump(data, f)
-    return added, skipped, 0
-
-
 def sync_base_from_missing(project_root: str) -> SyncBaseFromMissingResult:
     """Run ``i18n-tasks missing``, then add **globally missing** keys (Locale ``all``) to base locale files.
 
-    Uses ``pattern_router`` paths from ``config/i18n-tasks.yml``. Requires ``ruamel.yaml``
-    for writing. Does not run ``i18n-tasks add-missing``.
+    Uses ``pattern_router`` paths from ``config/i18n-tasks.yml``. Requires ``ruamel.yaml``.
+    Does not run ``i18n-tasks add-missing``.
     """
     if not RUAMEL_AVAILABLE:
         return SyncBaseFromMissingResult(
@@ -460,7 +221,7 @@ def sync_base_from_missing(project_root: str) -> SyncBaseFromMissingResult:
     total_skip = 0
     for rel, keys in sorted(by_file.items()):
         try:
-            a, s, _ = _merge_keys_into_file(project_root, rel, cfg.base_locale, keys)
+            a, s = merge_dotted_keys_into_locale_file(project_root, rel, cfg.base_locale, keys)
             total_added += a
             total_skip += s
         except Exception as e:

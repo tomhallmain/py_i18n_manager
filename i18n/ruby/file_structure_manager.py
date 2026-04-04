@@ -3,6 +3,11 @@
 This module provides a class to manage file structure parity across locales,
 tracking source files for translation keys and providing utilities for translating
 file paths between locales.
+
+For Rails apps that use the i18n-tasks gem, **routing new keys to files** from
+``config/i18n-tasks.yml`` ``data.write`` (``pattern_router``) is implemented in
+``i18n_tasks_pattern_router`` — that logic is config-driven and does not use the
+key→file maps maintained here (those reflect already-loaded YAML).
 """
 
 import os

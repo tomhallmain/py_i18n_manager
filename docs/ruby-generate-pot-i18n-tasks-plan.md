@@ -157,3 +157,31 @@ For each parsed row classified as “needs base entry” (initially: **locale co
 - Running **Sync base** on a Rails app with `pattern_router` no longer runs `i18n-tasks add-missing` by default.
 - New keys reported as globally missing are added to the **correct** per-project YAML files according to `config/i18n-tasks.yml`.
 - Existing comments and formatting in touched files are preserved **meaningfully** (exact definition depends on chosen YAML library and constraints documented in the implementation PR).
+
+## Implementation status (living)
+
+**Done**
+
+- Phases 1–5: `bundle exec i18n-tasks missing`, table parser, `config/i18n-tasks.yml` load + `pattern_router`, merge into base locale YAML, `generate_pot_file()` wired to `sync_base_from_missing`.
+- Shared **ruamel** / **PyYAML** helpers in `i18n/ruby/yaml_parser_utils.py` (used by `RubyI18nManager` dumps and by missing-sync merge).
+- **i18n-tasks file routing** isolated in `i18n/ruby/i18n_tasks_pattern_router.py` (distinct from `FileStructureManager`, which tracks paths from loaded keys).
+- Unit tests for parser, router order, and config load (`tests/test_i18n_tasks_missing_sync.py`).
+
+**Recommended next (from open items below)**
+
+- **Pluralization / `few, many` rows**: detect in the missing report (single-locale rows with non-string hints) and skip with a clear log, or insert minimal pluralization stubs — product decision.
+- **Machine-readable `missing` output**: quick check of `i18n-tasks missing --help` for JSON/CSV; prefer if stable.
+- **Optional `bundle_util.py`**: only if Bundler env duplication with other Ruby helpers becomes painful.
+
+**Later / optional**
+
+- Sync base filling keys for rows **not** equal to `all` (partial locale gaps) — likely separate from “base POT” semantics; may belong in outstanding-items flow.
+- Streaming parse for very large `missing` output.
+- Thin integration test for `generate_pot_file` delegation (mock subprocess).
+
+## Relationship: `FileStructureManager` vs `i18n_tasks_pattern_router`
+
+- **`FileStructureManager`**: learns which file holds each key **after** YAML is loaded into the app; translates paths across locales; stores original file text for comment-preserving writes in the UI workflow.
+- **`i18n_tasks_pattern_router`**: resolves a relative path from a **dotted key** using only `config/i18n-tasks.yml`, matching i18n-tasks’ `pattern_router` — required when inserting keys discovered from **`i18n-tasks missing`** before any in-memory topology exists.
+
+Both should agree for keys that already exist in files; they are complementary, not duplicates.

@@ -5,10 +5,9 @@ import textwrap
 import unittest
 from pathlib import Path
 
-from i18n.ruby.i18n_tasks_missing_sync import (
-    MissingRow,
+from i18n.ruby.i18n_tasks_missing_sync import MissingRow, parse_i18n_tasks_missing_table
+from i18n.ruby.i18n_tasks_pattern_router import (
     load_i18n_tasks_config,
-    parse_i18n_tasks_missing_table,
     path_for_key_pattern_router,
 )
 
