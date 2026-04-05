@@ -5,10 +5,11 @@ import shutil
 import subprocess
 import sys
 import time
+import copy
 import re
 import yaml
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from i18n.translation_group import TranslationGroup, TranslationKey
 from ..translation_manager_results import TranslationManagerResults, TranslationAction, LocaleStatus
@@ -27,7 +28,7 @@ from .yaml_parser_utils import (
 )
 
 from utils.logging_setup import get_logger
-from utils.nested_mapping import add_to_nested_dict, remove_from_nested_dict
+from utils.nested_mapping import add_to_nested_dict, get_nested_value, remove_from_nested_dict
 from utils.utils import Utils
 
 logger = get_logger("ruby_i18n_manager")
@@ -572,7 +573,7 @@ class RubyI18NManager(I18NManagerBase):
                             self._file_structure_manager.set_source_file(key, default_locale, yaml_file)
                             # Add the default locale translation
                             value = self._get_nested_value(data[default_locale], key)
-                            if value:
+                            if value is not None and (isinstance(value, list) or value):
                                 self.translations[translation_key].add_translation(default_locale, value)
                 except Exception as e:
                     logger.warning(f"Error parsing YAML file {yaml_file}: {e}")
@@ -608,7 +609,7 @@ class RubyI18NManager(I18NManagerBase):
                                 # Track source file for this key/locale
                                 self._file_structure_manager.set_source_file(key, locale, yaml_file)
                                 value = self._get_nested_value(data[locale], key)
-                                if value:
+                                if value is not None and (isinstance(value, list) or value):
                                     self.translations[group.key].add_translation(locale, value)
                 except Exception as e:
                     logger.warning(f"Error parsing YAML file {yaml_file}: {e}")
@@ -636,7 +637,7 @@ class RubyI18NManager(I18NManagerBase):
                 keys.append(full_key)
         return keys
     
-    def _get_nested_value(self, data: dict, key: str) -> str:
+    def _get_nested_value(self, data: dict, key: str) -> Any:
         """Get a value from nested dictionary using dot-notation key.
         
         Args:
@@ -644,16 +645,17 @@ class RubyI18NManager(I18NManagerBase):
             key: Dot-notation key (e.g., "tasks.form.title")
             
         Returns:
-            str: The translation value, or None if not found
+            For scalar leaves: str. For YAML sequence leaves: list (deep copy).
+            None if not found or leaf is a mapping.
         """
-        parts = key.split('.')
-        current = data
-        for part in parts:
-            if isinstance(current, dict) and part in current:
-                current = current[part]
-            else:
-                return None
-        return str(current) if current is not None else None
+        leaf = get_nested_value(data, key)
+        if leaf is None:
+            return None
+        if isinstance(leaf, list):
+            return copy.deepcopy(leaf)
+        if isinstance(leaf, dict):
+            return None
+        return str(leaf)
 
     def get_msgid(self, line):
         msgid = line[7:-2]
@@ -845,8 +847,8 @@ class RubyI18NManager(I18NManagerBase):
                     comment = group.usage_comment.strip('#\n')
                 if group.tcomment:
                     tcomment = group.tcomment.strip('#\n')
-                # Get the translation and ensure it's properly encoded
-                msgstr = group.get_translation_unescaped(locale) or ""
+                # Get the translation and ensure it's properly encoded (PO msgstr is str)
+                msgstr = group.get_translation_unescaped_as_text(locale)
                 try:
                     entry = polib.POEntry(
                         msgid=msgid,

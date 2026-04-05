@@ -1,11 +1,33 @@
 import re
 from dataclasses import dataclass, field
-from typing import List, Set
+from typing import Any, List, Set
 
 from polib import POEntry
 
 from .invalid_character_set import InvalidCharacterSetAnalyzer
 from utils.config import config_manager
+
+
+def _locale_value_as_text(value: Any) -> str:
+    """Flatten stored translation to one string; used only by :meth:`TranslationGroup.value_as_text`."""
+    if isinstance(value, list):
+        return "\n".join(str(x) for x in value)
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _map_translation_list_strings(items: list, fn) -> list:
+    """Apply ``fn`` to each string leaf; recurse into nested lists (YAML sequences)."""
+    out: list = []
+    for x in items:
+        if isinstance(x, list):
+            out.append(_map_translation_list_strings(x, fn))
+        else:
+            s = x if isinstance(x, str) else str(x)
+            out.append(fn(s))
+    return out
+
 
 @dataclass
 class InvalidTranslationGroupLocales:
@@ -266,14 +288,41 @@ class TranslationGroup():
 
     def get_translation_escaped(self, locale, fail_on_key_error=False):
         translation = self.get_translation(locale, fail_on_key_error)
+        if isinstance(translation, list):
+            return _map_translation_list_strings(translation, escape_unicode)
         return escape_unicode(translation)
 
     def get_translation_unescaped(self, locale, fail_on_key_error=False):
         translation = self.get_translation(locale, fail_on_key_error)
+        if isinstance(translation, list):
+            return _map_translation_list_strings(translation, unescape_unicode)
         return unescape_unicode(translation)
 
+    @staticmethod
+    def value_as_text(stored: Any) -> str:
+        """Flatten a stored translation (str or list of lines, possibly nested) to one string."""
+        return _locale_value_as_text(stored)
+
+    def get_translation_as_text(self, locale, fail_on_key_error=False) -> str:
+        return self.value_as_text(self.get_translation(locale, fail_on_key_error))
+
+    def get_translation_escaped_as_text(self, locale, fail_on_key_error=False) -> str:
+        return self.value_as_text(self.get_translation_escaped(locale, fail_on_key_error))
+
+    def get_translation_unescaped_as_text(self, locale, fail_on_key_error=False) -> str:
+        return self.value_as_text(self.get_translation_unescaped(locale, fail_on_key_error))
+
     def get_missing_locales(self, expected_locales):
-        return [locale for locale in expected_locales if not locale in self.values or self.values[locale].strip() == '']
+        def _is_empty(v: Any) -> bool:
+            if isinstance(v, list):
+                return len(v) == 0
+            return not str(v).strip()
+
+        return [
+            locale
+            for locale in expected_locales
+            if locale not in self.values or _is_empty(self.values[locale])
+        ]
 
     def get_encoded_unicode_locales(self):
         """Get locales that have non-ASCII characters encoded in UTF-8.
@@ -283,7 +332,8 @@ class TranslationGroup():
         """
         encoded_unicode_locales = []
         for locale, translation in self.values.items():
-            if re.search("[^\x00-\x7F]+", translation):
+            text = self.value_as_text(translation)
+            if re.search("[^\x00-\x7F]+", text):
                 encoded_unicode_locales.append(locale)
         return encoded_unicode_locales
 
@@ -295,7 +345,7 @@ class TranslationGroup():
         """
         invalid_unicode_locales = []
         for locale, translation in self.values.items():
-            if "\\u" in translation:
+            if "\\u" in self.value_as_text(translation):
                 invalid_unicode_locales.append(locale)
         return invalid_unicode_locales
 
@@ -307,12 +357,13 @@ class TranslationGroup():
         """
         invalid_unicode_locales = []
         for locale, translation in self.values.items():
+            text = self.value_as_text(translation)
             # Check for non-ASCII characters that aren't properly encoded
-            if any(ord(c) > 127 for c in translation):
+            if any(ord(c) > 127 for c in text):
                 # Check if the character is a valid UTF-8 character
                 try:
                     # Try to encode and decode to verify it's valid UTF-8
-                    translation.encode('utf-8').decode('utf-8')
+                    text.encode('utf-8').decode('utf-8')
                 except UnicodeError:
                     invalid_unicode_locales.append(locale)
         return invalid_unicode_locales
@@ -327,14 +378,14 @@ class TranslationGroup():
         printf-style placeholders to catch runtime interpolation mismatches.
         """
         invalid_index_locales = []
-        default_translation = self.get_translation(self.default_locale)
+        default_translation = self.get_translation_as_text(self.default_locale)
         default_signature = PlaceholderSignature.from_text(default_translation)
 
         for locale, translation in self.values.items():
             if locale == self.default_locale:
                 continue
 
-            this_signature = PlaceholderSignature.from_text(translation)
+            this_signature = PlaceholderSignature.from_text(self.value_as_text(translation))
             if this_signature.is_invalid_for(default_signature):
                 invalid_index_locales.append(locale)
 
@@ -347,7 +398,7 @@ class TranslationGroup():
             list: List of locales with mismatched brace counts compared to default locale
         """
         invalid_brace_locales = []
-        default_translation = self.get_translation(self.default_locale)
+        default_translation = self.get_translation_as_text(self.default_locale)
         
         # Parentheses row: balance-only vs default; see _brace_pair_counts.
         brace_pairs = [
@@ -383,8 +434,9 @@ class TranslationGroup():
             if locale == self.default_locale:
                 continue
 
+            text = self.value_as_text(translation)
             for open_brace, close_brace in brace_pairs:
-                open_count, close_count = _brace_pair_counts(translation, open_brace, close_brace)
+                open_count, close_count = _brace_pair_counts(text, open_brace, close_brace)
 
                 if open_brace == '(':  # Parentheses - only check balance (ASCII or full-width)
                     if open_count != close_count:
@@ -405,7 +457,7 @@ class TranslationGroup():
             list: List of locales with mismatched leading or trailing spaces compared to default locale
         """
         invalid_space_locales = []
-        default_translation = self.get_translation(self.default_locale)
+        default_translation = self.get_translation_as_text(self.default_locale)
         
         # Get default locale space counts
         default_leading_spaces = len(default_translation) - len(default_translation.lstrip())
@@ -415,9 +467,10 @@ class TranslationGroup():
             if locale == self.default_locale:
                 continue
                 
+            text = self.value_as_text(translation)
             # Get this locale's space counts
-            leading_spaces = len(translation) - len(translation.lstrip())
-            trailing_spaces = len(translation) - len(translation.rstrip())
+            leading_spaces = len(text) - len(text.lstrip())
+            trailing_spaces = len(text) - len(text.rstrip())
             
             # Check if either leading or trailing spaces don't match default
             if (leading_spaces != default_leading_spaces or 
@@ -433,7 +486,7 @@ class TranslationGroup():
             list: List of locales with mismatched newline characters compared to default locale
         """
         invalid_newline_locales = []
-        default_translation = self.get_translation(self.default_locale)
+        default_translation = self.get_translation_as_text(self.default_locale)
         
         # Count explicit newlines in default
         default_explicit_newlines = default_translation.count('\\n')
@@ -443,9 +496,10 @@ class TranslationGroup():
             if locale == self.default_locale:
                 continue
                 
+            text = self.value_as_text(translation)
             # Count newlines in this locale
-            explicit_newlines = translation.count('\\n')
-            encoded_newlines = translation.count('\n')
+            explicit_newlines = text.count('\\n')
+            encoded_newlines = text.count('\n')
             
             # Check if counts match default locale
             if explicit_newlines != default_explicit_newlines or encoded_newlines != default_encoded_newlines:
@@ -467,8 +521,9 @@ class TranslationGroup():
             list: Locales flagged by character-set mismatch rules.
         """
         threshold = max(0, min(100, int(threshold_percentage))) / 100.0
+        values_as_text = {loc: self.value_as_text(v) for loc, v in self.values.items()}
         return InvalidCharacterSetAnalyzer.find_invalid_locales(
-            self.values,
+            values_as_text,
             threshold,
             ignore_patterns=ignore_patterns,
         )
@@ -530,7 +585,7 @@ class TranslationGroup():
 
     def fix_ensure_encoded_unicode(self, invalid_locales):
         for locale in self.values:
-            if locale in invalid_locales:
+            if locale in invalid_locales and isinstance(self.values[locale], str):
                 self.values[locale] = unescape_unicode(self.values[locale])
 
     def fix_leading_and_trailing_spaces(self, invalid_locales):
@@ -546,6 +601,8 @@ class TranslationGroup():
         for locale in self.values:
             if locale in invalid_locales and locale != self.default_locale:
                 translation = self.values[locale]
+                if not isinstance(translation, str):
+                    continue
                 # Get current space counts
                 current_leading_spaces = len(translation) - len(translation.lstrip())
                 current_trailing_spaces = len(translation) - len(translation.rstrip())
@@ -572,7 +629,7 @@ class TranslationGroup():
         fixed = False
 
         for locale, translation in self.values.items():
-            if "\\n" in translation:
+            if isinstance(translation, str) and "\\n" in translation:
                 self.values[locale] = translation.replace("\\n", "\n")
                 fixed = True
 

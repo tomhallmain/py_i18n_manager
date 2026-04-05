@@ -33,7 +33,7 @@ from __future__ import annotations
 import io
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any, Iterable, Optional, TYPE_CHECKING
 
 import yaml
@@ -73,17 +73,25 @@ def empty_quoted_string() -> Any:
     return ""
 
 
+def _is_sequence_not_str(obj: Any) -> bool:
+    """True for lists/tuples/CommentedSeq; false for str/bytes (str is a Sequence)."""
+    return isinstance(obj, Sequence) and not isinstance(obj, (str, bytes, bytearray))
+
+
 def quote_string_values(data: Any) -> Any:
     """Recursively wrap string values in ``DoubleQuotedScalarString``.
 
     Converts structures to plain dicts/lists where needed, which **loses** ruamel comments;
     use :func:`quote_string_values_in_place` when preserving comments on existing trees.
+
+    Sequences (lists, ``CommentedSeq``, tuples) are preserved as YAML sequences, not
+    flattened to strings.
     """
     if not RUAMEL_AVAILABLE or DoubleQuotedScalarString is None:
         return data
     if isinstance(data, dict):
         return {k: quote_string_values(v) for k, v in data.items()}
-    if isinstance(data, list):
+    if _is_sequence_not_str(data):
         return [quote_string_values(item) for item in data]
     if isinstance(data, str):
         return DoubleQuotedScalarString(data)
@@ -120,6 +128,9 @@ def merge_ruamel_data(original: Any, new: Any) -> None:
     Keys are matched with :func:`~utils.nested_mapping.resolve_nested_dict_key` so
     ruamel/PyYAML trees (e.g. boolean ``true`` keys) merge with dot-path strings
     (``\"true\"``) instead of inserting a parallel branch that leaves old leaves unchanged.
+
+    YAML sequences (lists) are merged/replaced with quoted sequence content; a scalar
+    string is never written over an existing sequence (avoids ``str(list)`` one-liners).
     """
     if not isinstance(original, Mapping) or not isinstance(new, Mapping):
         return
@@ -138,10 +149,17 @@ def merge_ruamel_data(original: Any, new: Any) -> None:
                 and not isinstance(value, str)
             ):
                 merge_ruamel_data(existing, value)
+            elif _is_sequence_not_str(value) and _is_sequence_not_str(existing):
+                original[resolved] = quote_string_values(value)
+            elif isinstance(value, str) and _is_sequence_not_str(existing):
+                # Do not replace a YAML list with a scalar (e.g. accidental str(list)).
+                continue
             else:
                 if isinstance(value, str):
                     original[resolved] = DoubleQuotedScalarString(value)
                 elif isinstance(value, Mapping):
+                    original[resolved] = quote_string_values(value)
+                elif _is_sequence_not_str(value):
                     original[resolved] = quote_string_values(value)
                 else:
                     original[resolved] = value
@@ -149,6 +167,8 @@ def merge_ruamel_data(original: Any, new: Any) -> None:
             if isinstance(value, str):
                 original[key_str] = DoubleQuotedScalarString(value)
             elif isinstance(value, Mapping):
+                original[key_str] = quote_string_values(value)
+            elif _is_sequence_not_str(value):
                 original[key_str] = quote_string_values(value)
             else:
                 original[key_str] = value

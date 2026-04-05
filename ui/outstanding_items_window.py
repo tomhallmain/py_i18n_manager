@@ -556,7 +556,9 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             # Get source text for this key
             source_text = None
             if key in self.translations:
-                source_text = self.translations[key].get_translation('en') or self.translations[key].get_translation(default_locale)
+                g = self.translations[key]
+                raw = g.get_translation('en') or g.get_translation(default_locale)
+                source_text = g.value_as_text(raw)
             
             if not source_text:
                 continue
@@ -694,16 +696,16 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         """
         default_locale = config_manager.get('translation.default_locale', 'en')
         
-        # Build map of default locale values to translation keys
+        # Build map of default locale values to translation keys (normalized text; lists use join)
         value_to_keys = {}
         for key, group in translations.items():
             if not group.is_in_base:
                 continue
-            default_value = group.get_translation(default_locale)
-            if default_value and default_value.strip():
-                if default_value not in value_to_keys:
-                    value_to_keys[default_value] = []
-                value_to_keys[default_value].append(key)
+            default_text = group.get_translation_as_text(default_locale)
+            if default_text and default_text.strip():
+                if default_text not in value_to_keys:
+                    value_to_keys[default_text] = []
+                value_to_keys[default_text].append(key)
         
         # Find duplicates (values with multiple keys)
         existing_to_outstanding_matches = {}  # {default_value: [(existing_key, outstanding_key), ...]}
@@ -733,7 +735,9 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                     has_existing_translations = False
                     for locale in locales:
                         if locale != default_locale:
-                            if locale in group.values and group.values[locale].strip():
+                            if locale in group.values and group.value_as_text(
+                                group.values[locale]
+                            ).strip():
                                 has_existing_translations = True
                                 break
                     
@@ -841,8 +845,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         extras = sorted([loc for loc in locales_set if loc not in self.locales])
         values = []
         for locale in ordered + extras:
-            raw = group.get_translation(locale) or ""
-            values.append(f"{locale}={self._sanitize_export_text(raw)}")
+            text = group.get_translation_as_text(locale)
+            values.append(f"{locale}={self._sanitize_export_text(text)}")
         return " | ".join(values)
 
     def export_outstanding_to_tsv(self):
@@ -889,11 +893,12 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 | invalid_character_set
             )
 
-            default_value = group.get_translation(default_locale) or ""
+            default_value = group.get_translation_as_text(default_locale)
             defined_without_error = set()
             for locale in self.locales:
                 value = group.get_translation(locale)
-                if value and value.strip() and locale not in all_error_locales:
+                vt = group.value_as_text(value)
+                if vt and vt.strip() and locale not in all_error_locales:
                     defined_without_error.add(locale)
             # Default locale is often not in self.locales list from header filtering in this window.
             if default_value and default_value.strip() and default_locale not in all_error_locales:
@@ -1094,7 +1099,9 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                         
                         # Copy translations from existing to outstanding for all non-default locales
                         for locale in display_locales:
-                            if locale in existing_group.values and existing_group.values[locale].strip():
+                            if locale in existing_group.values and existing_group.value_as_text(
+                                existing_group.values[locale]
+                            ).strip():
                                 new_value = existing_group.values[locale]
                                 old_value = outstanding_group.get_translation(locale) or ""
                                 outstanding_group.add_translation(locale, new_value)
@@ -1190,8 +1197,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
 
             # Add translations for each locale (excluding default)
             for col, locale in enumerate(display_locales, 1):
-                value = group.get_translation(locale)
-                item = QTableWidgetItem(value)
+                item = QTableWidgetItem(group.get_translation_as_text(locale))
 
                 # Build tooltip text for invalid statuses
                 tooltip_parts = []
@@ -1354,14 +1360,15 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 locale = self.table.horizontalHeaderItem(col).text()
                 group = self.translations.get(key)
                 if group:
-                    value = group.get_translation(locale)
-                    if value:
+                    if group.get_translation(locale):
                         item = self.table.item(row, col)
                         if item:
-                            if self.show_escaped:
-                                item.setText(group.get_translation_escaped(locale))
-                            else:
-                                item.setText(group.get_translation_unescaped(locale)) 
+                            txt = (
+                                group.get_translation_escaped_as_text(locale)
+                                if self.show_escaped
+                                else group.get_translation_unescaped_as_text(locale)
+                            )
+                            item.setText(txt)
 
     def toggle_unicode_display(self):
         """Toggle the Unicode display mode."""

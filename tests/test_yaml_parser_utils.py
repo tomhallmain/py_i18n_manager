@@ -1,5 +1,6 @@
 """Tests for i18n/ruby/yaml_parser_utils.py."""
 
+import io
 import os
 import tempfile
 import unittest
@@ -68,6 +69,49 @@ class TestMergeRuamelDataKeyResolution(unittest.TestCase):
         data = {True: {"inner": "x"}}
         add_to_nested_dict(data, "true.inner", "updated")
         self.assertEqual(data[True]["inner"], "updated")
+
+    def test_merge_updates_existing_scalar_leaf(self):
+        """Regression: merged data must replace an existing string leaf (same as bool-key fix)."""
+        original = {"en": {"home": {"title": "Old title"}}}
+        merge_ruamel_data(
+            original,
+            quote_string_values({"en": {"home": {"title": "New title"}}}),
+        )
+        self.assertEqual(str(original["en"]["home"]["title"]), "New title")
+
+    def test_merge_preserves_yaml_list_not_python_repr_string(self):
+        """Lists must stay YAML sequences after merge/dump, not one scalar str(list)."""
+        ryaml = ruby_roundtrip_yaml()
+        original = ryaml.load(
+            'de:\n  compare:\n    features:\n'
+            '      - "14 Tage kostenlose Testversion"\n'
+            '      - "Keine Kreditkarte erforderlich"\n'
+        )
+        merge_ruamel_data(
+            original,
+            quote_string_values(
+                {
+                    "de": {
+                        "compare": {
+                            "features": [
+                                "Neu eins",
+                                "Neu zwei",
+                            ]
+                        }
+                    }
+                }
+            ),
+        )
+        features = original["de"]["compare"]["features"]
+        self.assertIsInstance(features, list)
+        self.assertEqual(len(features), 2)
+        self.assertEqual(str(features[0]), "Neu eins")
+
+        buf = io.StringIO()
+        ryaml.dump(original, buf)
+        dumped = buf.getvalue()
+        self.assertNotIn("['Neu eins'", dumped)
+        self.assertIn("- ", dumped)
 
 
 if __name__ == "__main__":

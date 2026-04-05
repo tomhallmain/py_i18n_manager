@@ -182,8 +182,12 @@ class AllTranslationsWindow(BaseTranslationWindow):
 
             # Add translations for each locale
             for col, locale in enumerate(locales, 1):
-                value = group.get_translation(locale)
-                item = QTableWidgetItem(value)
+                display_text = (
+                    group.get_translation_escaped_as_text(locale)
+                    if self.show_escaped
+                    else group.get_translation_unescaped_as_text(locale)
+                )
+                item = QTableWidgetItem(display_text)
 
                 # Determine cell status
                 cell_statuses = set()
@@ -394,11 +398,14 @@ class AllTranslationsWindow(BaseTranslationWindow):
                     continue
                     
                 new_value = item.text()
-                # Get original value in the same format as displayed
-                original_value = group.get_translation_escaped(locale) if self.show_escaped else group.get_translation_unescaped(locale)
-                
+                original_text = (
+                    group.get_translation_escaped_as_text(locale)
+                    if self.show_escaped
+                    else group.get_translation_unescaped_as_text(locale)
+                )
+
                 # Only include if the value has changed and is non-empty
-                if new_value != original_value and len(new_value) > 0:
+                if new_value != original_text and len(new_value) > 0:
                     if locale not in changes_by_locale:
                         changes_by_locale[locale] = []
                     changes_by_locale[locale].append((key, new_value))
@@ -445,10 +452,12 @@ class AllTranslationsWindow(BaseTranslationWindow):
                 locale = self.table.horizontalHeaderItem(col).text()
                 item = self.table.item(row, col)
                 if item:
-                    if self.show_escaped:
-                        item.setText(group.get_translation_escaped(locale))
-                    else:
-                        item.setText(group.get_translation_unescaped(locale))
+                    txt = (
+                        group.get_translation_escaped_as_text(locale)
+                        if self.show_escaped
+                        else group.get_translation_unescaped_as_text(locale)
+                    )
+                    item.setText(txt)
 
     def clear_search(self):
         """Clear the search box and reset the filter to show all items."""

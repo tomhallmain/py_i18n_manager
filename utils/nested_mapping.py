@@ -9,7 +9,29 @@ from __future__ import annotations
 from typing import Any
 
 
-def add_to_nested_dict(data: dict, key: str, value: str) -> None:
+def get_nested_value(data: dict, key: str) -> Any | None:
+    """Return the value at dot-notation ``key``, or None if the path is missing.
+
+    Uses :func:`resolve_nested_dict_key` per segment so keys match YAML-loaded maps
+    (e.g. boolean ``true`` vs the string ``\"true\"``).
+    """
+    parts = key.split(".")
+    current: Any = data
+    for part in parts[:-1]:
+        resolved = resolve_nested_dict_key(current, part)
+        if resolved is None:
+            return None
+        nxt = current[resolved]
+        if not isinstance(nxt, dict):
+            return None
+        current = nxt
+    resolved_leaf = resolve_nested_dict_key(current, parts[-1])
+    if resolved_leaf is None:
+        return None
+    return current[resolved_leaf]
+
+
+def add_to_nested_dict(data: dict, key: str, value: Any) -> None:
     """Set ``value`` at dot-notation ``key``, creating intermediate mappings as needed.
 
     Preserves existing nested structure: only the leaf path is written.
