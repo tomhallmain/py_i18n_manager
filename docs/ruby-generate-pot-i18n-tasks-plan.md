@@ -165,7 +165,7 @@ For each parsed row classified as “needs base entry” (initially: **locale co
 - Phases 1–5: `bundle exec i18n-tasks missing`, table parser, `config/i18n-tasks.yml` load + `pattern_router`, merge into base locale YAML, `generate_pot_file()` wired to `sync_base_from_missing`.
 - Shared **ruamel** / **PyYAML** helpers in `i18n/ruby/yaml_parser_utils.py` (used by `RubyI18nManager` dumps and by missing-sync merge).
 - **i18n-tasks file routing** isolated in `i18n/ruby/i18n_tasks_pattern_router.py` (distinct from `FileStructureManager`, which tracks paths from loaded keys).
-- Unit tests for parser, router order, and config load (`tests/test_i18n_tasks_missing_sync.py`).
+- Unit tests for parser, router order, and config load (`tests/test_i18n_tasks_sync.py`).
 
 **Recommended next (from open items below)**
 

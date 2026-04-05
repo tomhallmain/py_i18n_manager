@@ -25,7 +25,7 @@ loading and dumping, which fits i18n files where formatting matters.
 
 This module centralizes ruamel round-trip settings, merge/quote helpers, the PyYAML fallback
 dumper, and utilities used by :class:`~i18n.ruby.ruby_i18n_manager.RubyI18nManager` and
-:mod:`~i18n.ruby.i18n_tasks_missing_sync`.
+:mod:`~i18n.ruby.i18n_tasks_sync`.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from typing import Any, Iterable, Optional, TYPE_CHECKING
 
 import yaml
 
-from utils.nested_mapping import resolve_nested_dict_key
+from utils.nested_mapping import remove_from_nested_dict, resolve_nested_dict_key
 
 if TYPE_CHECKING:
     from ruamel.yaml import YAML as RuamelYAMLType
@@ -413,3 +413,47 @@ def merge_dotted_keys_into_locale_file(
     added, skipped = add_dotted_keys_with_empty_values(lr, dotted_keys)
     write_roundtrip_yaml_file(ryaml, data, abs_path)
     return added, skipped
+
+
+def remove_dotted_keys_from_locale_file(
+    project_root: str,
+    rel_path: str,
+    locale: str,
+    dotted_keys: Iterable[str],
+) -> tuple[int, int]:
+    """Remove dot-notation keys under ``locale`` in ``rel_path`` (relative to project root).
+
+    Uses :func:`~utils.nested_mapping.remove_from_nested_dict` on the locale subtree.
+    Skips keys that are not present. Does nothing if the file is missing.
+
+    Returns:
+        ``(removed_count, not_found_count)``.
+    """
+    if not RUAMEL_AVAILABLE:
+        raise RuntimeError("ruamel.yaml is required for locale YAML edits")
+
+    keys_list = [k for k in dotted_keys if k and str(k).strip()]
+    if not keys_list:
+        return 0, 0
+
+    abs_path = os.path.normpath(os.path.join(project_root, rel_path.replace("/", os.sep)))
+    if not os.path.isfile(abs_path):
+        return 0, len(keys_list)
+
+    ryaml, data = load_roundtrip_yaml_file(abs_path)
+    if data is None:
+        return 0, len(keys_list)
+    lr = ensure_top_level_locale_key(data, locale)
+    if lr is None:
+        return 0, len(keys_list)
+
+    removed = not_found = 0
+    for dk in keys_list:
+        if remove_from_nested_dict(lr, dk):
+            removed += 1
+        else:
+            not_found += 1
+
+    if removed:
+        write_roundtrip_yaml_file(ryaml, data, abs_path)
+    return removed, not_found

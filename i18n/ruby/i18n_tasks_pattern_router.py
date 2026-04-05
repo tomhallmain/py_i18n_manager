@@ -16,6 +16,17 @@ from typing import Any, Optional
 import yaml
 
 
+def _coerce_locales_list(val: Any) -> list[str]:
+    """Normalize ``locales`` from YAML (list, tuple, or comma-separated string)."""
+    if val is None:
+        return []
+    if isinstance(val, str):
+        return [x.strip() for x in val.replace(",", " ").split() if x.strip()]
+    if isinstance(val, (list, tuple)):
+        return [str(x).strip() for x in val if str(x).strip()]
+    return []
+
+
 @dataclass
 class I18nTasksConfig:
     """Subset of ``config/i18n-tasks.yml`` needed for routing."""
@@ -23,6 +34,7 @@ class I18nTasksConfig:
     base_locale: str
     router: Optional[str]
     data_write: list[Any]
+    locales: list[str]
 
 
 def find_i18n_tasks_config_path(project_root: str) -> Optional[str]:
@@ -52,10 +64,16 @@ def load_i18n_tasks_config(config_path: str) -> I18nTasksConfig:
     router = data_block.get("router")
     if router is None:
         router = raw.get("router")
+    locales = _coerce_locales_list(raw.get("locales"))
+    if not locales:
+        locales = _coerce_locales_list(data_block.get("locales"))
+    if not locales:
+        locales = [base_locale]
     return I18nTasksConfig(
         base_locale=base_locale,
         router=str(router) if router is not None else None,
         data_write=write_rules,
+        locales=locales,
     )
 
 

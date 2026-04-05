@@ -12,6 +12,7 @@ from i18n.ruby.yaml_parser_utils import (
     merge_ruamel_data,
     pyyaml_dump,
     quote_string_values,
+    remove_dotted_keys_from_locale_file,
     ruby_roundtrip_yaml,
 )
 from utils.nested_mapping import add_to_nested_dict
@@ -151,6 +152,28 @@ class TestRubyYamlYesNoKeyQuoting(unittest.TestCase):
             with open(abs_path, encoding="utf-8") as f:
                 text = f.read()
             self.assertIn('"yes":', text)
+
+
+@unittest.skipUnless(RUAMEL_AVAILABLE, "ruamel.yaml required")
+class TestRemoveDottedKeysFromLocaleFile(unittest.TestCase):
+    def test_removes_leaf_and_prunes_empty_parents(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rel = "config/locales/en/app.en.yml"
+            abs_path = os.path.normpath(os.path.join(tmp, rel.replace("/", os.sep)))
+            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+            with open(abs_path, "w", encoding="utf-8") as f:
+                f.write(
+                    'en:\n  admin:\n    stale:\n      title: "gone"\n    keep: "x"\n'
+                )
+            removed, not_found = remove_dotted_keys_from_locale_file(
+                tmp, rel, "en", ["admin.stale.title", "nope.missing"]
+            )
+            self.assertEqual(removed, 1)
+            self.assertEqual(not_found, 1)
+            with open(abs_path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertNotIn("stale", text)
+            self.assertIn("keep", text)
 
 
 if __name__ == "__main__":

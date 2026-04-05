@@ -16,7 +16,7 @@ from ..translation_manager_results import TranslationManagerResults, Translation
 from ..invalid_translation_groups import InvalidTranslationGroups
 from ..i18n_manager_base import I18NManagerBase
 from .file_structure_manager import FileStructureManager
-from .i18n_tasks_missing_sync import sync_base_from_missing
+from .i18n_tasks_sync import sync_base_from_missing, sync_base_from_unused
 from .yaml_parser_utils import (
     RUAMEL_AVAILABLE,
     ensure_ruby_yaml_safe_mapping_keys,
@@ -1373,9 +1373,9 @@ msgstr ""
         """Generate or update base locale data for Ruby/Rails projects.
 
         When a ``Gemfile`` exists at the project root, runs
-        ``bundle exec i18n-tasks missing`` and merges keys missing in every locale
-        (reported as Locale ``all``) into the base locale YAML files per
-        ``config/i18n-tasks.yml`` ``data.write`` routing—without ``add-missing``,
+        ``bundle exec i18n-tasks missing`` (merge keys with Locale ``all``) and
+        ``bundle exec i18n-tasks unused -f keys`` (remove unused keys from locale YAML),
+        using ``config/i18n-tasks.yml`` ``data.write`` routing—without ``add-missing``,
         so existing file comments and formatting are preserved where possible.
 
         Without a Gemfile, falls back to ensuring default locale YAML structure exists.
@@ -1388,7 +1388,7 @@ msgstr ""
             project_root = self._get_project_root()
             gemfile = os.path.join(project_root, "Gemfile")
             if os.path.isfile(gemfile):
-                logger.info("Syncing base locale from i18n-tasks missing (pattern_router)")
+                logger.info("Syncing locale YAML from i18n-tasks (missing + unused, pattern_router)")
                 result = sync_base_from_missing(project_root)
                 if not result.success:
                     self._last_generate_base_error = result.message
@@ -1396,6 +1396,13 @@ msgstr ""
                     return False
                 if result.message:
                     logger.info(result.message)
+                result_unused = sync_base_from_unused(project_root)
+                if not result_unused.success:
+                    self._last_generate_base_error = result_unused.message
+                    logger.error(f"i18n-tasks unused sync failed: {result_unused.message}")
+                    return False
+                if result_unused.message:
+                    logger.info(result_unused.message)
                 return True
 
             # No Gemfile: ensure default locale structure (legacy behavior)
