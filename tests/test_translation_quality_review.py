@@ -118,6 +118,85 @@ class TestLatinHeuristicsRegression(unittest.TestCase):
         self.assertTrue(_is_latin_char("ã"))
         self.assertTrue(_has_significant_latin_run("ação", ()))
 
+    def test_collect_findings_stop_character_inconsistency_extra(self):
+        class _FakeKey:
+            def __init__(self, msgid: str, context: str = ""):
+                self.msgid = msgid
+                self.context = context
+
+        class _FakeGroup:
+            def __init__(self):
+                self.key = _FakeKey("ui.save", "")
+                self._values = {
+                    "en": "Save",
+                    "de": "Speichern.",
+                }
+
+            def get_translation(self, locale: str):
+                return self._values.get(locale, "")
+
+        findings = collect_findings_for_group(
+            _FakeGroup(),
+            default_locale="en",
+            locales=["en", "de"],
+            latin_ignore_patterns=(),
+        )
+        signals = {f.signal for f in findings if f.locale == "de"}
+        self.assertIn(QualityHeuristicKind.STOP_CHARACTER_INCONSISTENCY, signals)
+
+    def test_collect_findings_no_inconsistency_when_stops_match(self):
+        class _FakeKey:
+            def __init__(self, msgid: str, context: str = ""):
+                self.msgid = msgid
+                self.context = context
+
+        class _FakeGroup:
+            def __init__(self):
+                self.key = _FakeKey("msg.ok", "")
+                self._values = {
+                    "en": "OK.",
+                    "de": "OK.",
+                }
+
+            def get_translation(self, locale: str):
+                return self._values.get(locale, "")
+
+        findings = collect_findings_for_group(
+            _FakeGroup(),
+            default_locale="en",
+            locales=["en", "de"],
+            latin_ignore_patterns=(),
+        )
+        self.assertFalse(
+            any(f.signal == QualityHeuristicKind.STOP_CHARACTER_INCONSISTENCY for f in findings)
+        )
+
+    def test_collect_findings_stop_inconsistency_missing_stop(self):
+        class _FakeKey:
+            def __init__(self, msgid: str, context: str = ""):
+                self.msgid = msgid
+                self.context = context
+
+        class _FakeGroup:
+            def __init__(self):
+                self.key = _FakeKey("msg.line", "")
+                self._values = {
+                    "en": "Done.",
+                    "de": "Fertig",
+                }
+
+            def get_translation(self, locale: str):
+                return self._values.get(locale, "")
+
+        findings = collect_findings_for_group(
+            _FakeGroup(),
+            default_locale="en",
+            locales=["en", "de"],
+            latin_ignore_patterns=(),
+        )
+        signals = {f.signal for f in findings if f.locale == "de"}
+        self.assertIn(QualityHeuristicKind.STOP_CHARACTER_INCONSISTENCY, signals)
+
 
 if __name__ == "__main__":
     unittest.main()

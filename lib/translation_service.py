@@ -8,7 +8,10 @@ from utils.utils import Utils
 
 from utils.logging_setup import get_logger
 
+from i18n.stop_character_utils import normalize_translation_trailing_stop
+
 logger = get_logger("translation_service")
+
 
 
 class TranslationService:
@@ -97,7 +100,8 @@ Return only the JSON object, no additional text."""
                 timeout=60,  # Shorter timeout for translations
                 cjk_reject_threshold_percentage=cjk_reject_threshold,
             )
-            return result.response if result else ""
+            raw = result.response if result else ""
+            return normalize_translation_trailing_stop(text, raw, target_locale)
         except Exception as e:
             logger.error(f"LLM translation failed: {e}")
             return ""
@@ -115,8 +119,9 @@ Return only the JSON object, no additional text."""
         """
         if source_locale is None:
             source_locale = self.default_locale
-            
-        return self.argos.translate(text, target_locale, source_locale)
+
+        raw = self.argos.translate(text, target_locale, source_locale)
+        return normalize_translation_trailing_stop(text, raw, target_locale)
             
     def translate(self, text, target_locale, context=None, use_llm=False):
         """Translate text using the specified or default method.

@@ -15,6 +15,7 @@ import re
 import unicodedata
 from typing import AbstractSet, Dict, List, Optional, Sequence, TYPE_CHECKING
 
+from i18n.stop_character_utils import translation_has_stop_inconsistency_vs_source
 from utils.globals import QualityHeuristicKind
 from utils.logging_setup import get_logger
 from utils.utils import Utils
@@ -119,6 +120,16 @@ def collect_findings_for_group(
                         signal=h,
                     )
                 )
+
+        if base and translation_has_stop_inconsistency_vs_source(base, tstrip, loc):
+            findings.append(
+                QualityReviewFinding(
+                    key_msgid=mid,
+                    key_context=ctx,
+                    locale=loc,
+                    signal=QualityHeuristicKind.STOP_CHARACTER_INCONSISTENCY,
+                )
+            )
 
     findings.extend(_findings_high_english_ratio_stub(group, default_locale, locales))
     return findings

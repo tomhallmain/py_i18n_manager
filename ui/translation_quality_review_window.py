@@ -173,8 +173,8 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             QLabel(
                 _(
                     "Built-in checks: non-Latin-script locales with Latin words/runs and a separate mixed-script Latin-leakage signal; translations identical "
-                    "to the default locale. Respects project exclusions and ignore patterns. "
-                    "(English-ratio heuristic reserved.)"
+                    "to the default locale; advisory check for trailing sentence-stop mismatches vs. the default (extra, missing, or wrong stop for the locale). "
+                    "Respects project exclusions and ignore patterns. (English-ratio heuristic reserved.)"
                 )
             )
         )
