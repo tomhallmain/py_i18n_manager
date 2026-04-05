@@ -2,9 +2,9 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2026-03-31 15:46-0400\n"
-"PO-Revision-Date: 2026-03-31 15:46-0400\n"
-"Last-Translator: Thomas Hall <tomhall.main@gmail.com>\n"
+"POT-Creation-Date: 2026-04-05 15:07-0400\n"
+"PO-Revision-Date: 2026-04-05 15:07-0400\n"
+"Last-Translator: Translator Name <translator@example.com>\n"
 "Language-Team: fr Team <<EMAIL>>\n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
@@ -12,75 +12,82 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: app.py:41 app.py:198
+#: app.py:41 app.py:201
 msgid "i18n Translation Manager"
 msgstr "i18n Responsable de traduction"
 
-#: app.py:78
+#: app.py:81
 msgid "Current Project:"
 msgstr "Projet en cours :"
 
-#: app.py:80
+#: app.py:83
 msgid "No project selected"
 msgstr "Aucun projet sélectionné"
 
-#: app.py:99 ui/recent_projects_dialog.py:82
+#: app.py:102 ui/recent_projects_dialog.py:82
 msgid "Select Project"
 msgstr "Sélectionner le projet"
 
-#: app.py:103
+#: app.py:106
 msgid "Modify Project Settings"
 msgstr "Modifier les paramètres du projet"
 
-#: app.py:136
+#: app.py:139
 msgid "Check Status"
 msgstr "Vérifier l'état"
 
-#: app.py:137
+#: app.py:140
 msgid "Write Default Locale"
 msgstr "Écrire la langue par défaut"
 
-#: app.py:138
+#: app.py:141
 msgid "Show All Translations"
 msgstr "Afficher toutes les traductions"
 
-#: app.py:139
+#: app.py:142
 msgid "Show Outstanding Items"
 msgstr "Afficher les éléments en suspens"
 
-#: app.py:140 ui/translation_quality_review_window.py:124
+#: app.py:143 ui/translation_quality_review_window.py:124
 msgid "Translation Quality Review"
 msgstr "Examen de la qualité de la traduction"
 
-#: app.py:142
+#: app.py:144 ui/all_translations_window.py:108
+#: ui/outstanding_items_window.py:319
+#: ui/quality_review_exclusions_dialog.py:39
+#: ui/setup_translation_project_window.py:153
+msgid "Heuristic Exclusions"
+msgstr "Exclusions heuristiques"
+
+#: app.py:145
 msgid "Find Untranslated"
 msgstr "Trouver non traduit"
 
-#: app.py:162 ui/bulk_pot_analysis_window.py:77
+#: app.py:165 ui/bulk_pot_analysis_window.py:77
 msgid "Bulk Project Status"
 msgstr "Statut du projet en bloc"
 
-#: app.py:163
+#: app.py:166
 msgid "Cross-Project Analysis"
 msgstr "Analyse inter-projets"
 
-#: app.py:164
+#: app.py:167
 msgid "Sync Base Translations"
 msgstr "Synchroniser les traductions de base"
 
-#: app.py:165
+#: app.py:168
 msgid "Update Translation Files"
 msgstr "Mettre à jour les fichiers"
 
-#: app.py:166
+#: app.py:169
 msgid "Compile Translations"
 msgstr "Compiler les traductions"
 
-#: app.py:185 ui/bulk_pot_analysis_window.py:129
+#: app.py:188 ui/bulk_pot_analysis_window.py:129
 msgid "Status"
 msgstr "État"
 
-#: app.py:316
+#: app.py:320
 msgid ""
 "Translation file compilation is not relevant for {} projects. {} projects "
 "use source translation files directly without a compilation step."
@@ -89,8 +96,8 @@ msgstr ""
 "projets {}. Les projets {} utilisent directement les fichiers de traduction "
 "sources sans une étape de compilation."
 
-#: app.py:464 app.py:486 app.py:589 app.py:605 app.py:651 app.py:673
-#: app.py:701 app.py:754 ui/bulk_pot_analysis_window.py:235
+#: app.py:508 app.py:530 app.py:654 app.py:669 app.py:714 app.py:736
+#: app.py:764 app.py:821 ui/bulk_pot_analysis_window.py:235
 #: ui/bulk_pot_analysis_window.py:263 ui/cross_project_analysis_window.py:268
 #: ui/cross_project_analysis_window.py:560 ui/llm_settings_dialog.py:265
 #: ui/llm_settings_dialog.py:321 ui/locale_selection_window.py:279
@@ -116,48 +123,48 @@ msgstr ""
 msgid "Error"
 msgstr "Erreur"
 
-#: app.py:464 app.py:651
+#: app.py:508 app.py:714
 msgid "No translation data available"
 msgstr "Aucune données de traduction n'est disponible."
 
-#: app.py:589 app.py:605
+#: app.py:530 app.py:736 app.py:764 app.py:821
+msgid "Please select a project first"
+msgstr "Veuillez sélectionner un projet d'abord."
+
+#: app.py:654 app.py:669
 msgid "Please check status first to load translation data"
 msgstr ""
 "Veuillez d'abord vérifier le statut pour charger les données de traduction."
 
-#: app.py:614 ui/all_translations_window.py:32
+#: app.py:677 ui/all_translations_window.py:32
 msgid "All Translations"
 msgstr "Toutes les traductions"
 
-#: app.py:615
+#: app.py:678
 msgid "Could not find that translation key in the current catalog."
 msgstr "Cette clé de traduction est introuvable dans le catalogue actuel."
 
-#: app.py:486 app.py:673 app.py:701 app.py:754
-msgid "Please select a project first"
-msgstr "Veuillez sélectionner un projet d'abord."
-
-#: app.py:677
+#: app.py:740
 msgid "Updating base translation files..."
 msgstr "Mise à jour des fichiers de traduction de base..."
 
-#: app.py:679
+#: app.py:742
 msgid "Base translation files updated successfully."
 msgstr "Les fichiers de base de traduction ont été mises à jour avec succès."
 
-#: app.py:688
+#: app.py:751
 msgid "Update failed"
 msgstr "Mise à jour échouée"
 
-#: app.py:691
+#: app.py:754
 msgid "Failed to update base translation files."
 msgstr "Échec de la mise à jour des fichiers de traduction de base."
 
-#: app.py:762 app.py:778
+#: app.py:829 app.py:845
 msgid "No Projects to Analyze"
 msgstr "Aucun projet à analyser"
 
-#: app.py:763
+#: app.py:830
 msgid ""
 "You need at least 2 projects in your recent projects list to perform cross-"
 "project analysis."
@@ -165,7 +172,7 @@ msgstr ""
 "Vous avez besoin d'au moins deux projets dans votre liste de projets récents"
 " pour effectuer une analyse inter-projets."
 
-#: app.py:779
+#: app.py:846
 msgid ""
 "You need at least 1 project in your recent projects list to perform bulk POT"
 " analysis."
@@ -173,17 +180,17 @@ msgstr ""
 "Vous devez avoir au moins un projet dans votre liste de projets récents pour"
 " effectuer une analyse POT groupée."
 
-#: app.py:797
+#: app.py:864
 msgid "Compiled Files Need Update"
 msgstr "Les fichiers compilés doivent être mis à jour"
 
-#: app.py:798
+#: app.py:865
 msgid "Translation files have been updated for the following locales:"
 msgstr ""
 "Les fichiers de traduction ont été mis à jour pour les paramètres régionaux "
 "suivants :"
 
-#: app.py:800
+#: app.py:867
 msgid "Remember to run Compile Translations to apply these changes."
 msgstr ""
 "N'oubliez pas d'exécuter Compiler les traductions pour appliquer ces "
@@ -396,64 +403,70 @@ msgstr "Effacer"
 msgid "Filter:"
 msgstr "Filtre:"
 
-#: ui/all_translations_window.py:98 ui/outstanding_items_window.py:305
+#: ui/all_translations_window.py:98 ui/outstanding_items_window.py:329
 msgid "Save Changes"
 msgstr "Enregistrer les modifications"
 
 #: ui/all_translations_window.py:100 ui/bulk_pot_analysis_window.py:105
 #: ui/cross_project_analysis_window.py:158 ui/outstanding_items_window.py:219
-#: ui/outstanding_items_window.py:307
+#: ui/outstanding_items_window.py:331
 #: ui/quality_review_exclusions_dialog.py:111
 msgid "Close"
 msgstr "Fermer"
 
-#: ui/all_translations_window.py:104 ui/outstanding_items_window.py:311
+#: ui/all_translations_window.py:104 ui/outstanding_items_window.py:335
 msgid "Show Escaped Unicode"
 msgstr "Afficher l'Unicode échappé"
 
-#: ui/all_translations_window.py:306 ui/all_translations_window.py:340
-#: ui/all_translations_window.py:351 ui/outstanding_items_window.py:382
-#: ui/outstanding_items_window.py:453 ui/outstanding_items_window.py:464
+#: ui/all_translations_window.py:111 ui/outstanding_items_window.py:322
+msgid "Manage msgid exclusions and ignore regex patterns for this project."
+msgstr ""
+"Gérer les exclusions d'identifiants de messages et ignorer les patrons de "
+"regex pour ce projet."
+
+#: ui/all_translations_window.py:310 ui/all_translations_window.py:344
+#: ui/all_translations_window.py:355 ui/outstanding_items_window.py:412
+#: ui/outstanding_items_window.py:483 ui/outstanding_items_window.py:494
 msgid "Copy Text"
 msgstr "Copier le texte"
 
-#: ui/all_translations_window.py:311 ui/outstanding_items_window.py:388
+#: ui/all_translations_window.py:315 ui/outstanding_items_window.py:418
 msgid "Copy Default Translation"
 msgstr "Copier la traduction par défaut"
 
-#: ui/all_translations_window.py:318 ui/base_translation_window.py:209
-#: ui/outstanding_items_window.py:393
+#: ui/all_translations_window.py:322 ui/base_translation_window.py:209
+#: ui/outstanding_items_window.py:423
 msgid "Delete Translation Key"
 msgstr "Supprimer la clé de traduction"
 
-#: ui/all_translations_window.py:324 ui/outstanding_items_window.py:401
+#: ui/all_translations_window.py:328 ui/outstanding_items_window.py:431
 msgid "Translate with Argos Translate"
 msgstr "Traduire avec Argos Translate"
 
-#: ui/all_translations_window.py:327 ui/outstanding_items_window.py:406
+#: ui/all_translations_window.py:331 ui/outstanding_items_window.py:436
 msgid "Translate with LLM"
 msgstr "Traduire avec LLM"
 
-#: ui/all_translations_window.py:415 ui/all_translations_window.py:426
+#: ui/all_translations_window.py:422 ui/all_translations_window.py:433
 #: ui/cross_project_analysis_window.py:548 ui/llm_settings_dialog.py:259
 msgid "Success"
 msgstr "Succès"
 
-#: ui/all_translations_window.py:415
+#: ui/all_translations_window.py:422
 msgid "Saved key deletions successfully!"
 msgstr "Les suppressions de clés ont été enregistrées avec succès !"
 
-#: ui/all_translations_window.py:418 ui/cross_project_analysis_window.py:471
+#: ui/all_translations_window.py:425 ui/cross_project_analysis_window.py:471
 #: ui/cross_project_analysis_window.py:474
 #: ui/cross_project_analysis_window.py:495
 msgid "Info"
 msgstr "Informations"
 
-#: ui/all_translations_window.py:418
+#: ui/all_translations_window.py:425
 msgid "No changes to save."
 msgstr "Aucun changement à enregistrer."
 
-#: ui/all_translations_window.py:426
+#: ui/all_translations_window.py:433
 msgid "Saved {} changes successfully!"
 msgstr "Sauvegarde de {}changements avec succès !"
 
@@ -1082,64 +1095,64 @@ msgstr "Annulation..."
 msgid "Outstanding Translation Items"
 msgstr "Éléments de traduction en suspens"
 
-#: ui/outstanding_items_window.py:264
+#: ui/outstanding_items_window.py:288
 msgid "Translation in Progress"
 msgstr "Traduction en cours"
 
-#: ui/outstanding_items_window.py:265
+#: ui/outstanding_items_window.py:289
 msgid "Translation is in progress. Are you sure you want to close?"
 msgstr "La traduction est en cours. Êtes-vous sûr de vouloir fermer ?"
 
-#: ui/outstanding_items_window.py:283
+#: ui/outstanding_items_window.py:307
 msgid "Translate All (Argos)"
 msgstr "Tout traduire (Argos)"
 
-#: ui/outstanding_items_window.py:285
+#: ui/outstanding_items_window.py:309
 msgid "Translate all missing items using Argos Translate (fast, offline)"
 msgstr ""
 "Traduisez tous les éléments manquants en utilisant Argos Traducteur (rapide,"
 " hors ligne)"
 
-#: ui/outstanding_items_window.py:287
+#: ui/outstanding_items_window.py:311
 msgid "Translate All (LLM)"
 msgstr "Tout traduire (LLM)"
 
-#: ui/outstanding_items_window.py:289
+#: ui/outstanding_items_window.py:313
 msgid "Translate all missing items using LLM (slower, higher quality)"
 msgstr ""
 "Traduire tous les éléments manquants à l'aide d'un modèle de langage de "
 "grande capacité (plus lent, mais de meilleure qualité)"
 
-#: ui/outstanding_items_window.py:291
+#: ui/outstanding_items_window.py:315
 msgid "LLM Settings"
 msgstr "Grand Modèle de Langue - Paramètres"
 
-#: ui/outstanding_items_window.py:293
+#: ui/outstanding_items_window.py:317
 msgid "Configure LLM translation prompt template"
 msgstr "Configurer le modèle de traduction avec un exemple."
 
-#: ui/outstanding_items_window.py:301 ui/outstanding_items_window.py:854
+#: ui/outstanding_items_window.py:325 ui/outstanding_items_window.py:955
 msgid "Export Outstanding TSV"
 msgstr "Export Excevant TSV"
 
-#: ui/outstanding_items_window.py:303
+#: ui/outstanding_items_window.py:327
 msgid "Export outstanding keys and invalid locale buckets to TSV"
 msgstr ""
 "Exporter les clés notoires et les paniers de localisation non valables"
 
-#: ui/outstanding_items_window.py:545
+#: ui/outstanding_items_window.py:577
 msgid "No Items"
 msgstr "Pas d'articles"
 
-#: ui/outstanding_items_window.py:545
+#: ui/outstanding_items_window.py:577
 msgid "No missing translations found."
 msgstr "Aucune traduction manquante n'a été trouvée."
 
-#: ui/outstanding_items_window.py:552
+#: ui/outstanding_items_window.py:584
 msgid "Confirm Translation"
 msgstr "Confirmer la traduction"
 
-#: ui/outstanding_items_window.py:553
+#: ui/outstanding_items_window.py:585
 msgid ""
 "This will translate {count} missing items using {method}.\n"
 "\n"
@@ -1155,15 +1168,15 @@ msgstr ""
 "\n"
 "Continuer ?"
 
-#: ui/outstanding_items_window.py:570
+#: ui/outstanding_items_window.py:602
 msgid "Translation Progress"
 msgstr "Progrès de la traduction"
 
-#: ui/outstanding_items_window.py:627
+#: ui/outstanding_items_window.py:659
 msgid "Translation Error"
 msgstr "Erreur de traduction"
 
-#: ui/outstanding_items_window.py:628
+#: ui/outstanding_items_window.py:660
 msgid ""
 "An error occurred during translation:\n"
 "{error}"
@@ -1171,23 +1184,23 @@ msgstr ""
 "Une erreur s’est produite pendant la traduction :\n"
 "{error}"
 
-#: ui/outstanding_items_window.py:760
+#: ui/outstanding_items_window.py:794
 msgid "Combine Duplicate Translations?"
 msgstr "Combiner les traductions en double ?"
 
-#: ui/outstanding_items_window.py:791
+#: ui/outstanding_items_window.py:855
 msgid "No Data"
 msgstr "Aucune donnée"
 
-#: ui/outstanding_items_window.py:791
+#: ui/outstanding_items_window.py:855
 msgid "There are no outstanding rows to export."
 msgstr "Il n'y a pas de lignes non traitées à exporter."
 
-#: ui/outstanding_items_window.py:856
+#: ui/outstanding_items_window.py:957
 msgid "TSV Files (*.tsv);;All Files (*)"
 msgstr "Fichiers TSV (*.tsv);;Tous les fichiers (*)"
 
-#: ui/outstanding_items_window.py:867
+#: ui/outstanding_items_window.py:1004
 msgid "Export Complete"
 msgstr "Export Terminé"
 
@@ -1199,11 +1212,11 @@ msgstr ""
 "Exporté {count} clés non utilisées(s) vers :\n"
 "{path}"
 
-#: ui/outstanding_items_window.py:877
+#: ui/outstanding_items_window.py:1015
 msgid "Export Failed"
 msgstr "Export Échoué"
 
-#: ui/outstanding_items_window.py:878
+#: ui/outstanding_items_window.py:1016
 msgid ""
 "Could not export TSV file:\n"
 "{error}"
@@ -1211,9 +1224,146 @@ msgstr ""
 "N'a pu exporter le fichier TSV :\n"
 "{error}"
 
-#: ui/outstanding_items_window.py:1013
+#: ui/outstanding_items_window.py:1163
 msgid "All Translations Resolved"
 msgstr "Toutes les traductions résolues"
+
+#: ui/quality_review_exclusions_dialog.py:59
+msgid ""
+"Configure per-project exclusions used by quality review and invalid "
+"character-set checks. Regex patterns are applied after placeholder "
+"scrubbing."
+msgstr ""
+"Configurez les exclusions par projet utilisées lors du contrôle qualité et "
+"de la vérification des jeux de caractères non valides. Les expressions "
+"régulières sont appliquées après le nettoyage des espaces réservés."
+
+#: ui/quality_review_exclusions_dialog.py:66
+msgid "Excluded translation keys (msgids)"
+msgstr "Clés de traduction exclues (msgids)"
+
+#: ui/quality_review_exclusions_dialog.py:72
+msgid "Add key..."
+msgstr "Ajouter la clef..."
+
+#: ui/quality_review_exclusions_dialog.py:73
+msgid "Remove key"
+msgstr "Supprimer la clef"
+
+#: ui/quality_review_exclusions_dialog.py:82
+msgid "Regex ignore patterns"
+msgstr "Regex patrons à ignorer"
+
+#: ui/quality_review_exclusions_dialog.py:86
+msgid ""
+"Default patterns are seeded for common technical tokens (CSV, HTML, JSON, "
+"etc.). You can remove or replace any of them."
+msgstr ""
+"Des modèles par défaut sont fournis pour les formats techniques courants "
+"(CSV, HTML, JSON, etc.). Vous pouvez les supprimer ou les remplacer à votre "
+"guise."
+
+#: ui/quality_review_exclusions_dialog.py:96
+msgid "Add pattern..."
+msgstr "Ajouter le patron..."
+
+#: ui/quality_review_exclusions_dialog.py:97
+#: ui/quality_review_exclusions_dialog.py:249
+msgid "Remove pattern"
+msgstr "Supprimer motif"
+
+#: ui/quality_review_exclusions_dialog.py:98
+msgid "Restore default patterns"
+msgstr "Restaurer les motifs par défaut"
+
+#: ui/quality_review_exclusions_dialog.py:156
+msgid "Add exclusion"
+msgstr "Ajouter exclusion"
+
+#: ui/quality_review_exclusions_dialog.py:157
+msgid "Translation msgid to exclude:"
+msgstr "msgid à exclure de la traduction:"
+
+#: ui/quality_review_exclusions_dialog.py:167
+msgid "Already excluded"
+msgstr "Déjà exclu"
+
+#: ui/quality_review_exclusions_dialog.py:168
+msgid "This msgid is already in the exclusion list."
+msgstr "Ce msgid est déjà dans la liste d'exclusion."
+
+#: ui/quality_review_exclusions_dialog.py:174
+#: ui/quality_review_exclusions_dialog.py:198
+msgid "Could not save exclusions."
+msgstr "Impossible d'enregistrer les exclusions."
+
+#: ui/quality_review_exclusions_dialog.py:188
+msgid "Remove exclusion"
+msgstr "Supprimer l'exclusion"
+
+#: ui/quality_review_exclusions_dialog.py:189
+msgid ""
+"Stop excluding this msgid?\n"
+"\n"
+"{mid}"
+msgstr ""
+"N'excluez pas cette msgid ?\n"
+"\n"
+"{mid}"
+
+#: ui/quality_review_exclusions_dialog.py:208
+msgid "Add ignore pattern"
+msgstr "Ajouter ignorer le motif"
+
+#: ui/quality_review_exclusions_dialog.py:209
+msgid "Regex pattern to remove before script checks:"
+msgstr ""
+"Modèle d'expression régulière à supprimer avant les vérifications de script "
+":"
+
+#: ui/quality_review_exclusions_dialog.py:221
+msgid "Invalid pattern"
+msgstr "Motif non valide"
+
+#: ui/quality_review_exclusions_dialog.py:222
+msgid "Regex error: {err}"
+msgstr "Erreur de regex : {err}"
+
+#: ui/quality_review_exclusions_dialog.py:228
+msgid "Already added"
+msgstr "Déjà ajouté"
+
+#: ui/quality_review_exclusions_dialog.py:229
+msgid "This pattern is already in the ignore list."
+msgstr "Ce modèle est déjà dans la liste d'ignorés."
+
+#: ui/quality_review_exclusions_dialog.py:235
+#: ui/quality_review_exclusions_dialog.py:259
+msgid "Could not save patterns."
+msgstr "Impossible d'enregistrer les motifs."
+
+#: ui/quality_review_exclusions_dialog.py:250
+msgid ""
+"Stop ignoring this regex pattern?\n"
+"\n"
+"{pat}"
+msgstr ""
+"Pourquoi ne pas ignorer ce motif d'expression régulière ?\n"
+"\n"
+"{pat}"
+
+#: ui/quality_review_exclusions_dialog.py:269
+msgid "Restore defaults"
+msgstr "Restaurer les paramètres par défaut"
+
+#: ui/quality_review_exclusions_dialog.py:270
+msgid "Replace current ignore patterns with the default set?"
+msgstr ""
+"Remplacer les patrons actuels d'ignorance par la configuration par défaut ?"
+
+#: ui/quality_review_exclusions_dialog.py:279
+msgid "Could not restore default patterns."
+msgstr "N'a pas pu restaurer les paramètres par défaut."
 
 #: ui/recent_projects_dialog.py:42 ui/recent_projects_dialog.py:112
 msgid "Select"
@@ -1355,31 +1505,31 @@ msgstr "Total des langues :"
 msgid "Missing Translations:"
 msgstr "Traductions manquantes :"
 
-#: ui/stats_widget.py:88
+#: ui/stats_widget.py:86
 msgid "Invalid Unicode:"
 msgstr "Unicode non valide:"
 
-#: ui/stats_widget.py:99
+#: ui/stats_widget.py:95
 msgid "Invalid Indices:"
 msgstr "Indices non valides:"
 
-#: ui/stats_widget.py:110
+#: ui/stats_widget.py:104
 msgid "Invalid Braces:"
 msgstr "Accolades invalides :"
 
-#: ui/stats_widget.py:121
+#: ui/stats_widget.py:113
 msgid "Invalid Leading Space:"
 msgstr "Espaces non valides :"
 
-#: ui/stats_widget.py:132
+#: ui/stats_widget.py:122
 msgid "Invalid Newline:"
 msgstr "Nouvelle ligne invalide :"
 
-#: ui/stats_widget.py:143
-msgid "Invalid CJK:"
-msgstr "CJK (chinois, japonais, coréen) non valides :"
+#: ui/stats_widget.py:131
+msgid "Invalid Character Set:"
+msgstr "Ensemble de caractères non valide"
 
-#: ui/stats_widget.py:154
+#: ui/stats_widget.py:140
 msgid "Stale Translations:"
 msgstr "Traductions sur place :"
 
@@ -1405,28 +1555,22 @@ msgid "Business rules"
 msgstr "Règles d'affaires"
 
 #: ui/translation_quality_review_window.py:166
-msgid "Exclusions"
-msgstr "Exclusions"
-
-#: ui/translation_quality_review_window.py:166
 #: ui/translation_quality_review_window.py:632
 #: ui/translation_quality_review_window.py:638
 msgid "LLM review"
 msgstr "Revue du MLP"
 
-#: ui/translation_quality_review_window.py:176
+#: ui/translation_quality_review_window.py:175
 msgid ""
 "Built-in checks: non-Latin-script locales with Latin words/runs and a "
 "separate mixed-script Latin-leakage signal; translations identical to the "
-"default locale. Respects exclusions from the Exclusions tab. (English-ratio "
-"heuristic reserved.)"
+"default locale. Respects project exclusions and ignore patterns. (English-"
+"ratio heuristic reserved.)"
 msgstr ""
-"Contrôles intégrés : paramètres régionaux utilisant un alphabet non latin "
-"contenant des mots ou des séquences en latin, ainsi qu'un indicateur "
-"distinct signalant la présence de caractères latins dans un texte à scripts "
-"mixtes ; traductions identiques à celles du paramètre régional par défaut. "
-"Respecte les exclusions définies dans l'onglet « Exclusions ». (Heuristique "
-"de proportion d'anglais réservée.)"
+"Vérifications intégrées : locales non en écriture latine avec mots/segments "
+"latins et un signal séparé de fuite latine mixée ; traductions identiques à "
+"la langue par défaut. Prend en compte les exclusions du projet et les motifs"
+" d'ignoré. (L'heuristique basée sur le rapport anglais est réservée.)"
 
 #: ui/translation_quality_review_window.py:181
 msgid "Filters"
@@ -1525,6 +1669,16 @@ msgstr ""
 "Exporter les lignes actuellement filtrées de cette table dans un fichier "
 "TSV."
 
+#: ui/translation_quality_review_window.py:268
+msgid "Heuristic exclusions..."
+msgstr "Exclusions heuristiques"
+
+#: ui/translation_quality_review_window.py:270
+msgid "Manage excluded msgids and ignore regex patterns for this project."
+msgstr ""
+"Gérer les msgids exclus et les expressions régulières à ignorer pour ce "
+"projet."
+
 #: ui/translation_quality_review_window.py:286
 msgid ""
 "Per-project rules saved in application settings. The rule engine may still "
@@ -1564,37 +1718,6 @@ msgid ""
 msgstr ""
 "Évaluer les règles enregistrées par rapport au catalogue chargé (lorsque le "
 "moteur signale des résultats)."
-
-#: ui/translation_quality_review_window.py:325
-msgid ""
-"Msgids excluded from heuristic and custom-rule checks (saved per project). "
-"Re-run heuristic analysis to refresh the Possible issues table after "
-"changes."
-msgstr ""
-"Msgids exclus des vérifications heuristiques et sur mesure (sauvegardés par "
-"projet). Relancer l'analyse heuristique pour rafraîchir la table Des "
-"problèmes possibles après les modifications."
-
-#: ui/translation_quality_review_window.py:336
-msgid "Add key…"
-msgstr "Ajouter la clé…"
-
-#: ui/translation_quality_review_window.py:348
-msgid ""
-"Regex patterns ignored by the Latin-in-CJK heuristic (matched text is "
-"removed before checking)."
-msgstr ""
-"Les expressions régulières ignorées par l'heuristique Latin-in-CJK (le texte"
-" coincidant est supprimé avant vérification)."
-
-#: ui/translation_quality_review_window.py:357
-msgid "Add pattern…"
-msgstr "Ajouter un motif..."
-
-#: ui/quality_review_exclusions_dialog.py:97
-#: ui/quality_review_exclusions_dialog.py:249
-msgid "Remove pattern"
-msgstr "Supprimer motif"
 
 #: ui/translation_quality_review_window.py:343
 msgid ""
@@ -1639,80 +1762,6 @@ msgstr "Sélectionnez un projet avec des paramètres."
 #: ui/translation_quality_review_window.py:454
 msgid "(unnamed rule)"
 msgstr "(règle non nomée)"
-
-#: ui/quality_review_exclusions_dialog.py:156
-msgid "Add exclusion"
-msgstr "Ajouter exclusion"
-
-#: ui/quality_review_exclusions_dialog.py:157
-msgid "Translation msgid to exclude:"
-msgstr "msgid à exclure de la traduction:"
-
-#: ui/quality_review_exclusions_dialog.py:167
-msgid "Already excluded"
-msgstr "Déjà exclu"
-
-#: ui/quality_review_exclusions_dialog.py:168
-msgid "This msgid is already in the exclusion list."
-msgstr "Ce msgid est déjà dans la liste d'exclusion."
-
-#: ui/quality_review_exclusions_dialog.py:174
-#: ui/quality_review_exclusions_dialog.py:198
-msgid "Could not save exclusions."
-msgstr "Impossible d'enregistrer les exclusions."
-
-#: ui/quality_review_exclusions_dialog.py:188
-msgid "Remove exclusion"
-msgstr "Supprimer l'exclusion"
-
-#: ui/quality_review_exclusions_dialog.py:189
-msgid ""
-"Stop excluding this msgid?\n"
-"\n"
-"{mid}"
-msgstr ""
-"N'excluez pas cette msgid ?\n"
-"\n"
-"{mid}"
-
-#: ui/translation_quality_review_window.py:597
-msgid "Add Latin-ignore pattern"
-msgstr "Ajouter le modèle latin-ignoré"
-
-#: ui/translation_quality_review_window.py:598
-msgid "Regex pattern to ignore in Latin-in-CJK heuristic:"
-msgstr "Expression régulière à ignorer dans l'héristique Latin-dans-CJK"
-
-#: ui/quality_review_exclusions_dialog.py:221
-msgid "Invalid pattern"
-msgstr "Motif non valide"
-
-#: ui/quality_review_exclusions_dialog.py:222
-msgid "Regex error: {err}"
-msgstr "Erreur de regex : {err}"
-
-#: ui/quality_review_exclusions_dialog.py:228
-msgid "Already added"
-msgstr "Déjà ajouté"
-
-#: ui/quality_review_exclusions_dialog.py:229
-msgid "This pattern is already in the ignore list."
-msgstr "Ce modèle est déjà dans la liste d'ignorés."
-
-#: ui/quality_review_exclusions_dialog.py:235
-#: ui/quality_review_exclusions_dialog.py:259
-msgid "Could not save patterns."
-msgstr "Impossible d'enregistrer les motifs."
-
-#: ui/quality_review_exclusions_dialog.py:250
-msgid ""
-"Stop ignoring this regex pattern?\n"
-"\n"
-"{pat}"
-msgstr ""
-"Pourquoi ne pas ignorer ce motif d'expression régulière ?\n"
-"\n"
-"{pat}"
 
 #: ui/translation_quality_review_window.py:475
 msgid "Rule name:"
@@ -1950,8 +1999,8 @@ msgstr "Nouvelle ligne invalide"
 
 #: utils/globals.py:101 utils/globals.py:126 utils/globals.py:162
 #: utils/globals.py:189
-msgid "Invalid CJK"
-msgstr "CJK (chinois, japonais, coréen) non valides"
+msgid "Invalid Character Set"
+msgstr "Jeu de caractères non valide"
 
 #: utils/globals.py:222
 msgid "Translation equals default locale text."
@@ -1995,112 +2044,69 @@ msgstr "Fuite de caractères latins mélangés"
 msgid "High English ratio"
 msgstr "Taux élevé d'anglais"
 
-#: app.py:141 ui/all_translations_window.py:108
-#: ui/outstanding_items_window.py:295
-#: ui/quality_review_exclusions_dialog.py:39
-#: ui/setup_translation_project_window.py:153
-msgid "Heuristic Exclusions"
-msgstr "Exclusions heuristiques"
+#: app.py:353
+msgid "Loading translation project..."
+msgstr "Chargement du projet de traduction..."
 
-#: ui/all_translations_window.py:111 ui/outstanding_items_window.py:298
-msgid "Manage msgid exclusions and ignore regex patterns for this project."
-msgstr ""
-"Gérer les exclusions d'identifiants de messages et ignorer les patrons de "
-"regex pour ce projet."
+#: app.py:354
+msgid "Updating translation files..."
+msgstr "Mettre à jour les fichiers de traduction..."
 
-#: ui/quality_review_exclusions_dialog.py:59
+#: app.py:355
+msgid "Compiling translation files..."
+msgstr "Compilation des fichiers de traduction..."
+
+#: app.py:356
+msgid "Syncing base translation files..."
+msgstr "Synchronisation des fichiers de base de traduction..."
+
+#: app.py:357
+msgid "Running quality review..."
+msgstr "Exécution de la vérification de la qualité..."
+
+#: app.py:359
+msgid "Running translation task..."
+msgstr "Exécution de la tâche de traduction..."
+
+#: app.py:360
+msgid "Please wait"
+msgstr "S'il vous plaît attendre"
+
+#: ui/outstanding_items_window.py:280
 msgid ""
-"Configure per-project exclusions used by quality review and invalid "
-"character-set checks. Regex patterns are applied after placeholder "
-"scrubbing."
+"Pending duplicate-prefill updates: {count}. These may include keys not "
+"currently visible in the table and will be saved."
 msgstr ""
-"Configurez les exclusions par projet utilisées lors du contrôle qualité et "
-"de la vérification des jeux de caractères non valides. Les expressions "
-"régulières sont appliquées après le nettoyage des espaces réservés."
+"Mises à jour en attente concernant les champs préremplis en double : "
+"{count}. Celles-ci peuvent inclure des clés qui ne sont pas actuellement "
+"visibles dans le tableau et seront enregistrées."
 
-#: ui/quality_review_exclusions_dialog.py:66
-msgid "Excluded translation keys (msgids)"
-msgstr "Clés de traduction exclues (msgids)"
-
-#: ui/quality_review_exclusions_dialog.py:72
-msgid "Add key..."
-msgstr "Ajouter la clef..."
-
-#: ui/quality_review_exclusions_dialog.py:73
-msgid "Remove key"
-msgstr "Supprimer la clef"
-
-#: ui/quality_review_exclusions_dialog.py:82
-msgid "Regex ignore patterns"
-msgstr "Regex patrons à ignorer"
-
-#: ui/quality_review_exclusions_dialog.py:86
+#: ui/outstanding_items_window.py:1005
 msgid ""
-"Default patterns are seeded for common technical tokens (CSV, HTML, JSON, "
-"etc.). You can remove or replace any of them."
+"Exported {count} outstanding key(s) to:\n"
+"{path}\n"
+"\n"
+"Markdown companion:\n"
+"{md_path}"
 msgstr ""
-"Des modèles par défaut sont fournis pour les formats techniques courants "
-"(CSV, HTML, JSON, etc.). Vous pouvez les supprimer ou les remplacer à votre "
-"guise."
+"{count} clé(s) en attente a (ont) été exportée(s) vers :\n"
+"{path}\n"
+"\n"
+"Fichier Markdown associé :\n"
+"{md_path}"
 
-#: ui/quality_review_exclusions_dialog.py:96
-msgid "Add pattern..."
-msgstr "Ajouter le patron..."
-
-#: ui/quality_review_exclusions_dialog.py:98
-msgid "Restore default patterns"
-msgstr "Restaurer les motifs par défaut"
-
-#: ui/quality_review_exclusions_dialog.py:208
-msgid "Add ignore pattern"
-msgstr "Ajouter ignorer le motif"
-
-#: ui/quality_review_exclusions_dialog.py:209
-msgid "Regex pattern to remove before script checks:"
+#: ui/outstanding_items_window.py:1257
+msgid "Save includes hidden duplicate-prefill updates"
 msgstr ""
-"Modèle d'expression régulière à supprimer avant les vérifications de script "
-":"
+"La sauvegarde comprend les mises à jour cachées de pré-remplissage des "
+"doublons."
 
-#: ui/quality_review_exclusions_dialog.py:269
-msgid "Restore defaults"
-msgstr "Restaurer les paramètres par défaut"
-
-#: ui/quality_review_exclusions_dialog.py:270
-msgid "Replace current ignore patterns with the default set?"
-msgstr ""
-"Remplacer les patrons actuels d'ignorance par la configuration par défaut ?"
-
-#: ui/quality_review_exclusions_dialog.py:279
-msgid "Could not restore default patterns."
-msgstr "N'a pas pu restaurer les paramètres par défaut."
-
-#: ui/stats_widget.py:143
-msgid "Invalid Character Set:"
-msgstr "Ensemble de caractères non valide"
-
-#: ui/translation_quality_review_window.py:175
+#: ui/outstanding_items_window.py:1259
 msgid ""
-"Built-in checks: non-Latin-script locales with Latin words/runs and a "
-"separate mixed-script Latin-leakage signal; translations identical to the "
-"default locale. Respects project exclusions and ignore patterns. (English-"
-"ratio heuristic reserved.)"
+"This save will also persist {count} pre-filled duplicate update(s), including keys that may not be visible in the current table.\n"
+"\n"
+"Continue?"
 msgstr ""
-"Vérifications intégrées : locales non en écriture latine avec mots/segments "
-"latins et un signal séparé de fuite latine mixée ; traductions identiques à "
-"la langue par défaut. Prend en compte les exclusions du projet et les motifs"
-" d'ignoré. (L'heuristique basée sur le rapport anglais est réservée.)"
-
-#: ui/translation_quality_review_window.py:268
-msgid "Heuristic exclusions..."
-msgstr "Exclusions heuristiques"
-
-#: ui/translation_quality_review_window.py:270
-msgid "Manage excluded msgids and ignore regex patterns for this project."
-msgstr ""
-"Gérer les msgids exclus et les expressions régulières à ignorer pour ce "
-"projet."
-
-#: utils/globals.py:101 utils/globals.py:126 utils/globals.py:162
-#: utils/globals.py:189
-msgid "Invalid Character Set"
-msgstr "Jeu de caractères non valide"
+"Cette sauvegarde conservera également {count} mises à jour de doublons préremplies, y compris les clés qui ne sont peut-être pas visibles dans la table actuelle.\n"
+"\n"
+"Continuer ?"
