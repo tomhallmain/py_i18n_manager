@@ -55,6 +55,10 @@ ALL_TRAILING_ALIGNABLE_CHARS: frozenset[str] = frozenset().union(
     frozenset({ELLIPSIS_UNICODE_CHAR}),
 )
 
+# Sentence-ending marks for reuse (e.g. stripping optional punctuation after a closing ``)`` in
+# :mod:`i18n.translation_group`). Same members as :data:`ALL_TRAILING_ALIGNABLE_CHARS`.
+SENTENCE_ENDING_PUNCTUATION_CHARS = ALL_TRAILING_ALIGNABLE_CHARS
+
 # Locales where we skip aligning sentence-ending punctuation. Extend as needed.
 LOCALES_WITHOUT_SENTENCE_STOP_ALIGNMENT: frozenset[str] = frozenset()
 
@@ -134,6 +138,21 @@ def source_has_trailing_sentence_stop(text: str) -> bool:
     if t.endswith(ELLIPSIS_UNICODE_CHAR) or _endswith_three_ascii_full_stops(t):
         return True
     return classify_trailing_sentence_char(t[-1]) is not None
+
+
+def strip_sentence_punct_after_close_paren(t: str) -> str:
+    """Remove optional sentence punctuation after ``)`` / ``）`` (ASCII/CJK stops—see stop_character_utils)."""
+    u = t
+    close_ch = (')', '\uff09')
+    # Three ASCII dots after ``)`` (strip as a unit before single-char peeling).
+    while len(u) >= 4 and u.endswith('...') and u[-4] in close_ch:
+        u = u[:-3]
+    while len(u) >= 2:
+        if u[-1] in SENTENCE_ENDING_PUNCTUATION_CHARS and u[-2] in close_ch:
+            u = u[:-1]
+            continue
+        break
+    return u
 
 
 def preferred_sentence_ending_for_locale(kind: SentenceEndingKind, target_locale: str) -> str:

@@ -5,6 +5,7 @@ from typing import Any, List, Set
 from polib import POEntry
 
 from .invalid_character_set import InvalidCharacterSetAnalyzer
+from .stop_character_utils import strip_sentence_punct_after_close_paren
 from utils.config import config_manager
 
 
@@ -392,27 +393,32 @@ class TranslationGroup():
         return invalid_index_locales
 
     def get_invalid_brace_locales(self):
-        """Check for mismatched open/close brace counts across all locales.
-        
-        Returns:
-            list: List of locales with mismatched brace counts compared to default locale
+        """Check for mismatched structural brackets across locales.
+
+        ``[]``, ``<>``, ``{}``: open/close counts must match the default locale.
+
+        ``()``: usually **balance-only** (open count equals close count) so translators may add or
+        drop parentheticals for tone. Exception: when the default **or** the locale string is a
+        *full-string parenthetical* (trimmed text starts with ``(``/（, balanced counts, and the
+        closing ``)``/） either ends the string or is followed only by sentence punctuation such as
+        ``.`` *outside* the paren—e.g. ``(….)`` vs ``(…).``), the other side must match—otherwise the
+        locale is invalid.
         """
         invalid_brace_locales = []
         default_translation = self.get_translation_as_text(self.default_locale)
-        
-        # Parentheses row: balance-only vs default; see _brace_pair_counts.
+
         brace_pairs = [
             ('(', (')', '\uff09')),
-            ('[', ']'),  # Square brackets - check against default
-            ('<', '>'),  # Angle brackets - check against default
-            ('{', '}')   # Curly braces - check against default
+            ('[', ']'),
+            ('<', '>'),
+            ('{', '}'),
         ]
 
         def _brace_pair_counts(text: str, open_brace: str, close_brace) -> tuple[int, int]:
             """Return (open_count, close_count) for one structural pair.
 
             For ``(``, ``)`` counts include full-width （ U+FF08 / ） U+FF09 so CJK typography
-            matches ASCII. Callers treat parentheses as balanced-only; other pairs vs default.
+            matches ASCII.
             """
             if open_brace == '(':
                 opens = text.count('(') + text.count('\uff08')
@@ -424,30 +430,63 @@ class TranslationGroup():
                 closes = text.count(close_brace)
             return opens, closes
 
+        def _is_fully_wrapped_parenthetical(s: str, open_count: int, close_count: int) -> bool:
+            """True when the string is a full parenthetical, including ``(...).`` (stop outside ``)``)."""
+            t = (s or "").strip()
+            if open_count == 0:
+                return False
+            if len(t) < 2:
+                return False
+            if t[0] not in ('(', '\uff08'):
+                return False
+            u = strip_sentence_punct_after_close_paren(t)
+            if len(u) < 2:
+                return False
+            if u[-1] not in (')', '\uff09'):
+                return False
+            return open_count == close_count and open_count >= 1
+
         default_counts = {}
+        open_paren_count = -1
+        close_paren_count = -1
         for open_brace, close_brace in brace_pairs:
             default_counts[open_brace] = _brace_pair_counts(
                 default_translation, open_brace, close_brace
             )
+            if open_brace == '(':
+                open_paren_count = default_counts[open_brace][0]
+                close_paren_count = default_counts[open_brace][1]
+
+        if open_paren_count > 0:
+            default_full_paren = _is_fully_wrapped_parenthetical(default_translation, open_paren_count, close_paren_count)
+        else:
+            default_full_paren = False
 
         for locale, translation in self.values.items():
             if locale == self.default_locale:
                 continue
 
+            loc_full_paren = False
             text = self.value_as_text(translation)
+
             for open_brace, close_brace in brace_pairs:
                 open_count, close_count = _brace_pair_counts(text, open_brace, close_brace)
 
-                if open_brace == '(':  # Parentheses - only check balance (ASCII or full-width)
+                if open_brace == '(':
+                    loc_full_paren = _is_fully_wrapped_parenthetical(text, open_count, close_count)
                     if open_count != close_count:
                         invalid_brace_locales.append(locale)
                         break
-                else:  # Other braces - check against default
-                    default_open, default_close = default_counts[open_brace]
-                    if open_count != default_open or close_count != default_close:
-                        invalid_brace_locales.append(locale)
-                        break
-                    
+                    continue
+
+                default_open, default_close = default_counts[open_brace]
+                if open_count != default_open or close_count != default_close:
+                    invalid_brace_locales.append(locale)
+                    break
+            else:
+                if default_full_paren != loc_full_paren:
+                    invalid_brace_locales.append(locale)
+
         return invalid_brace_locales
 
     def get_invalid_leading_space_locales(self):
