@@ -22,6 +22,46 @@ class TestTrailingSentenceStopHelpers(unittest.TestCase):
         self.assertTrue(source_has_trailing_sentence_stop("你好。"))
         self.assertTrue(source_has_trailing_sentence_stop("ｔｅｓｔ．"))  # fullwidth .
 
+    def test_source_has_trailing_sentence_stop_ellipsis(self):
+        self.assertTrue(source_has_trailing_sentence_stop("Loading translation project..."))
+        self.assertTrue(source_has_trailing_sentence_stop("Loading\u2026"))
+
+    def test_no_inconsistency_when_both_end_with_three_ascii_dots(self):
+        """Regression: ``...`` must not collapse to a single ``.`` (false positive in quality review)."""
+        self.assertFalse(
+            translation_has_stop_inconsistency_vs_source(
+                "Loading translation project...",
+                "Übersetzungsprojekt wird geladen...",
+                "de",
+            )
+        )
+        self.assertFalse(
+            translation_has_stop_inconsistency_vs_source(
+                "Updating translation files...",
+                "Übersetzungsdateien werden aktualisiert...",
+                "de",
+            )
+        )
+
+    def test_no_inconsistency_when_both_end_with_unicode_ellipsis(self):
+        self.assertFalse(
+            translation_has_stop_inconsistency_vs_source(
+                "Loading\u2026",
+                "Laden\u2026",
+                "de",
+            )
+        )
+
+    def test_no_inconsistency_when_unicode_ellipsis_vs_three_ascii_dots(self):
+        """U+2026 and ``...`` are treated as the same trailing ellipsis for review purposes."""
+        self.assertFalse(
+            translation_has_stop_inconsistency_vs_source(
+                "Add rule\u2026",
+                "Aggiungi regola...",
+                "it",
+            )
+        )
+
     def test_preferred_stop_cjk_vs_latin_locale(self):
         self.assertEqual(preferred_trailing_sentence_stop_for_locale("zh_CN"), "。")
         self.assertEqual(preferred_trailing_sentence_stop_for_locale("ja"), "。")
@@ -145,6 +185,33 @@ class TestTrailingSentenceStopHelpers(unittest.TestCase):
         )
         self.assertFalse(
             translation_has_stop_inconsistency_vs_source("Save", "Speichern", "de")
+        )
+
+    def test_zh_ja_ascii_vs_fullwidth_exclamation_not_inconsistent(self):
+        """English ``!`` with zh ``！`` (or ASCII ``!`` in Chinese) is the same role; do not flag."""
+        self.assertFalse(
+            translation_has_stop_inconsistency_vs_source(
+                "Invalid {0}, may cause errors or be unable to run!",
+                "无效的预先验证{0}, 可能导致错误或无法运行！",
+                "zh",
+            )
+        )
+        self.assertFalse(
+            translation_has_stop_inconsistency_vs_source(
+                "Run!",
+                "运行!",
+                "zh_CN",
+            )
+        )
+
+    def test_ja_exclamation_vs_period_still_inconsistent(self):
+        """Changing ``!`` to ``。`` is still a real mismatch (different kinds)."""
+        self.assertTrue(
+            translation_has_stop_inconsistency_vs_source(
+                "Invalid {0}, may cause errors or be unable to run!",
+                "無効な優先値 {0} は、エラーや実行できません。",
+                "ja",
+            )
         )
 
 
