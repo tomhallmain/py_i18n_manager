@@ -33,9 +33,12 @@ from __future__ import annotations
 import io
 import os
 import re
+from collections.abc import Mapping
 from typing import Any, Iterable, Optional, TYPE_CHECKING
 
 import yaml
+
+from utils.nested_mapping import resolve_nested_dict_key
 
 if TYPE_CHECKING:
     from ruamel.yaml import YAML as RuamelYAMLType
@@ -112,30 +115,43 @@ def quote_string_values_in_place(data: Any) -> Any:
 
 
 def merge_ruamel_data(original: Any, new: Any) -> None:
-    """Deep-merge ``new`` into ``original`` (both mappings), quoting new string leaves."""
-    if not isinstance(original, dict) or not isinstance(new, dict):
+    """Deep-merge ``new`` into ``original`` (both mappings), quoting new string leaves.
+
+    Keys are matched with :func:`~utils.nested_mapping.resolve_nested_dict_key` so
+    ruamel/PyYAML trees (e.g. boolean ``true`` keys) merge with dot-path strings
+    (``\"true\"``) instead of inserting a parallel branch that leaves old leaves unchanged.
+    """
+    if not isinstance(original, Mapping) or not isinstance(new, Mapping):
         return
     if not RUAMEL_AVAILABLE or DoubleQuotedScalarString is None:
         return
 
     for key, value in new.items():
-        if key in original:
-            if isinstance(original[key], dict) and isinstance(value, dict):
-                merge_ruamel_data(original[key], value)
+        key_str = str(key)
+        resolved = resolve_nested_dict_key(original, key_str)
+
+        if resolved is not None:
+            existing = original[resolved]
+            if (
+                isinstance(value, Mapping)
+                and isinstance(existing, Mapping)
+                and not isinstance(value, str)
+            ):
+                merge_ruamel_data(existing, value)
             else:
                 if isinstance(value, str):
-                    original[key] = DoubleQuotedScalarString(value)
-                elif isinstance(value, dict):
-                    original[key] = quote_string_values(value)
+                    original[resolved] = DoubleQuotedScalarString(value)
+                elif isinstance(value, Mapping):
+                    original[resolved] = quote_string_values(value)
                 else:
-                    original[key] = value
+                    original[resolved] = value
         else:
             if isinstance(value, str):
-                original[key] = DoubleQuotedScalarString(value)
-            elif isinstance(value, dict):
-                original[key] = quote_string_values(value)
+                original[key_str] = DoubleQuotedScalarString(value)
+            elif isinstance(value, Mapping):
+                original[key_str] = quote_string_values(value)
             else:
-                original[key] = value
+                original[key_str] = value
 
 
 def ruamel_yaml_dump_new_file(data: Any, stream, **kwargs: Any) -> None:

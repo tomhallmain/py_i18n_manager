@@ -13,18 +13,28 @@ def add_to_nested_dict(data: dict, key: str, value: str) -> None:
     """Set ``value`` at dot-notation ``key``, creating intermediate mappings as needed.
 
     Preserves existing nested structure: only the leaf path is written.
+    Uses :func:`resolve_nested_dict_key` so segments match YAML-loaded keys (e.g. bool
+    ``true`` vs ``\"true\"``), consistent with :func:`remove_from_nested_dict`.
     """
     parts = key.split(".")
     current = data
 
     for part in parts[:-1]:
-        if part not in current:
+        resolved = resolve_nested_dict_key(current, part)
+        if resolved is None:
             current[part] = {}
-        elif not isinstance(current[part], dict):
-            current[part] = {}
-        current = current[part]
+            current = current[part]
+        else:
+            if not isinstance(current[resolved], dict):
+                current[resolved] = {}
+            current = current[resolved]
 
-    current[parts[-1]] = value
+    leaf = parts[-1]
+    resolved_leaf = resolve_nested_dict_key(current, leaf)
+    if resolved_leaf is not None:
+        current[resolved_leaf] = value
+    else:
+        current[leaf] = value
 
 
 def resolve_nested_dict_key(mapping: dict, part: str) -> Any | None:

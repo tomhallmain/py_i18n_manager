@@ -4,7 +4,14 @@ import os
 import tempfile
 import unittest
 
-from i18n.ruby.yaml_parser_utils import RUAMEL_AVAILABLE, merge_dotted_keys_into_locale_file, ruby_roundtrip_yaml
+from i18n.ruby.yaml_parser_utils import (
+    RUAMEL_AVAILABLE,
+    merge_dotted_keys_into_locale_file,
+    merge_ruamel_data,
+    quote_string_values,
+    ruby_roundtrip_yaml,
+)
+from utils.nested_mapping import add_to_nested_dict
 
 
 @unittest.skipUnless(RUAMEL_AVAILABLE, "ruamel.yaml required")
@@ -44,6 +51,23 @@ class TestMergeDottedKeysKeyOrder(unittest.TestCase):
                 ["deep", "other"],
                 "Nested keys under a new parent follow the dotted-key sequence.",
             )
+
+
+@unittest.skipUnless(RUAMEL_AVAILABLE, "ruamel.yaml required")
+class TestMergeRuamelDataKeyResolution(unittest.TestCase):
+    """merge_ruamel_data must update existing leaves when YAML/ruamel key types differ from str."""
+
+    def test_merges_into_bool_true_key_when_new_uses_string_true(self):
+        original = {True: {"leaf": "old"}}
+        new = {"true": {"leaf": "new"}}
+        merge_ruamel_data(original, quote_string_values(new))
+        self.assertIn(True, original)
+        self.assertEqual(str(original[True]["leaf"]), "new")
+
+    def test_add_to_nested_dict_resolves_bool_segment(self):
+        data = {True: {"inner": "x"}}
+        add_to_nested_dict(data, "true.inner", "updated")
+        self.assertEqual(data[True]["inner"], "updated")
 
 
 if __name__ == "__main__":
