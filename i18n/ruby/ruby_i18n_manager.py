@@ -19,6 +19,7 @@ from .file_structure_manager import FileStructureManager
 from .i18n_tasks_missing_sync import sync_base_from_missing
 from .yaml_parser_utils import (
     RUAMEL_AVAILABLE,
+    ensure_ruby_yaml_safe_mapping_keys,
     merge_ruamel_data,
     pyyaml_dump,
     quote_string_values,
@@ -254,10 +255,12 @@ class RubyI18NManager(I18NManagerBase):
                             original_data[key] = quote_string_values(value)
                 
                 # Dump the merged data
+                ensure_ruby_yaml_safe_mapping_keys(original_data)
                 ryaml.dump(original_data, stream)
             else:
                 # New file or structure changed, just dump new data (quoted string values)
                 quoted_data = quote_string_values(data)
+                ensure_ruby_yaml_safe_mapping_keys(quoted_data)
                 ryaml.dump(quoted_data, stream)
         except Exception as e:
             logger.warning(f"Could not preserve comments with ruamel.yaml: {e}, falling back to PyYAML")

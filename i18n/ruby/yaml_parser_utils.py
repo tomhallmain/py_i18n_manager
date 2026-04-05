@@ -21,7 +21,7 @@ loading and dumping, which fits i18n files where formatting matters.
 - Use **PyYAML** for reading where we use a custom loader (e.g. i18n keys without implicit bools).
 - Use **ruamel.yaml** for writing when available (quoted values, comment preservation).
 - Fall back to **PyYAML** with a value-quoting dumper when ruamel is unavailable (valid YAML,
-  keys unquoted where the post-process strips key quotes).
+  keys unquoted where the post-process strips key quotes, except ``yes`` / ``no`` which stay quoted for Ruby).
 
 This module centralizes ruamel round-trip settings, merge/quote helpers, the PyYAML fallback
 dumper, and utilities used by :class:`~i18n.ruby.ruby_i18n_manager.RubyI18nManager` and
@@ -96,6 +96,36 @@ def quote_string_values(data: Any) -> Any:
     if isinstance(data, str):
         return DoubleQuotedScalarString(data)
     return data
+
+
+# YAML 1.1 (Ruby Psych): plain ``yes`` / ``no`` map keys are booleans. On write we must emit
+# quoted keys so Rails I18n sees string keys.
+_RUBY_BOOL_AMBIGUOUS_KEYS = frozenset(("yes", "no"))
+
+
+def ensure_ruby_yaml_safe_mapping_keys(obj: Any) -> None:
+    """Recursively rekey string ``yes`` / ``no`` to double-quoted key nodes for Ruby-safe YAML.
+
+    Call on data trees immediately before ruamel dump. Idempotent for already-quoted keys
+    (``DoubleQuotedScalarString`` is not in ``_RUBY_BOOL_AMBIGUOUS_KEYS`` as plain str).
+    """
+    if not RUAMEL_AVAILABLE or DoubleQuotedScalarString is None:
+        return
+    try:
+        from ruamel.yaml.comments import CommentedMap, CommentedSeq
+    except ImportError:
+        return
+
+    if isinstance(obj, (dict, CommentedMap)):
+        for k in list(obj.keys()):
+            ensure_ruby_yaml_safe_mapping_keys(obj[k])
+        for k in list(obj.keys()):
+            if isinstance(k, str) and k in _RUBY_BOOL_AMBIGUOUS_KEYS:
+                v = obj.pop(k)
+                obj[DoubleQuotedScalarString(k)] = v
+    elif isinstance(obj, (list, CommentedSeq)) or _is_sequence_not_str(obj):
+        for item in obj:
+            ensure_ruby_yaml_safe_mapping_keys(item)
 
 
 def quote_string_values_in_place(data: Any) -> Any:
@@ -178,6 +208,7 @@ def ruamel_yaml_dump_new_file(data: Any, stream, **kwargs: Any) -> None:
     """Dump YAML with ruamel for new files (no original content to preserve)."""
     ryaml = ruby_roundtrip_yaml()
     quoted_data = quote_string_values(data)
+    ensure_ruby_yaml_safe_mapping_keys(quoted_data)
     ryaml.dump(quoted_data, stream)
 
 
@@ -211,7 +242,11 @@ def pyyaml_dump(data: Any, stream, **kwargs: Any) -> None:
         match = key_pattern.match(line)
         if match:
             indent, quoted_key, rest = match.group(1), match.group(2), match.group(3) or ""
-            processed_lines.append(f"{indent}{quoted_key}:{rest}")
+            # Keep keys quoted so Ruby Psych does not read them as YAML 1.1 booleans.
+            if quoted_key in _RUBY_BOOL_AMBIGUOUS_KEYS:
+                processed_lines.append(f'{indent}"{quoted_key}":{rest}')
+            else:
+                processed_lines.append(f"{indent}{quoted_key}:{rest}")
         else:
             processed_lines.append(line)
     stream.write("\n".join(processed_lines))
@@ -329,6 +364,7 @@ def write_roundtrip_yaml_file(ryaml: Any, data: Any, path: str) -> None:
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
+    ensure_ruby_yaml_safe_mapping_keys(data)
     with open(path, "w", encoding="utf-8") as f:
         ryaml.dump(data, f)
 

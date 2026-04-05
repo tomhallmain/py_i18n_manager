@@ -7,8 +7,10 @@ import unittest
 
 from i18n.ruby.yaml_parser_utils import (
     RUAMEL_AVAILABLE,
+    ensure_ruby_yaml_safe_mapping_keys,
     merge_dotted_keys_into_locale_file,
     merge_ruamel_data,
+    pyyaml_dump,
     quote_string_values,
     ruby_roundtrip_yaml,
 )
@@ -112,6 +114,43 @@ class TestMergeRuamelDataKeyResolution(unittest.TestCase):
         dumped = buf.getvalue()
         self.assertNotIn("['Neu eins'", dumped)
         self.assertIn("- ", dumped)
+
+
+class TestRubyYamlYesNoKeyQuoting(unittest.TestCase):
+    """YAML 1.1 / Ruby Psych: unquoted yes/no keys become booleans; writers must quote them."""
+
+    def test_pyyaml_dump_keeps_quoted_yes_no_keys(self):
+        buf = io.StringIO()
+        pyyaml_dump({"en": {"common": {"yes": "Да", "no": "Нет", "other": "x"}}}, buf)
+        dumped = buf.getvalue()
+        self.assertIn('"yes":', dumped)
+        self.assertIn('"no":', dumped)
+
+    @unittest.skipUnless(RUAMEL_AVAILABLE, "ruamel.yaml required")
+    def test_ruamel_dump_quotes_yes_no_keys(self):
+        ryaml = ruby_roundtrip_yaml()
+        data = quote_string_values({"ru": {"common": {"yes": "Да", "no": "Нет"}}})
+        ensure_ruby_yaml_safe_mapping_keys(data)
+        buf = io.StringIO()
+        ryaml.dump(data, buf)
+        dumped = buf.getvalue()
+        self.assertIn('"yes":', dumped)
+        self.assertIn('"no":', dumped)
+
+    @unittest.skipUnless(RUAMEL_AVAILABLE, "ruamel.yaml required")
+    def test_merge_dotted_keys_writes_quoted_yes_leaf(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rel = "config/locales/en/widgets.en.yml"
+            abs_path = os.path.normpath(os.path.join(tmp, rel.replace("/", os.sep)))
+            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+            with open(abs_path, "w", encoding="utf-8") as f:
+                f.write('en:\n  common:\n    other: "x"\n')
+
+            merge_dotted_keys_into_locale_file(tmp, rel, "en", ["common.yes"])
+
+            with open(abs_path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertIn('"yes":', text)
 
 
 if __name__ == "__main__":
