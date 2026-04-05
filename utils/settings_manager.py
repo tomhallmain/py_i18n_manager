@@ -2,6 +2,7 @@ import json
 import os
 from collections import Counter
 from pathlib import Path
+from datetime import datetime
 from typing import Optional, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -341,6 +342,22 @@ class SettingsManager:
             bool: True if successful, False otherwise
         """
         return self.save_project_setting(project_path, 'default_locale', default_locale)
+
+    def get_project_last_user_sync_time(self, project_path: str) -> Optional[datetime]:
+        """When the user last ran a successful base sync (e.g. Sync Base Translations) for this project."""
+        raw = self.get_project_setting(project_path, "last_user_sync_time_iso")
+        if not raw or not isinstance(raw, str):
+            return None
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
+    def set_project_last_user_sync_time(self, project_path: str, when: datetime) -> bool:
+        """Record a successful user-initiated base sync time (ISO 8601 string in project settings)."""
+        return self.save_project_setting(
+            project_path, "last_user_sync_time_iso", when.isoformat(timespec="seconds")
+        )
         
     def get_project_locales(self, project_path: str) -> list[str]:
         """Get the list of locales for a specific project.

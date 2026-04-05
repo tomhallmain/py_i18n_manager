@@ -412,6 +412,9 @@ class RubyI18NManager(I18NManagerBase):
                 if not self.generate_pot_file():
                     results.action_successful = False
                     results.extend_error_message("Failed to generate base translation structure")
+
+            if action == TranslationAction.CHECK_STATUS:
+                self.apply_latest_translation_file_mtime(results)
             
             results.determine_action_successful()
             return results
@@ -517,7 +520,20 @@ class RubyI18NManager(I18NManagerBase):
         
         logger.info(f"Gathered YAML files for {len(yaml_files_by_locale)} locales: {list(yaml_files_by_locale.keys())}")
         return yaml_files_by_locale
-    
+
+    def list_translation_file_paths(self) -> list[str]:
+        """All locale YAML files discovered by :meth:`gather_yaml_files`."""
+        try:
+            by_locale = self.gather_yaml_files()
+            out: list[str] = []
+            for files in by_locale.values():
+                for f in files:
+                    if os.path.isfile(f):
+                        out.append(f)
+            return out
+        except Exception:
+            return []
+
     def gather_files(self):
         """Legacy method for compatibility. For Ruby, use gather_yaml_files() instead."""
         # This method is kept for interface compatibility but shouldn't be used for Ruby

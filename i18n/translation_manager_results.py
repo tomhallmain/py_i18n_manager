@@ -78,6 +78,9 @@ class TranslationManagerResults:
     # PO/MO file update tracking
     po_files_updated: bool = False
     updated_locales: List[str] = field(default_factory=list)
+
+    # Latest mtime among translation files (PO/POT, YAML, properties, etc.); set on CHECK_STATUS only
+    latest_translation_file_mtime: Optional[datetime] = None
     
     @classmethod
     def create(cls, project_dir: str, action: TranslationAction) -> 'TranslationManagerResults':

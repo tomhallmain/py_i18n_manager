@@ -225,6 +225,10 @@ class I18NManager(I18NManagerBase):
     def check_translations_changed(self, include_stale_translations: bool = False) -> bool:
         """Check if translations actually changed by comparing current state with a backup."""
         return self._manager.check_translations_changed(include_stale_translations)
+
+    def list_translation_file_paths(self) -> list[str]:
+        """Paths to translation files for the active project-type manager."""
+        return self._manager.list_translation_file_paths()
     
     # Delegate all other methods to the underlying manager
     def __getattr__(self, name):

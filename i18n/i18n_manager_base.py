@@ -1,4 +1,6 @@
+import os
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Dict, Iterable, List, Optional, Set
 
 from .translation_group import TranslationGroup, TranslationKey
@@ -94,6 +96,23 @@ class I18NManagerBase(ABC):
         else:
             results.invalid_groups = self.get_invalid_translations()
 
+    def apply_latest_translation_file_mtime(self, results: TranslationManagerResults) -> None:
+        """Set ``results.latest_translation_file_mtime`` from :meth:`list_translation_file_paths` mtimes."""
+        paths = self.list_translation_file_paths()
+        if not paths:
+            results.latest_translation_file_mtime = None
+            return
+        mtimes: list[float] = []
+        for p in paths:
+            try:
+                mtimes.append(os.path.getmtime(p))
+            except OSError:
+                continue
+        if not mtimes:
+            results.latest_translation_file_mtime = None
+        else:
+            results.latest_translation_file_mtime = datetime.fromtimestamp(max(mtimes))
+
     @property
     @abstractmethod
     def default_locale(self) -> str:
@@ -184,7 +203,11 @@ class I18NManagerBase(ABC):
             results: Results object to track failures
         """
         pass
-    
+
+    @abstractmethod
+    def list_translation_file_paths(self) -> List[str]:
+        """Absolute paths to all translation files for this project (for latest-mtime display)."""
+        pass
 
     
     @abstractmethod

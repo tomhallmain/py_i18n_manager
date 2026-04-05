@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: APPLICATION 1.0\n"
 "Report-Msgid-Bugs-To: Translator Name <translator@example.com>\n"
-"POT-Creation-Date: 2026-04-05 14:44-0400\n"
-"PO-Revision-Date: 2026-04-05 14:44-0400\n"
+"POT-Creation-Date: 2026-04-05 17:24-0400\n"
+"PO-Revision-Date: 2026-04-05 17:24-0400\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -16,114 +16,122 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.17.0\n"
 
-#: app.py:41 app.py:201
+#: app.py:41 app.py:224
 msgid "i18n Translation Manager"
 msgstr ""
 
-#: app.py:81
+#: app.py:82
 msgid "Current Project:"
 msgstr ""
 
-#: app.py:83
+#: app.py:84
 msgid "No project selected"
 msgstr ""
 
-#: app.py:102 ui/recent_projects_dialog.py:82
+#: app.py:105
+msgid "Latest file change:"
+msgstr ""
+
+#: app.py:112
+msgid "Last sync:"
+msgstr ""
+
+#: app.py:122 ui/recent_projects_dialog.py:82
 msgid "Select Project"
 msgstr ""
 
-#: app.py:106
+#: app.py:126
 msgid "Modify Project Settings"
 msgstr ""
 
-#: app.py:139
+#: app.py:160
 msgid "Check Status"
 msgstr ""
 
-#: app.py:140
+#: app.py:161
 msgid "Write Default Locale"
 msgstr ""
 
-#: app.py:141
+#: app.py:162
 msgid "Show All Translations"
 msgstr ""
 
-#: app.py:142
+#: app.py:163
 msgid "Show Outstanding Items"
 msgstr ""
 
-#: app.py:143 ui/translation_quality_review_window.py:124
+#: app.py:164 ui/translation_quality_review_window.py:124
 msgid "Translation Quality Review"
 msgstr ""
 
-#: app.py:144 ui/all_translations_window.py:108 ui/outstanding_items_window.py:319
+#: app.py:165 ui/all_translations_window.py:108 ui/outstanding_items_window.py:319
 #: ui/quality_review_exclusions_dialog.py:39 ui/setup_translation_project_window.py:153
 msgid "Heuristic Exclusions"
 msgstr ""
 
-#: app.py:145
+#: app.py:166
 msgid "Find Untranslated"
 msgstr ""
 
-#: app.py:165 ui/bulk_pot_analysis_window.py:77
+#: app.py:186 ui/bulk_pot_analysis_window.py:77
 msgid "Bulk Project Status"
 msgstr ""
 
-#: app.py:166
+#: app.py:187
 msgid "Cross-Project Analysis"
 msgstr ""
 
-#: app.py:167
+#: app.py:188
 msgid "Sync Base Translations"
 msgstr ""
 
-#: app.py:168
+#: app.py:189
 msgid "Update Translation Files"
 msgstr ""
 
-#: app.py:169
+#: app.py:190
 msgid "Compile Translations"
 msgstr ""
 
-#: app.py:188 ui/bulk_pot_analysis_window.py:129
+#: app.py:209 ui/bulk_pot_analysis_window.py:129
 msgid "Status"
 msgstr ""
 
-#: app.py:320
+#: app.py:349
 msgid ""
 "Translation file compilation is not relevant for {} projects. {} projects use source translation files directly "
 "without a compilation step."
 msgstr ""
 
-#: app.py:353
+#: app.py:382
 msgid "Loading translation project..."
 msgstr ""
 
-#: app.py:354
+#: app.py:383
 msgid "Updating translation files..."
 msgstr ""
 
-#: app.py:355
+#: app.py:384
 msgid "Compiling translation files..."
 msgstr ""
 
-#: app.py:356
+#: app.py:385
 msgid "Syncing base translation files..."
 msgstr ""
 
-#: app.py:357
+#: app.py:386
 msgid "Running quality review..."
 msgstr ""
 
-#: app.py:359
+#: app.py:388
 msgid "Running translation task..."
 msgstr ""
 
-#: app.py:360
+#: app.py:389
 msgid "Please wait"
 msgstr ""
 
-#: app.py:508 app.py:530 app.py:654 app.py:669 app.py:714 app.py:736 app.py:764 app.py:821
+#: app.py:557 app.py:579 app.py:703 app.py:718 app.py:765 app.py:787 app.py:817 app.py:874
 #: ui/bulk_pot_analysis_window.py:235 ui/bulk_pot_analysis_window.py:263 ui/cross_project_analysis_window.py:268
 #: ui/cross_project_analysis_window.py:560 ui/llm_settings_dialog.py:265 ui/llm_settings_dialog.py:321
 #: ui/locale_selection_window.py:279 ui/locale_selection_window.py:290 ui/locale_selection_window.py:298
@@ -139,63 +147,63 @@ msgstr ""
 msgid "Error"
 msgstr ""
 
-#: app.py:508 app.py:714
+#: app.py:557 app.py:765
 msgid "No translation data available"
 msgstr ""
 
-#: app.py:530 app.py:736 app.py:764 app.py:821
+#: app.py:579 app.py:787 app.py:817 app.py:874
 msgid "Please select a project first"
 msgstr ""
 
-#: app.py:654 app.py:669
+#: app.py:703 app.py:718
 msgid "Please check status first to load translation data"
 msgstr ""
 
-#: app.py:677 ui/all_translations_window.py:32
+#: app.py:726 ui/all_translations_window.py:32
 msgid "All Translations"
 msgstr ""
 
-#: app.py:678
+#: app.py:727
 msgid "Could not find that translation key in the current catalog."
 msgstr ""
 
-#: app.py:740
+#: app.py:791
 msgid "Updating base translation files..."
 msgstr ""
 
-#: app.py:742
+#: app.py:795
 msgid "Base translation files updated successfully."
 msgstr ""
 
-#: app.py:751
+#: app.py:804
 msgid "Update failed"
 msgstr ""
 
-#: app.py:754
+#: app.py:807
 msgid "Failed to update base translation files."
 msgstr ""
 
-#: app.py:829 app.py:845
+#: app.py:882 app.py:898
 msgid "No Projects to Analyze"
 msgstr ""
 
-#: app.py:830
+#: app.py:883
 msgid "You need at least 2 projects in your recent projects list to perform cross-project analysis."
 msgstr ""
 
-#: app.py:846
+#: app.py:899
 msgid "You need at least 1 project in your recent projects list to perform bulk POT analysis."
 msgstr ""
 
-#: app.py:864
+#: app.py:917
 msgid "Compiled Files Need Update"
 msgstr ""
 
-#: app.py:865
+#: app.py:918
 msgid "Translation files have been updated for the following locales:"
 msgstr ""
 
-#: app.py:867
+#: app.py:920
 msgid "Remember to run Compile Translations to apply these changes."
 msgstr ""
 

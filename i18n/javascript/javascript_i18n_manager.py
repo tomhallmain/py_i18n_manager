@@ -3,7 +3,7 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from i18n.translation_group import TranslationGroup, TranslationKey
 from ..file_topology_manager import FileTopologyManager
@@ -132,6 +132,18 @@ class JavaScriptI18NManager(I18NManagerBase):
         elif normalized.endswith(".ts"):
             normalized = normalized[:-3]
         return normalized
+
+    def list_translation_file_paths(self) -> List[str]:
+        """JSON/JS/TS translation files under the project locale directory (same scan as load)."""
+        locale_dir = os.path.join(self._directory, self._locale_dir)
+        if not Utils.isdir_with_retry(locale_dir):
+            return []
+        exts = {".json", ".js", ".ts"}
+        return [
+            str(p)
+            for p in Path(locale_dir).rglob("*")
+            if p.is_file() and p.suffix.lower() in exts
+        ]
 
     def _scan_locale_files(self) -> Tuple[Dict[str, Dict[str, dict]], Dict[str, dict]]:
         locale_dir = os.path.join(self._directory, self._locale_dir)
@@ -361,6 +373,9 @@ class JavaScriptI18NManager(I18NManagerBase):
                 if not self.generate_pot_file():
                     results.action_successful = False
                     results.extend_error_message("Failed to generate JavaScript base locale file")
+
+            if action == TranslationAction.CHECK_STATUS:
+                self.apply_latest_translation_file_mtime(results)
 
             results.determine_action_successful()
             return results

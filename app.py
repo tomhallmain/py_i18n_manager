@@ -58,6 +58,7 @@ class MainWindow(SmartMainWindow):
         self.worker = None
         self._task_running = False
         self._task_progress_dialog = None
+        self._last_latest_translation_file_mtime: Optional[datetime] = None
 
         # Initialize debounce timer for translation updates
         self.update_timer = QTimer()
@@ -86,8 +87,11 @@ class MainWindow(SmartMainWindow):
         title_layout.addWidget(self.project_label)
         
         # Add project type label (after project name)
+        muted_header = AppStyle.get_secondary_text_color_css()
         self.project_type_label = QLabel("")
-        self.project_type_label.setStyleSheet("font-size: 12px; color: #666; padding-left: 10px;")
+        self.project_type_label.setStyleSheet(
+            f"font-size: 12px; color: {muted_header}; padding-left: 10px;"
+        )
         title_layout.addWidget(self.project_type_label)
         
         # Add locales label (right-aligned)
@@ -96,6 +100,22 @@ class MainWindow(SmartMainWindow):
         self.locales_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         title_layout.addStretch()  # Add stretch before the locales label to push it right
         title_layout.addWidget(self.locales_label)
+
+        times_row = QHBoxLayout()
+        times_row.addWidget(QLabel(_("Latest file change:")))
+        self.latest_translation_file_time_label = QLabel("--")
+        self.latest_translation_file_time_label.setStyleSheet(
+            f"font-size: 12px; color: {muted_header};"
+        )
+        times_row.addWidget(self.latest_translation_file_time_label)
+        times_row.addSpacing(24)
+        times_row.addWidget(QLabel(_("Last sync:")))
+        self.last_user_sync_time_label = QLabel("--")
+        self.last_user_sync_time_label.setStyleSheet(
+            f"font-size: 12px; color: {muted_header};"
+        )
+        times_row.addWidget(self.last_user_sync_time_label)
+        times_row.addStretch()
 
         # Project selection buttons in a horizontal layout
         button_layout = QHBoxLayout()
@@ -111,6 +131,7 @@ class MainWindow(SmartMainWindow):
         button_layout.addWidget(self.modify_project_btn)
 
         project_layout.addLayout(title_layout)
+        project_layout.addLayout(times_row)
         project_layout.addLayout(button_layout)
         layout.addWidget(project_frame)
 
@@ -193,6 +214,8 @@ class MainWindow(SmartMainWindow):
         # Restore main window position/size from app_info_cache (same display as last run)
         self.restore_window_geometry()
 
+        self.update_project_time_display()
+
         # Load last project if available
         self.load_last_project()
 
@@ -217,6 +240,9 @@ class MainWindow(SmartMainWindow):
 
             # Keep recent_projects in sync (handle_project_selection does this; auto-load did not)
             self.settings_manager.save_last_project(last_project)
+
+            self._last_latest_translation_file_mtime = None
+            self.update_project_time_display()
 
             # Clear previous status
             self.status_text.clear()
@@ -263,6 +289,9 @@ class MainWindow(SmartMainWindow):
 
         # Save the selected project
         self.settings_manager.save_last_project(directory)
+
+        self._last_latest_translation_file_mtime = None
+        self.update_project_time_display()
 
         # Clear previous status
         self.status_text.clear()
@@ -477,6 +506,26 @@ class MainWindow(SmartMainWindow):
     def update_stats(self, results: TranslationManagerResults):
         """Update the statistics display."""
         self.stats_widget.update_stats(results)
+        self.update_project_time_display(results)
+
+    def _format_display_time(self, dt: Optional[datetime]) -> str:
+        if dt is None:
+            return "--"
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    def update_project_time_display(self, results: Optional[TranslationManagerResults] = None):
+        """Show latest translation file mtime (after CHECK_STATUS) and last user sync from settings."""
+        if not self.current_project:
+            self.latest_translation_file_time_label.setText("--")
+            self.last_user_sync_time_label.setText("--")
+            return
+        if results is not None and results.action == TranslationAction.CHECK_STATUS:
+            self._last_latest_translation_file_mtime = results.latest_translation_file_mtime
+        self.latest_translation_file_time_label.setText(
+            self._format_display_time(self._last_latest_translation_file_mtime)
+        )
+        sync = self.settings_manager.get_project_last_user_sync_time(self.current_project)
+        self.last_user_sync_time_label.setText(self._format_display_time(sync))
 
     def show_outstanding_items(self):
         """Show the outstanding items window."""
@@ -700,6 +749,8 @@ class MainWindow(SmartMainWindow):
             self.stats_widget.clear_stats()
             # Clear status text
             self.status_text.clear()
+            self._last_latest_translation_file_mtime = None
+            self.update_project_time_display()
 
     def closeEvent(self, event):
         """Handle application closing."""
@@ -739,6 +790,8 @@ class MainWindow(SmartMainWindow):
         try:
             self.status_text.append("\n" + _("Updating base translation files..."))
             if self.i18n_manager and self.i18n_manager.generate_pot_file():
+                self.settings_manager.set_project_last_user_sync_time(self.current_project, datetime.now())
+                self.update_project_time_display()
                 self.status_text.append(_("Base translation files updated successfully."))
                 self.run_translation_task()
             else:

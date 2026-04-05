@@ -2,7 +2,7 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from i18n.translation_group import TranslationGroup, TranslationKey
 from ..file_topology_manager import FileTopologyManager
@@ -137,6 +137,13 @@ class JavaI18NManager(I18NManagerBase):
         if rel_dir and rel_dir != ".":
             return f"{rel_dir}/{bundle_stem}"
         return bundle_stem
+
+    def list_translation_file_paths(self) -> List[str]:
+        """All ``.properties`` files under the project locale directory."""
+        locale_dir = os.path.join(self._directory, self._locale_dir)
+        if not Utils.isdir_with_retry(locale_dir):
+            return []
+        return [str(p) for p in Path(locale_dir).rglob("*.properties") if p.is_file()]
 
     def _scan_bundle_files(self) -> Tuple[Dict[str, Dict[str, str]], Dict[str, str]]:
         locale_dir = os.path.join(self._directory, self._locale_dir)
@@ -446,6 +453,9 @@ class JavaI18NManager(I18NManagerBase):
                 if not self.generate_pot_file():
                     results.action_successful = False
                     results.extend_error_message("Failed to generate Java base properties file")
+
+            if action == TranslationAction.CHECK_STATUS:
+                self.apply_latest_translation_file_mtime(results)
 
             results.determine_action_successful()
             return results

@@ -222,6 +222,9 @@ class PythonI18NManager(I18NManagerBase):
                 if not self.generate_pot_file():
                     results.action_successful = False
                     results.extend_error_message("Failed to generate POT file")
+
+            if action == TranslationAction.CHECK_STATUS:
+                self.apply_latest_translation_file_mtime(results)
             
             results.determine_action_successful()
             return results
@@ -241,6 +244,15 @@ class PythonI18NManager(I18NManagerBase):
             str: Path to the POT file
         """
         return os.path.join(self._directory, self._locale_dir, "base.pot")
+
+    def list_translation_file_paths(self) -> list[str]:
+        """POT and all matching PO files (same domain as :meth:`gather_files`)."""
+        try:
+            pot_file, po_files = self.gather_files()
+            paths = [pot_file] + list(po_files)
+            return [p for p in paths if os.path.isfile(p)]
+        except Exception:
+            return []
 
     def gather_files(self):
         # TODO: gettext supports multiple domains (e.g. base.pot, admin.pot); each domain has its

@@ -49,6 +49,13 @@ class AppStyle:
         }
 
     @staticmethod
+    def get_secondary_text_color_css() -> str:
+        """Muted foreground for secondary header labels (project type, timestamps)."""
+        if AppStyle.get_theme_name() == AppStyle.DARK_THEME:
+            return "#d4d4d4"
+        return "#555555"
+
+    @staticmethod
     def get_translation_highlight_colors() -> dict[str, QColor]:
         """Theme-aware highlight colors for translation status cells."""
         if AppStyle.get_theme_name() == AppStyle.DARK_THEME:

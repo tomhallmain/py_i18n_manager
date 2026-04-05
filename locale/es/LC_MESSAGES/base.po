@@ -2,8 +2,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2026-04-05 15:07-0400\n"
-"PO-Revision-Date: 2026-04-05 15:07-0400\n"
+"POT-Creation-Date: 2026-04-05 17:26-0400\n"
+"PO-Revision-Date: 2026-04-05 17:26-0400\n"
 "Last-Translator: Translator Name <translator@example.com>\n"
 "Language-Team: es Team <<EMAIL>>\n"
 "Language: es\n"
@@ -12,82 +12,82 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: app.py:41 app.py:201
+#: app.py:41 app.py:224
 msgid "i18n Translation Manager"
 msgstr "i18n Gestor de Traducción"
 
-#: app.py:81
+#: app.py:82
 msgid "Current Project:"
 msgstr "Proyecto actual:"
 
-#: app.py:83
+#: app.py:84
 msgid "No project selected"
 msgstr "No hay proyecto seleccionado"
 
-#: app.py:102 ui/recent_projects_dialog.py:82
+#: app.py:122 ui/recent_projects_dialog.py:82
 msgid "Select Project"
 msgstr "Seleccionar proyecto"
 
-#: app.py:106
+#: app.py:126
 msgid "Modify Project Settings"
 msgstr "Modificar la configuración del proyecto"
 
-#: app.py:139
+#: app.py:160
 msgid "Check Status"
 msgstr "Ver estado"
 
-#: app.py:140
+#: app.py:161
 msgid "Write Default Locale"
 msgstr "Escribir la lengua predeterminada"
 
-#: app.py:141
+#: app.py:162
 msgid "Show All Translations"
 msgstr "Mostrar todas las traducciones"
 
-#: app.py:142
+#: app.py:163
 msgid "Show Outstanding Items"
 msgstr "Mostrar partidas pendientes"
 
-#: app.py:143 ui/translation_quality_review_window.py:124
+#: app.py:164 ui/translation_quality_review_window.py:124
 msgid "Translation Quality Review"
 msgstr "Revisión de Calidad de Traducción"
 
-#: app.py:144 ui/all_translations_window.py:108
+#: app.py:165 ui/all_translations_window.py:108
 #: ui/outstanding_items_window.py:319
 #: ui/quality_review_exclusions_dialog.py:39
 #: ui/setup_translation_project_window.py:153
 msgid "Heuristic Exclusions"
 msgstr "Exclusiones Heurísticas"
 
-#: app.py:145
+#: app.py:166
 msgid "Find Untranslated"
 msgstr "Encontrar No Traducido"
 
-#: app.py:165 ui/bulk_pot_analysis_window.py:77
+#: app.py:186 ui/bulk_pot_analysis_window.py:77
 msgid "Bulk Project Status"
 msgstr "Estado del proyecto en bloque"
 
-#: app.py:166
+#: app.py:187
 msgid "Cross-Project Analysis"
 msgstr "Análisis entre proyectos"
 
-#: app.py:167
+#: app.py:188
 msgid "Sync Base Translations"
 msgstr "Sincronizar traducciones básicas"
 
-#: app.py:168
+#: app.py:189
 msgid "Update Translation Files"
 msgstr "Actualizar archivos"
 
-#: app.py:169
+#: app.py:190
 msgid "Compile Translations"
 msgstr "Compilar traducciones"
 
-#: app.py:188 ui/bulk_pot_analysis_window.py:129
+#: app.py:209 ui/bulk_pot_analysis_window.py:129
 msgid "Status"
 msgstr "Estado"
 
-#: app.py:320
+#: app.py:349
 msgid ""
 "Translation file compilation is not relevant for {} projects. {} projects "
 "use source translation files directly without a compilation step."
@@ -96,8 +96,36 @@ msgstr ""
 "{}. Los {} proyectos utilizan archivos de traducción directamente sin un "
 "paso de compilación."
 
-#: app.py:508 app.py:530 app.py:654 app.py:669 app.py:714 app.py:736
-#: app.py:764 app.py:821 ui/bulk_pot_analysis_window.py:235
+#: app.py:382
+msgid "Loading translation project..."
+msgstr "Cargando proyecto de traducción..."
+
+#: app.py:383
+msgid "Updating translation files..."
+msgstr "Actualizando archivos de traducción..."
+
+#: app.py:384
+msgid "Compiling translation files..."
+msgstr "Compilando archivos de traducción..."
+
+#: app.py:385
+msgid "Syncing base translation files..."
+msgstr "Sincronizando archivos de traducción base..."
+
+#: app.py:386
+msgid "Running quality review..."
+msgstr "Se está realizando una revisión de calidad..."
+
+#: app.py:388
+msgid "Running translation task..."
+msgstr "Ejecutando tarea de traducción..."
+
+#: app.py:389
+msgid "Please wait"
+msgstr "Por favor, espere"
+
+#: app.py:557 app.py:579 app.py:703 app.py:718 app.py:765 app.py:787
+#: app.py:817 app.py:874 ui/bulk_pot_analysis_window.py:235
 #: ui/bulk_pot_analysis_window.py:263 ui/cross_project_analysis_window.py:268
 #: ui/cross_project_analysis_window.py:560 ui/llm_settings_dialog.py:265
 #: ui/llm_settings_dialog.py:321 ui/locale_selection_window.py:279
@@ -123,48 +151,48 @@ msgstr ""
 msgid "Error"
 msgstr "Error"
 
-#: app.py:508 app.py:714
+#: app.py:557 app.py:765
 msgid "No translation data available"
 msgstr "No hay datos de traducción disponibles."
 
-#: app.py:530 app.py:736 app.py:764 app.py:821
+#: app.py:579 app.py:787 app.py:817 app.py:874
 msgid "Please select a project first"
 msgstr "Por favor, seleccione un proyecto primero"
 
-#: app.py:654 app.py:669
+#: app.py:703 app.py:718
 msgid "Please check status first to load translation data"
 msgstr ""
 "Por favor, verifique el estado primero para cargar los datos de traducción."
 
-#: app.py:677 ui/all_translations_window.py:32
+#: app.py:726 ui/all_translations_window.py:32
 msgid "All Translations"
 msgstr "Todas las traducciones"
 
-#: app.py:678
+#: app.py:727
 msgid "Could not find that translation key in the current catalog."
 msgstr "No se ha encontrado esa clave de traducción en el catálogo actual."
 
-#: app.py:740
+#: app.py:791
 msgid "Updating base translation files..."
 msgstr "Actualizando los archivos de traducción básicos..."
 
-#: app.py:742
+#: app.py:795
 msgid "Base translation files updated successfully."
 msgstr "Los archivos de traducción base se actualizaron exitosamente."
 
-#: app.py:751
+#: app.py:804
 msgid "Update failed"
 msgstr "La actualización falló"
 
-#: app.py:754
+#: app.py:807
 msgid "Failed to update base translation files."
 msgstr "No se pudo actualizar los archivos de traducción base."
 
-#: app.py:829 app.py:845
+#: app.py:882 app.py:898
 msgid "No Projects to Analyze"
 msgstr "No hay proyectos para analizar"
 
-#: app.py:830
+#: app.py:883
 msgid ""
 "You need at least 2 projects in your recent projects list to perform cross-"
 "project analysis."
@@ -172,7 +200,7 @@ msgstr ""
 "Necesita al menos 2 proyectos en su lista de proyectos recientes para "
 "realizar un análisis cruzado de proyectos."
 
-#: app.py:846
+#: app.py:899
 msgid ""
 "You need at least 1 project in your recent projects list to perform bulk POT"
 " analysis."
@@ -180,17 +208,17 @@ msgstr ""
 "Necesitas al menos 1 proyecto en tu lista de proyectos recientes para "
 "realizar un análisis POT masivo."
 
-#: app.py:864
+#: app.py:917
 msgid "Compiled Files Need Update"
 msgstr "Los archivos compilados necesitan actualización"
 
-#: app.py:865
+#: app.py:918
 msgid "Translation files have been updated for the following locales:"
 msgstr ""
 "Se han actualizado los archivos de traducción para las siguientes "
 "configuraciones regionales:"
 
-#: app.py:867
+#: app.py:920
 msgid "Remember to run Compile Translations to apply these changes."
 msgstr "Recuerda ejecutar Compilar traducciones para aplicar estos cambios."
 
@@ -1097,6 +1125,15 @@ msgstr "Cancelando..."
 msgid "Outstanding Translation Items"
 msgstr "Partidas de conversión pendientes"
 
+#: ui/outstanding_items_window.py:280
+msgid ""
+"Pending duplicate-prefill updates: {count}. These may include keys not "
+"currently visible in the table and will be saved."
+msgstr ""
+"Actualizaciones pendientes de rellenado automático de duplicados: {count}. "
+"Estas pueden incluir claves que actualmente no se ven en la tabla y se "
+"guardarán."
+
 #: ui/outstanding_items_window.py:288
 msgid "Translation in Progress"
 msgstr "Traducción en curso"
@@ -1207,13 +1244,19 @@ msgstr "Archivos TSV (*.tsv);;Todos los archivos (*)"
 msgid "Export Complete"
 msgstr "Exportación completa"
 
-#: ui/outstanding_items_window.py:868
+#: ui/outstanding_items_window.py:1005
 msgid ""
 "Exported {count} outstanding key(s) to:\n"
-"{path}"
+"{path}\n"
+"\n"
+"Markdown companion:\n"
+"{md_path}"
 msgstr ""
-"Exportado {count} clave(s) sin sincronizar a:\n"
-"{path}"
+"Se han exportado {count} claves pendientes a:\n"
+"{path}\n"
+"\n"
+"Complemento de Markdown:\n"
+"{md_path}"
 
 #: ui/outstanding_items_window.py:1015
 msgid "Export Failed"
@@ -1230,6 +1273,20 @@ msgstr ""
 #: ui/outstanding_items_window.py:1163
 msgid "All Translations Resolved"
 msgstr "Todas las traducciones resueltas"
+
+#: ui/outstanding_items_window.py:1257
+msgid "Save includes hidden duplicate-prefill updates"
+msgstr "Salvar incluye actualizaciones ocultas de prellenado de duplicados."
+
+#: ui/outstanding_items_window.py:1259
+msgid ""
+"This save will also persist {count} pre-filled duplicate update(s), including keys that may not be visible in the current table.\n"
+"\n"
+"Continue?"
+msgstr ""
+"Esta copia de seguridad también conservará {count} actualizaciones duplicadas ya rellenadas, incluidas las claves que quizá no sean visibles en la tabla actual.\n"
+"\n"
+"¿Desea continuar?"
 
 #: ui/quality_review_exclusions_dialog.py:59
 msgid ""
@@ -2047,67 +2104,10 @@ msgstr "Fuga de caracteres latinos de distintos tipos"
 msgid "High English ratio"
 msgstr "Proporción elevada de inglés"
 
-#: app.py:353
-msgid "Loading translation project..."
-msgstr "Cargando proyecto de traducción..."
+#: app.py:105
+msgid "Latest file change:"
+msgstr "Último cambio del archivo:"
 
-#: app.py:354
-msgid "Updating translation files..."
-msgstr "Actualizando archivos de traducción..."
-
-#: app.py:355
-msgid "Compiling translation files..."
-msgstr "Compilando archivos de traducción..."
-
-#: app.py:356
-msgid "Syncing base translation files..."
-msgstr "Sincronizando archivos de traducción base..."
-
-#: app.py:357
-msgid "Running quality review..."
-msgstr "Se está realizando una revisión de calidad..."
-
-#: app.py:359
-msgid "Running translation task..."
-msgstr "Ejecutando tarea de traducción..."
-
-#: app.py:360
-msgid "Please wait"
-msgstr "Por favor, espere"
-
-#: ui/outstanding_items_window.py:280
-msgid ""
-"Pending duplicate-prefill updates: {count}. These may include keys not "
-"currently visible in the table and will be saved."
-msgstr ""
-"Actualizaciones pendientes de rellenado automático de duplicados: {count}. "
-"Estas pueden incluir claves que actualmente no se ven en la tabla y se "
-"guardarán."
-
-#: ui/outstanding_items_window.py:1005
-msgid ""
-"Exported {count} outstanding key(s) to:\n"
-"{path}\n"
-"\n"
-"Markdown companion:\n"
-"{md_path}"
-msgstr ""
-"Se han exportado {count} claves pendientes a:\n"
-"{path}\n"
-"\n"
-"Complemento de Markdown:\n"
-"{md_path}"
-
-#: ui/outstanding_items_window.py:1257
-msgid "Save includes hidden duplicate-prefill updates"
-msgstr "Salvar incluye actualizaciones ocultas de prellenado de duplicados."
-
-#: ui/outstanding_items_window.py:1259
-msgid ""
-"This save will also persist {count} pre-filled duplicate update(s), including keys that may not be visible in the current table.\n"
-"\n"
-"Continue?"
-msgstr ""
-"Esta copia de seguridad también conservará {count} actualizaciones duplicadas ya rellenadas, incluidas las claves que quizá no sean visibles en la tabla actual.\n"
-"\n"
-"¿Desea continuar?"
+#: app.py:112
+msgid "Last sync:"
+msgstr "Última sincronización:"
