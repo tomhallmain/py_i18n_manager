@@ -3,11 +3,9 @@
 import os
 import tempfile
 import textwrap
-import unittest
 
 from i18n.python.python_i18n_manager import PythonI18NManager
 from i18n.translation_manager_results import TranslationAction
-from tests.helpers import FakeSettingsManager
 
 # Minimal valid POT / PO content
 _POT_CONTENT = textwrap.dedent("""\
@@ -54,40 +52,40 @@ def _build_python_project(root: str) -> str:
     return root
 
 
-class TestPythonI18NManagerLocaleDirectory(unittest.TestCase):
+class TestPythonI18NManagerLocaleDirectory:
     def test_detects_locale_directory(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             os.makedirs(os.path.join(tmpdir, "locale"))
             mgr = PythonI18NManager(tmpdir)
-            self.assertEqual(mgr._locale_dir, "locale")
+            assert mgr._locale_dir == "locale"
 
     def test_detects_locales_directory(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             os.makedirs(os.path.join(tmpdir, "locales"))
             mgr = PythonI18NManager(tmpdir)
-            self.assertEqual(mgr._locale_dir, "locales")
+            assert mgr._locale_dir == "locales"
 
     def test_defaults_to_locale_when_neither_exists(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             mgr = PythonI18NManager(tmpdir)
-            self.assertEqual(mgr._locale_dir, "locale")
+            assert mgr._locale_dir == "locale"
 
     def test_prefers_locale_when_both_exist(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             os.makedirs(os.path.join(tmpdir, "locale"))
             os.makedirs(os.path.join(tmpdir, "locales"))
             mgr = PythonI18NManager(tmpdir)
-            self.assertEqual(mgr._locale_dir, "locale")
+            assert mgr._locale_dir == "locale"
 
 
-class TestPythonI18NManagerSetDirectory(unittest.TestCase):
+class TestPythonI18NManagerSetDirectory:
     def test_set_directory_resets_translations(self):
         with tempfile.TemporaryDirectory() as d1, tempfile.TemporaryDirectory() as d2:
             mgr = PythonI18NManager(d1)
             from i18n.translation_group import TranslationKey, TranslationGroup
             mgr.translations[TranslationKey("x")] = TranslationGroup("x")
             mgr.set_directory(d2)
-            self.assertEqual(mgr.translations, {})
+            assert mgr.translations == {}
 
     def test_set_directory_resets_locales_and_written(self):
         with tempfile.TemporaryDirectory() as d1, tempfile.TemporaryDirectory() as d2:
@@ -95,50 +93,51 @@ class TestPythonI18NManagerSetDirectory(unittest.TestCase):
             mgr.locales = ["en", "fr"]
             mgr.written_locales = {"en"}
             mgr.set_directory(d2)
-            self.assertEqual(mgr.locales, [])
-            self.assertEqual(mgr.written_locales, set())
+            assert mgr.locales == []
+            assert mgr.written_locales == set()
 
     def test_set_directory_updates_locale_dir(self):
         with tempfile.TemporaryDirectory() as d1, tempfile.TemporaryDirectory() as d2:
             mgr = PythonI18NManager(d1)
             os.makedirs(os.path.join(d2, "locales"))
             mgr.set_directory(d2)
-            self.assertEqual(mgr._locale_dir, "locales")
+            assert mgr._locale_dir == "locales"
 
 
-class TestPythonI18NManagerFilePaths(unittest.TestCase):
+class TestPythonI18NManagerFilePaths:
     def test_get_pot_file_path(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             mgr = PythonI18NManager(tmpdir)
             expected = os.path.join(tmpdir, "locale", "base.pot")
-            self.assertEqual(mgr.get_pot_file_path(), expected)
+            assert os.path.normpath(mgr.get_pot_file_path()) == os.path.normpath(expected)
 
     def test_get_po_file_path(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             mgr = PythonI18NManager(tmpdir)
             expected = os.path.join(tmpdir, "locale", "fr", "LC_MESSAGES", "base.po")
-            self.assertEqual(mgr.get_po_file_path("fr"), expected)
+            assert os.path.normpath(mgr.get_po_file_path("fr")) == os.path.normpath(expected)
 
 
-class TestPythonI18NManagerGatherFiles(unittest.TestCase):
+class TestPythonI18NManagerGatherFiles:
     def test_gather_files_finds_pot_and_po(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             _build_python_project(tmpdir)
             mgr = PythonI18NManager(tmpdir)
             pot, po_files = mgr.gather_files()
-            self.assertTrue(pot.endswith("base.pot"))
-            self.assertEqual(len(po_files), 1)
-            self.assertTrue(po_files[0].endswith("base.po"))
+            assert pot.endswith("base.pot")
+            assert len(po_files) == 1
+            assert po_files[0].endswith("base.po")
 
     def test_gather_files_raises_when_no_pot(self):
+        import pytest
         with tempfile.TemporaryDirectory() as tmpdir:
             os.makedirs(os.path.join(tmpdir, "locale"))
             mgr = PythonI18NManager(tmpdir)
-            with self.assertRaises(Exception):
+            with pytest.raises(Exception):
                 mgr.gather_files()
 
 
-class TestPythonI18NManagerParsing(unittest.TestCase):
+class TestPythonI18NManagerParsing:
     def test_parse_pot_populates_translations_as_base(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             _build_python_project(tmpdir)
@@ -146,8 +145,8 @@ class TestPythonI18NManagerParsing(unittest.TestCase):
             pot_path = os.path.join(tmpdir, "locale", "base.pot")
             mgr._parse_pot(pot_path)
             msgids = [k.msgid for k in mgr.translations]
-            self.assertIn("Hello", msgids)
-            self.assertIn("Item {0} of {1}", msgids)
+            assert "Hello" in msgids
+            assert "Item {0} of {1}" in msgids
 
     def test_parse_pot_marks_groups_as_in_base(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -156,7 +155,7 @@ class TestPythonI18NManagerParsing(unittest.TestCase):
             pot_path = os.path.join(tmpdir, "locale", "base.pot")
             mgr._parse_pot(pot_path)
             for group in mgr.translations.values():
-                self.assertTrue(group.is_in_base)
+                assert group.is_in_base
 
     def test_parse_po_adds_locale_translation(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -168,7 +167,7 @@ class TestPythonI18NManagerParsing(unittest.TestCase):
             mgr._parse_po(po_path, "fr")
             from i18n.translation_group import TranslationKey
             hello_group = mgr.translations[TranslationKey("Hello")]
-            self.assertEqual(hello_group.get_translation("fr"), "Bonjour")
+            assert hello_group.get_translation("fr") == "Bonjour"
 
     def test_fill_translations_populates_locales_list(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -178,38 +177,38 @@ class TestPythonI18NManagerParsing(unittest.TestCase):
             mgr._parse_pot(pot_path)
             _, po_files = mgr.gather_files()
             mgr._fill_translations(po_files)
-            self.assertIn("fr", mgr.locales)
+            assert "fr" in mgr.locales
 
 
-class TestPythonI18NManagerManageTranslations(unittest.TestCase):
+class TestPythonI18NManagerManageTranslations:
     def test_check_status_returns_successful_result(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             _build_python_project(tmpdir)
             mgr = PythonI18NManager(tmpdir)
             result = mgr.manage_translations(TranslationAction.CHECK_STATUS)
-            self.assertTrue(result.action_successful)
-            self.assertIsNone(result.error_message)
+            assert result.action_successful
+            assert result.error_message is None
 
     def test_check_status_populates_total_strings(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             _build_python_project(tmpdir)
             mgr = PythonI18NManager(tmpdir)
             result = mgr.manage_translations(TranslationAction.CHECK_STATUS)
-            self.assertGreater(result.total_strings, 0)
+            assert result.total_strings > 0
 
     def test_check_status_detects_fr_locale(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             _build_python_project(tmpdir)
             mgr = PythonI18NManager(tmpdir)
             mgr.manage_translations(TranslationAction.CHECK_STATUS)
-            self.assertIn("fr", mgr.locales)
+            assert "fr" in mgr.locales
 
     def test_check_status_sets_latest_mtime(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             _build_python_project(tmpdir)
             mgr = PythonI18NManager(tmpdir)
             result = mgr.manage_translations(TranslationAction.CHECK_STATUS)
-            self.assertIsNotNone(result.latest_translation_file_mtime)
+            assert result.latest_translation_file_mtime is not None
 
     def test_check_status_on_empty_project_returns_result(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -218,18 +217,18 @@ class TestPythonI18NManagerManageTranslations(unittest.TestCase):
             # No POT file → gather_files raises, manage_translations catches it
             result = mgr.manage_translations(TranslationAction.CHECK_STATUS)
             # Should return a result (even on failure), not propagate the exception
-            self.assertIsNotNone(result)
+            assert result is not None
 
     def test_list_translation_file_paths_includes_pot_and_po(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             _build_python_project(tmpdir)
             mgr = PythonI18NManager(tmpdir)
             paths = mgr.list_translation_file_paths()
-            self.assertTrue(any(p.endswith(".pot") for p in paths))
-            self.assertTrue(any(p.endswith(".po") for p in paths))
+            assert any(p.endswith(".pot") for p in paths)
+            assert any(p.endswith(".po") for p in paths)
 
 
-class TestPythonI18NManagerWritePOFile(unittest.TestCase):
+class TestPythonI18NManagerWritePOFile:
     def test_write_po_file_creates_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             _build_python_project(tmpdir)
@@ -237,7 +236,7 @@ class TestPythonI18NManagerWritePOFile(unittest.TestCase):
             mgr.manage_translations(TranslationAction.CHECK_STATUS)
             po_path = mgr.get_po_file_path("fr")
             mgr.write_po_file(po_path, "fr")
-            self.assertTrue(os.path.exists(po_path))
+            assert os.path.exists(po_path)
 
     def test_write_po_file_contains_translation(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -248,8 +247,4 @@ class TestPythonI18NManagerWritePOFile(unittest.TestCase):
             mgr.write_po_file(po_path, "fr")
             with open(po_path, encoding="utf-8") as f:
                 content = f.read()
-            self.assertIn("Bonjour", content)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert "Bonjour" in content

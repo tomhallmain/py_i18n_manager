@@ -2,7 +2,6 @@
 
 import tempfile
 import textwrap
-import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -25,18 +24,18 @@ from i18n.ruby.i18n_tasks_pattern_router import (
 )
 
 
-class TestI18nTasksMissingReportDetection(unittest.TestCase):
+class TestI18nTasksMissingReportDetection:
     def test_detects_header_line_and_missing_translations_title(self):
-        self.assertTrue(is_i18n_tasks_missing_report_output("Missing translations (12) | i18n-tasks\n"))
+        assert is_i18n_tasks_missing_report_output("Missing translations (12) | i18n-tasks\n")
         table = "| Locale | Key | Value |\n| all | k | v |\n"
-        self.assertTrue(is_i18n_tasks_missing_report_output(table))
+        assert is_i18n_tasks_missing_report_output(table)
 
     def test_rejects_empty_and_random_stderr(self):
-        self.assertFalse(is_i18n_tasks_missing_report_output(""))
-        self.assertFalse(is_i18n_tasks_missing_report_output("Some political banner text\n"))
+        assert not is_i18n_tasks_missing_report_output("")
+        assert not is_i18n_tasks_missing_report_output("Some political banner text\n")
 
 
-class TestRunI18nTasksMissingExitCode(unittest.TestCase):
+class TestRunI18nTasksMissingExitCode:
     @patch("i18n.ruby.i18n_tasks_sync._resolve_bundle_executable")
     @patch("i18n.ruby.i18n_tasks_sync.subprocess.run")
     def test_exit_1_with_table_on_stdout_is_success_stdout_only(
@@ -53,11 +52,11 @@ class TestRunI18nTasksMissingExitCode(unittest.TestCase):
             stderr="Unrelated stderr banner\n",
         )
         ok, text = run_i18n_tasks_missing("/tmp/project")
-        self.assertTrue(ok)
-        self.assertEqual(text.strip(), table.strip())
+        assert ok
+        assert text.strip() == table.strip()
 
 
-class TestI18nTasksMissingSync(unittest.TestCase):
+class TestI18nTasksMissingSync:
     def test_parse_missing_table_sample(self):
         sample = textwrap.dedent(
             """\
@@ -72,12 +71,12 @@ class TestI18nTasksMissingSync(unittest.TestCase):
             """
         )
         rows = parse_i18n_tasks_missing_table(sample)
-        self.assertEqual(len(rows), 3)
-        self.assertEqual(rows[0], MissingRow("all", "admin.feature_abusers.no"))
-        self.assertTrue(rows[0].is_missing_in_all_locales())
-        self.assertEqual(rows[1], MissingRow("de es fr", "dashboard.alliances"))
-        self.assertFalse(rows[1].is_missing_in_all_locales())
-        self.assertEqual(rows[2].locale_column.strip(), "en")
+        assert len(rows) == 3
+        assert rows[0] == MissingRow("all", "admin.feature_abusers.no")
+        assert rows[0].is_missing_in_all_locales()
+        assert rows[1] == MissingRow("de es fr", "dashboard.alliances")
+        assert not rows[1].is_missing_in_all_locales()
+        assert rows[2].locale_column.strip() == "en"
 
     def test_path_for_key_pattern_router_order(self):
         rules = [
@@ -85,17 +84,17 @@ class TestI18nTasksMissingSync(unittest.TestCase):
             ["admin.*", "config/locales/%{locale}/admin.%{locale}.yml"],
             "config/locales/%{locale}/%{locale}.yml",
         ]
-        self.assertEqual(
-            path_for_key_pattern_router("js.alert", "en", rules),
-            "config/locales/en/javascript.en.yml",
+        assert (
+            path_for_key_pattern_router("js.alert", "en", rules)
+            == "config/locales/en/javascript.en.yml"
         )
-        self.assertEqual(
-            path_for_key_pattern_router("admin.users.title", "en", rules),
-            "config/locales/en/admin.en.yml",
+        assert (
+            path_for_key_pattern_router("admin.users.title", "en", rules)
+            == "config/locales/en/admin.en.yml"
         )
-        self.assertEqual(
-            path_for_key_pattern_router("guilds.members.title", "en", rules),
-            "config/locales/en/en.yml",
+        assert (
+            path_for_key_pattern_router("guilds.members.title", "en", rules)
+            == "config/locales/en/en.yml"
         )
 
     def test_load_i18n_tasks_config_router_under_data(self):
@@ -116,10 +115,10 @@ class TestI18nTasksMissingSync(unittest.TestCase):
                 encoding="utf-8",
             )
             cfg = load_i18n_tasks_config(str(p))
-            self.assertEqual(cfg.base_locale, "en")
-            self.assertEqual(cfg.router, "pattern_router")
-            self.assertEqual(len(cfg.data_write), 2)
-            self.assertEqual(cfg.locales, ["en"])
+            assert cfg.base_locale == "en"
+            assert cfg.router == "pattern_router"
+            assert len(cfg.data_write) == 2
+            assert cfg.locales == ["en"]
 
     def test_load_i18n_tasks_config_locales(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -138,14 +137,14 @@ class TestI18nTasksMissingSync(unittest.TestCase):
                 encoding="utf-8",
             )
             cfg = load_i18n_tasks_config(str(p))
-            self.assertEqual(cfg.locales, ["en", "de"])
+            assert cfg.locales == ["en", "de"]
 
 
-class TestDynamicPrefixBrace(unittest.TestCase):
+class TestDynamicPrefixBrace:
     def test_needle_parent_plus_brace(self):
-        self.assertEqual(
-            dynamic_prefix_brace_needle("admin.dashboard.danger_zone.modal.error"),
-            "admin.dashboard.danger_zone.modal.{",
+        assert (
+            dynamic_prefix_brace_needle("admin.dashboard.danger_zone.modal.error")
+            == "admin.dashboard.danger_zone.modal.{"
         )
 
     def test_partition_skips_when_needle_in_source(self):
@@ -157,11 +156,11 @@ class TestDynamicPrefixBrace(unittest.TestCase):
             )
             keys = ["admin.dashboard.danger_zone.modal.error", "other.unused.key"]
             keep, skipped = partition_keys_by_dynamic_prefix_hint(str(tmp), keys)
-            self.assertEqual(skipped, 1)
-            self.assertEqual(keep, ["other.unused.key"])
+            assert skipped == 1
+            assert keep == ["other.unused.key"]
 
 
-class TestI18nTasksUnusedCli(unittest.TestCase):
+class TestI18nTasksUnusedCli:
     @patch("i18n.ruby.i18n_tasks_sync._resolve_bundle_executable")
     @patch("i18n.ruby.i18n_tasks_sync.subprocess.run")
     def test_exit_1_with_keys_on_stdout_is_success(self, mock_run, mock_bundle):
@@ -172,15 +171,12 @@ class TestI18nTasksUnusedCli(unittest.TestCase):
             stderr="",
         )
         ok, text = run_i18n_tasks_unused("/tmp/project")
-        self.assertTrue(ok)
-        self.assertIn("admin.foo.bar", text)
+        assert ok
+        assert "admin.foo.bar" in text
 
     def test_parse_unused_keys(self):
         raw = "# comment\nadmin.x\n\nbeta.y\n"
-        self.assertEqual(
-            parse_i18n_tasks_unused_keys(raw),
-            ["admin.x", "beta.y"],
-        )
+        assert parse_i18n_tasks_unused_keys(raw) == ["admin.x", "beta.y"]
 
     def test_parse_unused_table_dedupes_key_column(self):
         sample = textwrap.dedent(
@@ -195,29 +191,29 @@ class TestI18nTasksUnusedCli(unittest.TestCase):
             +--------+------------------------------------------+-------+
             """
         )
-        self.assertEqual(
-            parse_i18n_tasks_unused_keys(sample),
-            ["admin.dashboard.modal.error", "other.key"],
+        assert (
+            parse_i18n_tasks_unused_keys(sample)
+            == ["admin.dashboard.modal.error", "other.key"]
         )
 
 
-class TestNormalizeUnusedKeys(unittest.TestCase):
+class TestNormalizeUnusedKeys:
     def test_strip_locale_prefix_for_yaml_path(self):
         locales = merge_locale_prefixes_for_unused_strip(
             ["en", "de", "zh-CN"],
             [],
         )
-        self.assertEqual(
+        assert (
             strip_leading_locale_from_i18n_tasks_key(
                 "en.admin.dashboard.danger_zone.modal.error", locales
-            ),
-            "admin.dashboard.danger_zone.modal.error",
+            )
+            == "admin.dashboard.danger_zone.modal.error"
         )
-        self.assertEqual(
+        assert (
             strip_leading_locale_from_i18n_tasks_key(
                 "zh-CN.admin.dashboard.title", locales
-            ),
-            "admin.dashboard.title",
+            )
+            == "admin.dashboard.title"
         )
 
     def test_normalize_dedupes_per_locale_lines(self):
@@ -227,20 +223,13 @@ class TestNormalizeUnusedKeys(unittest.TestCase):
             "en.other.leaf",
         ]
         locales = merge_locale_prefixes_for_unused_strip(["en", "de"], raw)
-        self.assertEqual(
-            normalize_and_dedupe_unused_keys(raw, locales),
-            ["admin.dashboard.title", "other.leaf"],
-        )
+        assert normalize_and_dedupe_unused_keys(raw, locales) == [
+            "admin.dashboard.title",
+            "other.leaf",
+        ]
 
     def test_does_not_strip_admin_segment(self):
         """First segment ``admin`` is not treated as a locale."""
         raw = ["admin.dashboard.title"]
         locales = merge_locale_prefixes_for_unused_strip(["en"], raw)
-        self.assertEqual(
-            normalize_and_dedupe_unused_keys(raw, locales),
-            ["admin.dashboard.title"],
-        )
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert normalize_and_dedupe_unused_keys(raw, locales) == ["admin.dashboard.title"]

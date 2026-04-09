@@ -2,13 +2,12 @@
 
 import os
 import tempfile
-import unittest
 from datetime import datetime
 
 from i18n.i18n_manager_base import I18NManagerBase
 from i18n.translation_group import TranslationGroup, TranslationKey
 from i18n.translation_manager_results import TranslationAction, TranslationManagerResults
-from tests.helpers import FakeSettingsManager
+from helpers import FakeSettingsManager
 
 
 class _StubManager(I18NManagerBase):
@@ -79,68 +78,68 @@ def _minimal_results(action=TranslationAction.CHECK_STATUS) -> TranslationManage
 # Deleted key queue
 # ---------------------------------------------------------------------------
 
-class TestQueuedDeletedKeys(unittest.TestCase):
-    def setUp(self):
+class TestQueuedDeletedKeys:
+    def setup_method(self):
         self.mgr = _make_manager()
 
     def test_queue_deleted_keys_from_plain_strings(self):
         self.mgr.queue_deleted_keys(["foo", "bar"])
-        self.assertIn("foo", self.mgr.pending_deleted_keys)
-        self.assertIn("bar", self.mgr.pending_deleted_keys)
+        assert "foo" in self.mgr.pending_deleted_keys
+        assert "bar" in self.mgr.pending_deleted_keys
 
     def test_queue_deleted_keys_from_translation_key_objects(self):
         self.mgr.queue_deleted_keys([TranslationKey("hello")])
-        self.assertIn("hello", self.mgr.pending_deleted_keys)
+        assert "hello" in self.mgr.pending_deleted_keys
 
     def test_queue_deleted_keys_ignores_empty_strings(self):
         self.mgr.queue_deleted_keys([""])
-        self.assertEqual(self.mgr.pending_deleted_keys, set())
+        assert self.mgr.pending_deleted_keys == set()
 
     def test_queue_deleted_keys_accumulates(self):
         self.mgr.queue_deleted_keys(["a"])
         self.mgr.queue_deleted_keys(["b"])
-        self.assertIn("a", self.mgr.pending_deleted_keys)
-        self.assertIn("b", self.mgr.pending_deleted_keys)
+        assert "a" in self.mgr.pending_deleted_keys
+        assert "b" in self.mgr.pending_deleted_keys
 
     def test_clear_queued_deleted_keys_empties_set(self):
         self.mgr.queue_deleted_keys(["foo", "bar"])
         self.mgr.clear_queued_deleted_keys()
-        self.assertEqual(self.mgr.pending_deleted_keys, set())
+        assert self.mgr.pending_deleted_keys == set()
 
 
 # ---------------------------------------------------------------------------
 # Quality review settings delegation
 # ---------------------------------------------------------------------------
 
-class TestQualityReviewSettings(unittest.TestCase):
+class TestQualityReviewSettings:
     def test_excluded_msgids_without_settings_manager_returns_empty_frozenset(self):
         mgr = _make_manager(settings_manager=None)
-        self.assertEqual(mgr.get_quality_review_excluded_msgids(), frozenset())
+        assert mgr.get_quality_review_excluded_msgids() == frozenset()
 
     def test_excluded_msgids_with_settings_manager(self):
         sm = FakeSettingsManager(excluded_msgids=["skip.this", "and.this"])
         mgr = _make_manager(settings_manager=sm)
         excluded = mgr.get_quality_review_excluded_msgids()
-        self.assertIn("skip.this", excluded)
-        self.assertIn("and.this", excluded)
+        assert "skip.this" in excluded
+        assert "and.this" in excluded
 
     def test_ignore_patterns_without_settings_manager_returns_empty_tuple(self):
         mgr = _make_manager(settings_manager=None)
-        self.assertEqual(mgr.get_quality_review_script_ignore_patterns(), tuple())
+        assert mgr.get_quality_review_script_ignore_patterns() == tuple()
 
     def test_ignore_patterns_with_settings_manager(self):
         sm = FakeSettingsManager(ignore_patterns=[r"\d+%", r"^\d+$"])
         mgr = _make_manager(settings_manager=sm)
         patterns = mgr.get_quality_review_script_ignore_patterns()
-        self.assertIn(r"\d+%", patterns)
+        assert r"\d+%" in patterns
 
 
 # ---------------------------------------------------------------------------
 # get_invalid_translations
 # ---------------------------------------------------------------------------
 
-class TestGetInvalidTranslations(unittest.TestCase):
-    def setUp(self):
+class TestGetInvalidTranslations:
+    def setup_method(self):
         self.mgr = _make_manager(locales=["en", "fr"])
 
     def _add_group(self, msgid, en_text, other_translations=None, is_in_base=True):
@@ -154,12 +153,12 @@ class TestGetInvalidTranslations(unittest.TestCase):
 
     def test_empty_translations_returns_no_errors(self):
         result = self.mgr.get_invalid_translations()
-        self.assertFalse(result.has_errors)
+        assert not result.has_errors
 
     def test_missing_locale_detected(self):
         self._add_group("greeting", "Hello", {})  # no fr translation
         result = self.mgr.get_invalid_translations()
-        self.assertTrue(any("fr" in locs for _, locs in result.missing_locale_groups))
+        assert any("fr" in locs for _, locs in result.missing_locale_groups)
 
     def test_not_in_base_flagged_when_not_all_locales_written(self):
         key = TranslationKey("stale")
@@ -168,7 +167,7 @@ class TestGetInvalidTranslations(unittest.TestCase):
         self.mgr.translations[key] = g
         # written_locales is empty → not all locales written
         result = self.mgr.get_invalid_translations()
-        self.assertIn(key, result.not_in_base)
+        assert key in result.not_in_base
 
     def test_not_in_base_suppressed_when_all_locales_written(self):
         key = TranslationKey("stale")
@@ -177,25 +176,25 @@ class TestGetInvalidTranslations(unittest.TestCase):
         self.mgr.translations[key] = g
         self.mgr.written_locales = set(self.mgr.locales)
         result = self.mgr.get_invalid_translations()
-        self.assertNotIn(key, result.not_in_base)
+        assert key not in result.not_in_base
 
     def test_invalid_index_placeholder_detected(self):
         self._add_group("fmt", "Hello {0}", {"fr": "Bonjour"})
         result = self.mgr.get_invalid_translations()
-        self.assertTrue(any("fr" in locs for _, locs in result.invalid_index_locale_groups))
+        assert any("fr" in locs for _, locs in result.invalid_index_locale_groups)
 
     def test_valid_translations_produce_no_errors(self):
         self._add_group("greeting", "Hello", {"fr": "Bonjour"})
         result = self.mgr.get_invalid_translations()
-        self.assertFalse(result.has_errors)
+        assert not result.has_errors
 
 
 # ---------------------------------------------------------------------------
 # fix_invalid_translations
 # ---------------------------------------------------------------------------
 
-class TestFixInvalidTranslations(unittest.TestCase):
-    def setUp(self):
+class TestFixInvalidTranslations:
+    def setup_method(self):
         self.mgr = _make_manager(locales=["en", "fr"])
 
     def test_fix_returns_false_when_nothing_to_fix(self):
@@ -204,7 +203,7 @@ class TestFixInvalidTranslations(unittest.TestCase):
         g.add_translation("en", "Hello")
         g.add_translation("fr", "Bonjour")
         self.mgr.translations[key] = g
-        self.assertFalse(self.mgr.fix_invalid_translations())
+        assert not self.mgr.fix_invalid_translations()
 
     def test_fix_corrects_leading_space_mismatch(self):
         key = TranslationKey("spaced")
@@ -214,22 +213,22 @@ class TestFixInvalidTranslations(unittest.TestCase):
         self.mgr.translations[key] = g
         self.mgr.fix_invalid_translations()
         fixed = self.mgr.translations[key].get_translation("fr")
-        self.assertFalse(fixed.startswith("  "))
+        assert not fixed.startswith("  ")
 
 
 # ---------------------------------------------------------------------------
 # _populate_translation_statistics
 # ---------------------------------------------------------------------------
 
-class TestPopulateTranslationStatistics(unittest.TestCase):
-    def setUp(self):
+class TestPopulateTranslationStatistics:
+    def setup_method(self):
         self.mgr = _make_manager(locales=["en", "fr"])
 
     def test_no_translations_leaves_stats_at_zero(self):
         results = _minimal_results()
         self.mgr._populate_translation_statistics(results, TranslationAction.CHECK_STATUS)
-        self.assertEqual(results.total_strings, 0)
-        self.assertEqual(results.total_locales, 0)
+        assert results.total_strings == 0
+        assert results.total_locales == 0
 
     def test_total_strings_reflects_translation_count(self):
         for i in range(4):
@@ -239,7 +238,7 @@ class TestPopulateTranslationStatistics(unittest.TestCase):
             self.mgr.translations[key] = g
         results = _minimal_results()
         self.mgr._populate_translation_statistics(results, TranslationAction.CHECK_STATUS)
-        self.assertEqual(results.total_strings, 4)
+        assert results.total_strings == 4
 
     def test_total_locales_reflects_manager_locales(self):
         key = TranslationKey("msg")
@@ -248,7 +247,7 @@ class TestPopulateTranslationStatistics(unittest.TestCase):
         self.mgr.translations[key] = g
         results = _minimal_results()
         self.mgr._populate_translation_statistics(results, TranslationAction.CHECK_STATUS)
-        self.assertEqual(results.total_locales, len(self.mgr.locales))
+        assert results.total_locales == len(self.mgr.locales)
 
     def test_check_status_populates_invalid_groups_not_quality_findings(self):
         key = TranslationKey("msg")
@@ -257,20 +256,20 @@ class TestPopulateTranslationStatistics(unittest.TestCase):
         self.mgr.translations[key] = g
         results = _minimal_results(TranslationAction.CHECK_STATUS)
         self.mgr._populate_translation_statistics(results, TranslationAction.CHECK_STATUS)
-        self.assertIsNotNone(results.invalid_groups)
-        self.assertIsNone(results.quality_findings)
+        assert results.invalid_groups is not None
+        assert results.quality_findings is None
 
 
 # ---------------------------------------------------------------------------
 # apply_latest_translation_file_mtime
 # ---------------------------------------------------------------------------
 
-class TestApplyLatestMtime(unittest.TestCase):
+class TestApplyLatestMtime:
     def test_no_files_sets_none(self):
         mgr = _make_manager()
         results = _minimal_results()
         mgr.apply_latest_translation_file_mtime(results)
-        self.assertIsNone(results.latest_translation_file_mtime)
+        assert results.latest_translation_file_mtime is None
 
     def test_real_file_sets_datetime(self):
         with tempfile.NamedTemporaryFile(suffix=".po", delete=False) as f:
@@ -280,7 +279,7 @@ class TestApplyLatestMtime(unittest.TestCase):
             mgr.list_translation_file_paths = lambda: [path]
             results = _minimal_results()
             mgr.apply_latest_translation_file_mtime(results)
-            self.assertIsInstance(results.latest_translation_file_mtime, datetime)
+            assert isinstance(results.latest_translation_file_mtime, datetime)
         finally:
             os.unlink(path)
 
@@ -289,7 +288,7 @@ class TestApplyLatestMtime(unittest.TestCase):
         mgr.list_translation_file_paths = lambda: ["/nonexistent/path/base.po"]
         results = _minimal_results()
         mgr.apply_latest_translation_file_mtime(results)
-        self.assertIsNone(results.latest_translation_file_mtime)
+        assert results.latest_translation_file_mtime is None
 
     def test_picks_latest_mtime_among_multiple_files(self):
         with tempfile.NamedTemporaryFile(suffix=".po", delete=False) as f1, \
@@ -301,11 +300,7 @@ class TestApplyLatestMtime(unittest.TestCase):
             results = _minimal_results()
             mgr.apply_latest_translation_file_mtime(results)
             expected_mtime = datetime.fromtimestamp(max(os.path.getmtime(p1), os.path.getmtime(p2)))
-            self.assertEqual(results.latest_translation_file_mtime, expected_mtime)
+            assert results.latest_translation_file_mtime == expected_mtime
         finally:
             os.unlink(p1)
             os.unlink(p2)
-
-
-if __name__ == "__main__":
-    unittest.main()

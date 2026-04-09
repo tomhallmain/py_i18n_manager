@@ -1,8 +1,9 @@
 import importlib
 import os
-import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -18,13 +19,13 @@ from test_utils import isolated_settings_and_cache_env
 from utils.settings_manager import SettingsManager
 
 
-@unittest.skipUnless(_HAS_PYQT6, "PyQt6 not installed in this environment")
-class TestUiSmoke(unittest.TestCase):
+@pytest.mark.skipif(not _HAS_PYQT6, reason="PyQt6 not installed in this environment")
+class TestUiSmoke:
     @classmethod
-    def setUpClass(cls):
+    def setup_class(cls):
         cls._app = QApplication.instance() or QApplication([])
 
-    def setUp(self):
+    def setup_method(self):
         self._env_ctx = isolated_settings_and_cache_env(
             prefix=".tmp_ui_smoke_",
             base_dir=Path(__file__).parent,
@@ -36,7 +37,7 @@ class TestUiSmoke(unittest.TestCase):
         self.settings_path = env_paths["settings_path"]
         self.app_cache_path = env_paths["app_cache_path"]
 
-    def tearDown(self):
+    def teardown_method(self):
         self._env_ctx.__exit__(None, None, None)
         if self.kept_tmp:
             print(f"[ui-smoke] kept temp test directory: {self.tmp_root}")
@@ -50,13 +51,13 @@ class TestUiSmoke(unittest.TestCase):
 
         window = app_module.MainWindow()
         try:
-            self.assertEqual(str(window.settings_manager.settings_file), self.settings_path)
-            self.assertEqual(
-                app_info_cache_module.AppInfoCache.JSON_LOC,
-                self.app_cache_path,
+            assert str(window.settings_manager.settings_file) == self.settings_path
+            assert (
+                app_info_cache_module.AppInfoCache.JSON_LOC
+                == self.app_cache_path
             )
             window.close()
-            self.assertTrue(Path(self.app_cache_path).exists())
+            assert Path(self.app_cache_path).exists()
         finally:
             window.deleteLater()
 
@@ -64,7 +65,7 @@ class TestUiSmoke(unittest.TestCase):
         from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 
         mgr = SettingsManager()
-        self.assertEqual(str(mgr.settings_file), self.settings_path)
+        assert str(mgr.settings_file) == self.settings_path
         project_path = "C:/tmp/ui-smoke-project"
         mgr.save_quality_review_script_ignore_patterns(project_path, [r"(?i)\bSKU\b"])
 
@@ -81,11 +82,7 @@ class TestUiSmoke(unittest.TestCase):
             ):
                 dialog._on_restore_default_patterns()
             loaded = mgr.get_quality_review_script_ignore_patterns(project_path)
-            self.assertIn(r"(?i)\bCSV\b", loaded)
-            self.assertNotIn(r"(?i)\bSKU\b", loaded)
+            assert r"(?i)\bCSV\b" in loaded
+            assert r"(?i)\bSKU\b" not in loaded
         finally:
             dialog.deleteLater()
-
-
-if __name__ == "__main__":
-    unittest.main()

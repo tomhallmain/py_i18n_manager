@@ -3,7 +3,8 @@
 import io
 import os
 import tempfile
-import unittest
+
+import pytest
 
 from i18n.ruby.yaml_parser_utils import (
     RUAMEL_AVAILABLE,
@@ -18,8 +19,8 @@ from i18n.ruby.yaml_parser_utils import (
 from utils.nested_mapping import add_to_nested_dict
 
 
-@unittest.skipUnless(RUAMEL_AVAILABLE, "ruamel.yaml required")
-class TestMergeDottedKeysKeyOrder(unittest.TestCase):
+@pytest.mark.skipif(not RUAMEL_AVAILABLE, reason="ruamel.yaml required")
+class TestMergeDottedKeysKeyOrder:
     """merge_dotted_keys_into_locale_file appends new mapping keys; it does not sort keys."""
 
     def test_existing_keys_keep_order_new_keys_follow_call_order(self):
@@ -44,34 +45,28 @@ class TestMergeDottedKeysKeyOrder(unittest.TestCase):
             with open(abs_path, encoding="utf-8") as f:
                 data = ryaml.load(f)
             en = data["en"]
-            self.assertEqual(
-                list(en.keys()),
-                ["alpha", "beta", "zebra", "aaa", "nested"],
-                "Existing keys stay first; new top-level keys follow insertion order (zebra before aaa, not sorted).",
-            )
+            assert list(en.keys()) == ["alpha", "beta", "zebra", "aaa", "nested"], \
+                "Existing keys stay first; new top-level keys follow insertion order (zebra before aaa, not sorted)."
             nested = en["nested"]
-            self.assertEqual(
-                list(nested.keys()),
-                ["deep", "other"],
-                "Nested keys under a new parent follow the dotted-key sequence.",
-            )
+            assert list(nested.keys()) == ["deep", "other"], \
+                "Nested keys under a new parent follow the dotted-key sequence."
 
 
-@unittest.skipUnless(RUAMEL_AVAILABLE, "ruamel.yaml required")
-class TestMergeRuamelDataKeyResolution(unittest.TestCase):
+@pytest.mark.skipif(not RUAMEL_AVAILABLE, reason="ruamel.yaml required")
+class TestMergeRuamelDataKeyResolution:
     """merge_ruamel_data must update existing leaves when YAML/ruamel key types differ from str."""
 
     def test_merges_into_bool_true_key_when_new_uses_string_true(self):
         original = {True: {"leaf": "old"}}
         new = {"true": {"leaf": "new"}}
         merge_ruamel_data(original, quote_string_values(new))
-        self.assertIn(True, original)
-        self.assertEqual(str(original[True]["leaf"]), "new")
+        assert True in original
+        assert str(original[True]["leaf"]) == "new"
 
     def test_add_to_nested_dict_resolves_bool_segment(self):
         data = {True: {"inner": "x"}}
         add_to_nested_dict(data, "true.inner", "updated")
-        self.assertEqual(data[True]["inner"], "updated")
+        assert data[True]["inner"] == "updated"
 
     def test_merge_updates_existing_scalar_leaf(self):
         """Regression: merged data must replace an existing string leaf (same as bool-key fix)."""
@@ -80,7 +75,7 @@ class TestMergeRuamelDataKeyResolution(unittest.TestCase):
             original,
             quote_string_values({"en": {"home": {"title": "New title"}}}),
         )
-        self.assertEqual(str(original["en"]["home"]["title"]), "New title")
+        assert str(original["en"]["home"]["title"]) == "New title"
 
     def test_merge_preserves_yaml_list_not_python_repr_string(self):
         """Lists must stay YAML sequences after merge/dump, not one scalar str(list)."""
@@ -106,28 +101,28 @@ class TestMergeRuamelDataKeyResolution(unittest.TestCase):
             ),
         )
         features = original["de"]["compare"]["features"]
-        self.assertIsInstance(features, list)
-        self.assertEqual(len(features), 2)
-        self.assertEqual(str(features[0]), "Neu eins")
+        assert isinstance(features, list)
+        assert len(features) == 2
+        assert str(features[0]) == "Neu eins"
 
         buf = io.StringIO()
         ryaml.dump(original, buf)
         dumped = buf.getvalue()
-        self.assertNotIn("['Neu eins'", dumped)
-        self.assertIn("- ", dumped)
+        assert "['Neu eins'" not in dumped
+        assert "- " in dumped
 
 
-class TestRubyYamlYesNoKeyQuoting(unittest.TestCase):
+class TestRubyYamlYesNoKeyQuoting:
     """YAML 1.1 / Ruby Psych: unquoted yes/no keys become booleans; writers must quote them."""
 
     def test_pyyaml_dump_keeps_quoted_yes_no_keys(self):
         buf = io.StringIO()
         pyyaml_dump({"en": {"common": {"yes": "Да", "no": "Нет", "other": "x"}}}, buf)
         dumped = buf.getvalue()
-        self.assertIn('"yes":', dumped)
-        self.assertIn('"no":', dumped)
+        assert '"yes":' in dumped
+        assert '"no":' in dumped
 
-    @unittest.skipUnless(RUAMEL_AVAILABLE, "ruamel.yaml required")
+    @pytest.mark.skipif(not RUAMEL_AVAILABLE, reason="ruamel.yaml required")
     def test_ruamel_dump_quotes_yes_no_keys(self):
         ryaml = ruby_roundtrip_yaml()
         data = quote_string_values({"ru": {"common": {"yes": "Да", "no": "Нет"}}})
@@ -135,10 +130,10 @@ class TestRubyYamlYesNoKeyQuoting(unittest.TestCase):
         buf = io.StringIO()
         ryaml.dump(data, buf)
         dumped = buf.getvalue()
-        self.assertIn('"yes":', dumped)
-        self.assertIn('"no":', dumped)
+        assert '"yes":' in dumped
+        assert '"no":' in dumped
 
-    @unittest.skipUnless(RUAMEL_AVAILABLE, "ruamel.yaml required")
+    @pytest.mark.skipif(not RUAMEL_AVAILABLE, reason="ruamel.yaml required")
     def test_merge_dotted_keys_writes_quoted_yes_leaf(self):
         with tempfile.TemporaryDirectory() as tmp:
             rel = "config/locales/en/widgets.en.yml"
@@ -151,11 +146,11 @@ class TestRubyYamlYesNoKeyQuoting(unittest.TestCase):
 
             with open(abs_path, encoding="utf-8") as f:
                 text = f.read()
-            self.assertIn('"yes":', text)
+            assert '"yes":' in text
 
 
-@unittest.skipUnless(RUAMEL_AVAILABLE, "ruamel.yaml required")
-class TestRemoveDottedKeysFromLocaleFile(unittest.TestCase):
+@pytest.mark.skipif(not RUAMEL_AVAILABLE, reason="ruamel.yaml required")
+class TestRemoveDottedKeysFromLocaleFile:
     def test_removes_leaf_and_prunes_empty_parents(self):
         with tempfile.TemporaryDirectory() as tmp:
             rel = "config/locales/en/app.en.yml"
@@ -168,13 +163,9 @@ class TestRemoveDottedKeysFromLocaleFile(unittest.TestCase):
             removed, not_found = remove_dotted_keys_from_locale_file(
                 tmp, rel, "en", ["admin.stale.title", "nope.missing"]
             )
-            self.assertEqual(removed, 1)
-            self.assertEqual(not_found, 1)
+            assert removed == 1
+            assert not_found == 1
             with open(abs_path, encoding="utf-8") as f:
                 text = f.read()
-            self.assertNotIn("stale", text)
-            self.assertIn("keep", text)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert "stale" not in text
+            assert "keep" in text
