@@ -12,11 +12,30 @@ from utils.logging_setup import get_logger
 
 logger = get_logger("argos_translate")
 
+WINDOWS_DRIVE_PATH_PREFIXES = tuple(f"{drive}:\\" for drive in "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
 class ArgosTranslate(QObject):
     """Handles translation using Argos Translate models."""
     
     # Signal for download progress updates
     download_progress = pyqtSignal(str)
+
+    @staticmethod
+    def _resolve_models_dir(configured_models_dir):
+        """Resolve configured models path into a safe local filesystem path."""
+        configured = (configured_models_dir or "").strip()
+        if not configured:
+            configured = "~/.py_i18n_manager/models/argos"
+
+        # On non-Windows platforms, treat Windows drive paths as invalid and fallback.
+        if os.name != "nt" and configured.upper().startswith(WINDOWS_DRIVE_PATH_PREFIXES):
+            logger.warning(
+                "Ignoring Windows models_dir '%s' on non-Windows platform; using home directory fallback.",
+                configured,
+            )
+            configured = "~/.py_i18n_manager/models/argos"
+
+        return Path(configured).expanduser()
     
     def __init__(self):
         """Initialize Argos Translate with configuration from settings."""
@@ -27,8 +46,8 @@ class ArgosTranslate(QObject):
         
         # Configure model storage path from config
         try:
-            models_dir = config_manager.get('translation.models_dir', 'models/argos')
-            self.models_dir = Path(models_dir)
+            models_dir = config_manager.get('translation.models_dir', '~/.py_i18n_manager/models/argos')
+            self.models_dir = self._resolve_models_dir(models_dir)
             
             # Try to create the directory
             try:
