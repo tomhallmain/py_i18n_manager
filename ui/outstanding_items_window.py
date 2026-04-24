@@ -419,6 +419,12 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         copy_default.triggered.connect(lambda: self.copy_default_translation(item, default_locale))
         menu.addAction(copy_default)
 
+        fill_missing_with_default = QAction(_("Fill Missing in Row with Default Translation"), self)
+        fill_missing_with_default.triggered.connect(
+            lambda: self.fill_row_missing_with_default_translation(item.row())
+        )
+        menu.addAction(fill_missing_with_default)
+
         menu.addSeparator()
         delete_key = QAction(_("Delete Translation Key"), self)
         delete_key.triggered.connect(lambda: self.delete_translation_group_for_row(item.row()))
@@ -438,6 +444,42 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             menu.addAction(translate_with_llm)
         
         menu.exec(global_position)
+
+    def fill_row_missing_with_default_translation(self, row: int):
+        """Fill empty locale cells in the row with its default locale translation."""
+        key = self._get_key_from_row(row)
+        group = self.translations.get(key) if hasattr(self, "translations") else None
+        if not group:
+            return
+
+        default_locale = config_manager.get('translation.default_locale', 'en')
+        default_text = group.get_translation_as_text(default_locale)
+        if not default_text or not default_text.strip():
+            QMessageBox.information(
+                self,
+                _("No Default Translation"),
+                _("The default locale translation is empty for this row."),
+            )
+            return
+
+        updated_count = 0
+        for col in range(1, self.table.columnCount()):
+            current_item = self.table.item(row, col)
+            current_text = current_item.text().strip() if current_item else ""
+            if current_text:
+                continue
+            self.table.setItem(row, col, QTableWidgetItem(default_text))
+            updated_count += 1
+
+        if updated_count == 0:
+            QMessageBox.information(
+                self,
+                _("No Missing Values"),
+                _("No missing values were found in this row."),
+            )
+            return
+
+        QTimer.singleShot(0, lambda: self.table.viewport().update())
 
     def delete_translation_group_for_row(self, row: int):
         """Delete translation group represented by a table row."""
