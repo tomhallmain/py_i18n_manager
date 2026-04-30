@@ -398,9 +398,23 @@ When testing the Ruby i18n manager, consider:
 9. **Large Files**: Test performance with many translations
 10. **Error Cases**: Test malformed YAML, missing files, permission errors
 
+## Standalone Ruby helpers
+
+Optional Ruby scripts next to this package (`locale_yaml_branch_diff.rb`, `locale_yaml_duplicate_report.rb`) are **not** used by the UI. Run them with Ruby against a Rails app when you want Git-aware YAML comparisons or a duplicate-key report while splitting locale files. You need Ruby (Psych), Git on `PATH`, and `--rails-root` to the app (or discover via env / `git rev-parse`; monorepos: `--app-subdir`). See `--help` on each script.
+
+- **`locale_yaml_branch_diff.rb`** — merged `config/locales/**/*.yml` per locale across two Git refs; requires a **clean** working tree (it checkouts refs, then restores).
+- **`locale_yaml_duplicate_report.rb`** — duplicate top-level branches and leaf value clashes under `config/locales/<locale>/` (directory-per-locale layout, not flat `en.yml` alone).
+
+```text
+ruby i18n/ruby/locale_yaml_branch_diff.rb --rails-root /path/to/rails_app
+ruby i18n/ruby/locale_yaml_duplicate_report.rb --rails-root /path/to/rails_app
+```
+
 ## Related Files
 
 - `i18n/i18n_manager_base.py`: Base class defining common interface
 - `i18n/python/python_i18n_manager.py`: Python/Gettext implementation (for comparison)
 - `i18n/translation_group.py`: TranslationGroup data structure
 - `i18n/translation_manager_results.py`: Results container for operations
+- `i18n/ruby/locale_yaml_branch_diff.rb`: optional Git branch/ref YAML merge diff
+- `i18n/ruby/locale_yaml_duplicate_report.rb`: optional duplicate-branch and value-clash report under `config/locales/<locale>/`
