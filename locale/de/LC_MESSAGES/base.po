@@ -2,8 +2,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2026-04-05 17:26-0400\n"
-"PO-Revision-Date: 2026-04-05 17:26-0400\n"
+"POT-Creation-Date: 2026-04-30 19:11-0400\n"
+"PO-Revision-Date: 2026-04-30 19:11-0400\n"
 "Last-Translator: Translator Name <translator@example.com>\n"
 "Language-Team: de Team <<EMAIL>>\n"
 "Language: de\n"
@@ -23,6 +23,14 @@ msgstr "Aktuelles Projekt:"
 #: app.py:84
 msgid "No project selected"
 msgstr "Kein Projekt ausgewählt"
+
+#: app.py:105
+msgid "Latest file change:"
+msgstr "Neuste Dateiänderung:"
+
+#: app.py:112
+msgid "Last sync:"
+msgstr "Letzte Sync:"
 
 #: app.py:122 ui/recent_projects_dialog.py:82
 msgid "Select Project"
@@ -456,7 +464,7 @@ msgstr ""
 
 #: ui/all_translations_window.py:310 ui/all_translations_window.py:344
 #: ui/all_translations_window.py:355 ui/outstanding_items_window.py:412
-#: ui/outstanding_items_window.py:483 ui/outstanding_items_window.py:494
+#: ui/outstanding_items_window.py:525 ui/outstanding_items_window.py:536
 msgid "Copy Text"
 msgstr "Text kopieren"
 
@@ -465,15 +473,15 @@ msgid "Copy Default Translation"
 msgstr "Standardübersetzung kopieren"
 
 #: ui/all_translations_window.py:322 ui/base_translation_window.py:209
-#: ui/outstanding_items_window.py:423
+#: ui/outstanding_items_window.py:429
 msgid "Delete Translation Key"
 msgstr "Löschen der Übersetzungsschlüssel"
 
-#: ui/all_translations_window.py:328 ui/outstanding_items_window.py:431
+#: ui/all_translations_window.py:328 ui/outstanding_items_window.py:437
 msgid "Translate with Argos Translate"
 msgstr "Übersetzen mit Argos Translate"
 
-#: ui/all_translations_window.py:331 ui/outstanding_items_window.py:436
+#: ui/all_translations_window.py:331 ui/outstanding_items_window.py:442
 msgid "Translate with LLM"
 msgstr "Übersetzen mit LLM"
 
@@ -1166,7 +1174,7 @@ msgstr "LLM-Einstellungen"
 msgid "Configure LLM translation prompt template"
 msgstr "Konfigurieren Sie das LLM-Übersetzungsaufforderungsmuster Template"
 
-#: ui/outstanding_items_window.py:325 ui/outstanding_items_window.py:955
+#: ui/outstanding_items_window.py:325 ui/outstanding_items_window.py:997
 msgid "Export Outstanding TSV"
 msgstr "Exportiere ausgezeichnete TSV-Daten"
 
@@ -1175,19 +1183,19 @@ msgid "Export outstanding keys and invalid locale buckets to TSV"
 msgstr ""
 "Exportiere aktive Schlüssel und ungültige Lokalisationscontainer als TSV"
 
-#: ui/outstanding_items_window.py:577
+#: ui/outstanding_items_window.py:619
 msgid "No Items"
 msgstr "Keine Artikel"
 
-#: ui/outstanding_items_window.py:577
+#: ui/outstanding_items_window.py:619
 msgid "No missing translations found."
 msgstr "Keine fehlenden Übersetzungen gefunden."
 
-#: ui/outstanding_items_window.py:584
+#: ui/outstanding_items_window.py:626
 msgid "Confirm Translation"
 msgstr "Übersetzungsbestätigung"
 
-#: ui/outstanding_items_window.py:585
+#: ui/outstanding_items_window.py:627
 msgid ""
 "This will translate {count} missing items using {method}.\n"
 "\n"
@@ -1203,15 +1211,15 @@ msgstr ""
 "\n"
 "Weitermachen?"
 
-#: ui/outstanding_items_window.py:602
+#: ui/outstanding_items_window.py:644
 msgid "Translation Progress"
 msgstr "Übersetzung Fortschritt"
 
-#: ui/outstanding_items_window.py:659
+#: ui/outstanding_items_window.py:701
 msgid "Translation Error"
 msgstr "Übersetzungsfehler"
 
-#: ui/outstanding_items_window.py:660
+#: ui/outstanding_items_window.py:702
 msgid ""
 "An error occurred during translation:\n"
 "{error}"
@@ -1219,27 +1227,27 @@ msgstr ""
 "Beim Übersetzen ist ein Fehler aufgetreten:\n"
 "{error}"
 
-#: ui/outstanding_items_window.py:794
+#: ui/outstanding_items_window.py:836
 msgid "Combine Duplicate Translations?"
 msgstr "Doppelte Übersetzungen zusammenführen?"
 
-#: ui/outstanding_items_window.py:855
+#: ui/outstanding_items_window.py:897
 msgid "No Data"
 msgstr "Keine Daten"
 
-#: ui/outstanding_items_window.py:855
+#: ui/outstanding_items_window.py:897
 msgid "There are no outstanding rows to export."
 msgstr "Es gibt keine ausstehenden Zeilen zum Exportieren."
 
-#: ui/outstanding_items_window.py:957
+#: ui/outstanding_items_window.py:999
 msgid "TSV Files (*.tsv);;All Files (*)"
 msgstr "CSV-Dateien (*.tsv);;Alle Dateien (*.)"
 
-#: ui/outstanding_items_window.py:1004
+#: ui/outstanding_items_window.py:1046
 msgid "Export Complete"
 msgstr "Export vollständig"
 
-#: ui/outstanding_items_window.py:1005
+#: ui/outstanding_items_window.py:1047
 msgid ""
 "Exported {count} outstanding key(s) to:\n"
 "{path}\n"
@@ -1253,11 +1261,11 @@ msgstr ""
 "Markdown-Begleitdatei:\n"
 "{md_path}"
 
-#: ui/outstanding_items_window.py:1015
+#: ui/outstanding_items_window.py:1057
 msgid "Export Failed"
 msgstr "Export fehlgeschlagen"
 
-#: ui/outstanding_items_window.py:1016
+#: ui/outstanding_items_window.py:1058
 msgid ""
 "Could not export TSV file:\n"
 "{error}"
@@ -1265,15 +1273,15 @@ msgstr ""
 "Konnte die TSV-Datei nicht exportieren:\n"
 "{error}"
 
-#: ui/outstanding_items_window.py:1163
+#: ui/outstanding_items_window.py:1205
 msgid "All Translations Resolved"
 msgstr "Alle Übersetzungen geklärt"
 
-#: ui/outstanding_items_window.py:1257
+#: ui/outstanding_items_window.py:1299
 msgid "Save includes hidden duplicate-prefill updates"
 msgstr "Die Fähigkeit enthält versteckte doppelte-vorschfüllen-Updates."
 
-#: ui/outstanding_items_window.py:1259
+#: ui/outstanding_items_window.py:1301
 msgid ""
 "This save will also persist {count} pre-filled duplicate update(s), including keys that may not be visible in the current table.\n"
 "\n"
@@ -2057,11 +2065,11 @@ msgstr "Ungültige Neue Zeile"
 msgid "Invalid Character Set"
 msgstr "Ungültiger Zeichensatz"
 
-#: utils/globals.py:222
+#: utils/globals.py:223
 msgid "Translation equals default locale text."
 msgstr "Die Übersetzung entspricht dem Text der Standard-Ländereinstellung."
 
-#: utils/globals.py:225
+#: utils/globals.py:226
 msgid ""
 "Latin word/run (2+ chars) in a locale that primarily uses a non-Latin "
 "script."
@@ -2070,7 +2078,7 @@ msgstr ""
 "Sprachumgebung, in der hauptsächlich eine nicht-lateinische Schrift "
 "verwendet wird."
 
-#: utils/globals.py:229
+#: utils/globals.py:230
 msgid ""
 "Mixed-script leakage: a single Latin character appears inside non-Latin text"
 " or as a lone token."
@@ -2078,32 +2086,74 @@ msgstr ""
 "Vermischung von Schriftarten: Ein einzelnes lateinisches Zeichen taucht "
 "innerhalb eines nicht-lateinischen Textes oder als einzelnes Zeichen auf."
 
-#: utils/globals.py:232
+#: utils/globals.py:233
 msgid "English token ratio above threshold (heuristic not yet enabled)."
 msgstr ""
 "Der englische Token-Anteil liegt über dem Schwellenwert (Heuristik noch "
 "nicht aktiviert)."
 
-#: utils/globals.py:237
+#: utils/globals.py:242
 msgid "Identical to default"
 msgstr "Identisch mit der Voreinstellung"
 
-#: utils/globals.py:239
+#: utils/globals.py:244
 msgid "Latin in non-Latin locale"
 msgstr "Lateinische Zeichen in einer nicht-lateinischen Sprache"
 
-#: utils/globals.py:241
+#: utils/globals.py:246
 msgid "Mixed-script Latin leakage"
 msgstr "Vermischung lateinischer Schriftzeichen"
 
-#: utils/globals.py:243
+#: utils/globals.py:248
 msgid "High English ratio"
 msgstr "Hohe englische Quote"
 
-#: app.py:105
-msgid "Latest file change:"
-msgstr "Neuste Dateiänderung:"
+#: ui/outstanding_items_window.py:422
+msgid "Fill Missing in Row with Default Translation"
+msgstr "Fehlende Einträge in der Zeile mit der Standardübersetzung ergänzen"
 
-#: app.py:112
-msgid "Last sync:"
-msgstr "Letzte Sync:"
+#: ui/outstanding_items_window.py:460
+msgid "No Default Translation"
+msgstr "Keine Standardübersetzung"
+
+#: ui/outstanding_items_window.py:461
+msgid "The default locale translation is empty for this row."
+msgstr "Die Standard-Locale-Übersetzung ist für diese Zeile leer."
+
+#: ui/outstanding_items_window.py:477
+msgid "No Missing Values"
+msgstr "Keine fehlenden Werte"
+
+#: ui/outstanding_items_window.py:478
+msgid "No missing values were found in this row."
+msgstr "Keine fehlenden Werte in dieser Zeile gefunden."
+
+#: ui/translation_quality_review_window.py:175
+msgid ""
+"Built-in checks: non-Latin-script locales with Latin words/runs and a "
+"separate mixed-script Latin-leakage signal; translations identical to the "
+"default locale; advisory check for trailing sentence-stop mismatches vs. the"
+" default (extra, missing, or wrong stop for the locale). Respects project "
+"exclusions and ignore patterns. (English-ratio heuristic reserved.)"
+msgstr ""
+"Integrierte Prüfungen: Sprachumgebungen mit nicht-lateinischer Schrift, die "
+"lateinische Wörter oder Wortfolgen enthalten, sowie ein separates Signal für"
+" lateinische Zeichen in gemischten Schriftzeichen; Übersetzungen, die mit "
+"der Standard-Sprachumgebung identisch sind; hinweisende Prüfung auf "
+"Abweichungen beim abschließenden Satzzeichen im Vergleich zur "
+"Standardeinstellung (zusätzliches, fehlendes oder falsches Satzzeichen für "
+"die Sprachumgebung). Berücksichtigt Projektausschlüsse und Ignoriermuster. "
+"(Heuristik für den Englisch-Anteil reserviert.)"
+
+#: utils/globals.py:236
+msgid ""
+"Trailing sentence stop does not match the default locale (missing, extra, or"
+" wrong character for this locale)."
+msgstr ""
+"Das Zeichen am Satzende stimmt nicht mit der Standard-Ländereinstellung "
+"überein (fehlendes, überflüssiges oder falsches Zeichen für diese "
+"Ländereinstellung)."
+
+#: utils/globals.py:250
+msgid "Stop character inconsistency"
+msgstr "Inkonsistenz bei Stoppzeichen"
