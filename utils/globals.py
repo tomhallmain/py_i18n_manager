@@ -205,6 +205,7 @@ class QualityHeuristicKind(str, Enum):
     """Built-in quality-review heuristics; ``value`` is the stable id stored on :class:`QualityReviewFinding`."""
 
     IDENTICAL_TO_DEFAULT = "identical_to_default"
+    IDENTICAL_TO_NONDEFAULT = "identical_to_nondefault"
     LATIN_IN_CJK_LOCALE = "latin_in_cjk_locale"
     LATIN_MIXED_SCRIPT_IN_NON_LATIN_LOCALE = "latin_mixed_script_in_non_latin_locale"
     HIGH_ENGLISH_RATIO = "high_english_ratio"
@@ -221,6 +222,8 @@ class QualityHeuristicKind(str, Enum):
         """English detail text persisted on findings (gettext msgid)."""
         if self is QualityHeuristicKind.IDENTICAL_TO_DEFAULT:
             return _("Translation equals default locale text.")
+        if self is QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT:
+            return _("Translation equals another non-default locale's text.")
         if self is QualityHeuristicKind.LATIN_IN_CJK_LOCALE:
             return _(
                 "Latin word/run (2+ chars) in a locale that primarily uses a non-Latin script."
@@ -240,6 +243,8 @@ class QualityHeuristicKind(str, Enum):
     def get_display_name(self) -> str:
         if self is QualityHeuristicKind.IDENTICAL_TO_DEFAULT:
             return _("Identical to default")
+        if self is QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT:
+            return _("Identical to non-default locale")
         if self is QualityHeuristicKind.LATIN_IN_CJK_LOCALE:
             return _("Latin in non-Latin locale")
         if self is QualityHeuristicKind.LATIN_MIXED_SCRIPT_IN_NON_LATIN_LOCALE:

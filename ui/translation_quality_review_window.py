@@ -173,7 +173,8 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             QLabel(
                 _(
                     "Built-in checks: non-Latin-script locales with Latin words/runs and a separate mixed-script Latin-leakage signal; translations identical "
-                    "to the default locale; advisory check for trailing sentence-stop mismatches vs. the default (extra, missing, or wrong stop for the locale). "
+                    "to the default locale or to other non-default locales (one row per key, with affected locales in Notes); advisory check for trailing "
+                    "sentence-stop mismatches vs. the default (extra, missing, or wrong stop for the locale). "
                     "Respects project exclusions and ignore patterns. (English-ratio heuristic reserved.)"
                 )
             )
@@ -211,11 +212,12 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         layout.addWidget(filter_box)
 
         self._heuristic_table = create_frozen_translation_table()
-        self._heuristic_table.setColumnCount(6)
+        self._heuristic_table.setColumnCount(7)
         self._heuristic_table.setHorizontalHeaderLabels(
             [
                 _("Key"),
                 _("Locale"),
+                _("Notes"),
                 _("Default locale value"),
                 _("Locale value"),
                 _("Signal"),
@@ -229,13 +231,15 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
         hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
-        hdr.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+        hdr.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
+        hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionsClickable(True)
         hdr.setSortIndicatorShown(True)
         self._heuristic_table.setColumnWidth(0, 240)
-        self._heuristic_table.setColumnWidth(2, 200)
+        self._heuristic_table.setColumnWidth(2, 160)
         self._heuristic_table.setColumnWidth(3, 200)
+        self._heuristic_table.setColumnWidth(4, 200)
         self._heuristic_table.setSortingEnabled(True)
         self._heuristic_table.cellDoubleClicked.connect(self._on_heuristic_cell_double_clicked)
         self._heuristic_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -794,6 +798,18 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         menu.addAction(act)
         menu.exec(global_pos)
 
+    @staticmethod
+    def _locales_referenced_by_heuristic_row(row: dict[str, Any]) -> set[str]:
+        loc = (row.get("locale") or "").strip()
+        if loc:
+            return {loc}
+        out: set[str] = set()
+        for part in (row.get("notes") or "").replace(";", ",").split(","):
+            token = part.strip()
+            if token:
+                out.add(token)
+        return out
+
     def _build_heuristic_rows(self, qf: TranslationQualityFindings) -> list[dict[str, Any]]:
         rows = qf.findings
         out: list[dict[str, Any]] = []
@@ -812,9 +828,15 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             group = catalog.get(key)
             default_text = ""
             locale_text = ""
+            notes = f.notes or ""
             if group is not None:
                 default_text = group.get_translation(default_loc) or ""
-                locale_text = group.get_translation(f.locale) or ""
+                loc_for_value = (f.locale or "").strip()
+                if not loc_for_value and notes:
+                    first = notes.split(",", 1)[0].strip()
+                    loc_for_value = first.split(";", 1)[0].strip()
+                if loc_for_value:
+                    locale_text = group.get_translation(loc_for_value) or ""
             kind = f.signal
             det = kind.get_display_details()
             out.append(
@@ -822,6 +844,7 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
                     "key_obj": key,
                     "key_msgid": f.key_msgid,
                     "locale": f.locale,
+                    "notes": notes,
                     "default_text": default_text,
                     "locale_text": locale_text,
                     "signal_name": kind.get_display_name(),
@@ -842,16 +865,19 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             k_item.setToolTip(r["key_msgid"])
             self._heuristic_table.setItem(i, 0, k_item)
             self._heuristic_table.setItem(i, 1, QTableWidgetItem(r["locale"]))
+            notes_item = QTableWidgetItem(r["notes"])
+            notes_item.setToolTip(r["notes"])
+            self._heuristic_table.setItem(i, 2, notes_item)
             def_item = QTableWidgetItem(r["default_text"])
             def_item.setToolTip(r["default_text"])
-            self._heuristic_table.setItem(i, 2, def_item)
+            self._heuristic_table.setItem(i, 3, def_item)
             loc_item = QTableWidgetItem(r["locale_text"])
             loc_item.setToolTip(r["locale_text"])
-            self._heuristic_table.setItem(i, 3, loc_item)
-            self._heuristic_table.setItem(i, 4, QTableWidgetItem(r["signal_name"]))
+            self._heuristic_table.setItem(i, 4, loc_item)
+            self._heuristic_table.setItem(i, 5, QTableWidgetItem(r["signal_name"]))
             det_item = QTableWidgetItem(r["detail"])
             det_item.setToolTip(r["detail"])
-            self._heuristic_table.setItem(i, 5, det_item)
+            self._heuristic_table.setItem(i, 6, det_item)
         self._heuristic_table.setSortingEnabled(True)
         if sort_col >= 0:
             self._heuristic_table.sortItems(sort_col, sort_order)
@@ -917,7 +943,10 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         line.setText(_("{n} selected").format(n=len(selected)))
 
     def _sync_filter_options_from_rows(self) -> None:
-        locales = sorted({r["locale"] for r in self._heuristic_rows})
+        locales: set[str] = set()
+        for r in self._heuristic_rows:
+            locales.update(self._locales_referenced_by_heuristic_row(r))
+        locales = sorted(locales)
         signals = sorted({r["signal_name"] for r in self._heuristic_rows})
         self._set_multi_select_items(self._filter_locale_combo, locales)
         self._set_multi_select_items(self._filter_signal_combo, signals)
@@ -939,7 +968,8 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
 
         filtered = []
         for r in rows:
-            if locale_selected and r["locale"] not in locale_selected:
+            row_locales = self._locales_referenced_by_heuristic_row(r)
+            if locale_selected and not (row_locales & locale_selected):
                 continue
             if signal_selected and r["signal_name"] not in signal_selected:
                 continue
@@ -949,7 +979,10 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
                 continue
             if not self._matches_filter(r["locale_text"], locale_val_filter):
                 continue
-            if not self._matches_filter(r["detail"], detail_filter):
+            if detail_filter and not (
+                self._matches_filter(r["detail"], detail_filter)
+                or self._matches_filter(r["notes"], detail_filter)
+            ):
                 continue
             filtered.append(r)
         self._render_heuristic_rows(filtered)
@@ -968,7 +1001,15 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             selected_filter = ""
         if not path:
             return
-        headers = ["Key", "Locale", "Default locale value", "Locale value", "Signal", "Detail"]
+        headers = [
+            "Key",
+            "Locale",
+            "Notes",
+            "Default locale value",
+            "Locale value",
+            "Signal",
+            "Detail",
+        ]
         try:
             with open(path, "w", encoding="utf-8", newline="\n") as f:
                 f.write("\t".join(headers) + "\n")

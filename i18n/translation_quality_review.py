@@ -76,6 +76,7 @@ def collect_findings_for_group(
     ctx = group.key.context or ""
     mid = group.key.msgid
     base = (group.get_translation(default_locale) or "").strip()
+    identical_to_default_locales: set[str] = set()
 
     for loc in locales:
         if loc == default_locale:
@@ -90,13 +91,13 @@ def collect_findings_for_group(
         if base and tstrip == base and not _is_allowed_identical_to_english_default(
             default_locale, loc, tstrip, latin_ignore_patterns
         ):
-            h = QualityHeuristicKind.IDENTICAL_TO_DEFAULT
+            identical_to_default_locales.add(loc)
             findings.append(
                 QualityReviewFinding(
                     key_msgid=mid,
                     key_context=ctx,
                     locale=loc,
-                    signal=h,
+                    signal=QualityHeuristicKind.IDENTICAL_TO_DEFAULT,
                 )
             )
         if Utils.is_non_latin_script_locale(loc):
@@ -130,6 +131,17 @@ def collect_findings_for_group(
                     signal=QualityHeuristicKind.STOP_CHARACTER_INCONSISTENCY,
                 )
             )
+
+    nond = _finding_identical_to_nondefault_for_group(
+        group,
+        locales,
+        default_locale,
+        identical_to_default_locales,
+        mid,
+        ctx,
+    )
+    if nond is not None:
+        findings.append(nond)
 
     findings.extend(_findings_high_english_ratio_stub(group, default_locale, locales))
     return findings
@@ -262,6 +274,39 @@ _EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
         }
     ),
 }
+
+
+def _finding_identical_to_nondefault_for_group(
+    group: TranslationGroup,
+    locales: List[str],
+    default_locale: str,
+    identical_to_default_locales: AbstractSet[str],
+    key_msgid: str,
+    key_context: str,
+) -> Optional[QualityReviewFinding]:
+    """One group-level finding when 2+ non-default locales share the same translation text."""
+    by_text: Dict[str, List[str]] = {}
+    for loc in locales:
+        if loc == default_locale or loc in identical_to_default_locales:
+            continue
+        text = (group.get_translation(loc) or "").strip()
+        if not text:
+            continue
+        by_text.setdefault(text, []).append(loc)
+
+    clusters = [sorted(locs) for locs in by_text.values() if len(locs) >= 2]
+    if not clusters:
+        return None
+
+    clusters.sort(key=lambda locs: (-len(locs), locs[0]))
+    notes = "; ".join(", ".join(locs) for locs in clusters)
+    return QualityReviewFinding(
+        key_msgid=key_msgid,
+        key_context=key_context,
+        locale="",
+        signal=QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT,
+        notes=notes,
+    )
 
 
 def _base_language(locale: str) -> str:

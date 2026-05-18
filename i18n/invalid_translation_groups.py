@@ -15,12 +15,14 @@ class QualityReviewFinding:
     Translation text for the default locale and for ``locale`` is not stored here; resolve it from
     the in-memory catalog via :attr:`~i18n.translation_group.TranslationKey` and
     :meth:`~i18n.translation_group.TranslationGroup.get_translation` when displaying.
+    ``locale`` may be empty for group-scoped findings; use :attr:`notes` for affected locales.
     """
 
     key_msgid: str
     key_context: str
     locale: str
     signal: QualityHeuristicKind
+    notes: str = ""
 
 
 @dataclass

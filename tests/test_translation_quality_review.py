@@ -180,3 +180,99 @@ class TestLatinHeuristicsRegression:
         )
         signals = {f.signal for f in findings if f.locale == "de"}
         assert QualityHeuristicKind.STOP_CHARACTER_INCONSISTENCY in signals
+
+    def test_collect_findings_identical_to_nondefault_when_locales_match(self):
+        class _FakeKey:
+            def __init__(self, msgid: str, context: str = ""):
+                self.msgid = msgid
+                self.context = context
+
+        class _FakeGroup:
+            def __init__(self):
+                self.key = _FakeKey("greeting.hello", "")
+                self._values = {
+                    "en": "Hello",
+                    "fr": "Bonjour",
+                    "de": "Bonjour",
+                }
+
+            def get_translation(self, locale: str):
+                return self._values.get(locale, "")
+
+        findings = collect_findings_for_group(
+            _FakeGroup(),
+            default_locale="en",
+            locales=["en", "fr", "de"],
+            latin_ignore_patterns=(),
+        )
+        nond = [
+            f
+            for f in findings
+            if f.signal == QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT
+        ]
+        assert len(nond) == 1
+        assert nond[0].locale == ""
+        assert nond[0].notes == "de, fr"
+
+    def test_collect_findings_one_nondefault_finding_for_many_locales(self):
+        class _FakeKey:
+            def __init__(self, msgid: str, context: str = ""):
+                self.msgid = msgid
+                self.context = context
+
+        class _FakeGroup:
+            def __init__(self):
+                self.key = _FakeKey("shared.msg", "")
+                self._values = {
+                    "en": "Hello",
+                    "fr": "Bonjour",
+                    "de": "Bonjour",
+                    "es": "Bonjour",
+                    "it": "Bonjour",
+                }
+
+            def get_translation(self, locale: str):
+                return self._values.get(locale, "")
+
+        findings = collect_findings_for_group(
+            _FakeGroup(),
+            default_locale="en",
+            locales=["en", "fr", "de", "es", "it"],
+            latin_ignore_patterns=(),
+        )
+        nond = [
+            f
+            for f in findings
+            if f.signal == QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT
+        ]
+        assert len(nond) == 1
+        assert set(nond[0].notes.split(", ")) == {"de", "es", "fr", "it"}
+
+    def test_collect_findings_skips_nondefault_when_identical_to_default(self):
+        class _FakeKey:
+            def __init__(self, msgid: str, context: str = ""):
+                self.msgid = msgid
+                self.context = context
+
+        class _FakeGroup:
+            def __init__(self):
+                self.key = _FakeKey("greeting.hello", "")
+                self._values = {
+                    "en": "Hello",
+                    "fr": "Hello",
+                    "de": "Hello",
+                }
+
+            def get_translation(self, locale: str):
+                return self._values.get(locale, "")
+
+        findings = collect_findings_for_group(
+            _FakeGroup(),
+            default_locale="en",
+            locales=["en", "fr", "de"],
+            latin_ignore_patterns=(),
+        )
+        for loc in ("fr", "de"):
+            signals = {f.signal for f in findings if f.locale == loc}
+            assert signals == {QualityHeuristicKind.IDENTICAL_TO_DEFAULT}
+            assert QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT not in signals
