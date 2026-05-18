@@ -272,7 +272,45 @@ class TestLatinHeuristicsRegression:
             locales=["en", "fr", "de"],
             latin_ignore_patterns=(),
         )
-        for loc in ("fr", "de"):
-            signals = {f.signal for f in findings if f.locale == loc}
-            assert signals == {QualityHeuristicKind.IDENTICAL_TO_DEFAULT}
-            assert QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT not in signals
+        default_findings = [
+            f for f in findings if f.signal == QualityHeuristicKind.IDENTICAL_TO_DEFAULT
+        ]
+        assert len(default_findings) == 1
+        assert default_findings[0].locale == ""
+        assert set(default_findings[0].notes.split(", ")) == {"de", "fr"}
+        assert QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT not in {
+            f.signal for f in findings
+        }
+
+    def test_collect_findings_default_not_nondefault_when_values_match_default(self):
+        class _FakeKey:
+            def __init__(self, msgid: str, context: str = ""):
+                self.msgid = msgid
+                self.context = context
+
+        class _FakeGroup:
+            def __init__(self):
+                self.key = _FakeKey("msg.ok", "")
+                self._values = {
+                    "en": "OK:",
+                    "de": "OK:",
+                    "it": "OK:",
+                }
+
+            def get_translation(self, locale: str):
+                return self._values.get(locale, "")
+
+        findings = collect_findings_for_group(
+            _FakeGroup(),
+            default_locale="en",
+            locales=["en", "de", "it"],
+            latin_ignore_patterns=(),
+        )
+        assert [
+            f for f in findings if f.signal == QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT
+        ] == []
+        default_findings = [
+            f for f in findings if f.signal == QualityHeuristicKind.IDENTICAL_TO_DEFAULT
+        ]
+        assert len(default_findings) == 1
+        assert set(default_findings[0].notes.split(", ")) == {"de", "it"}

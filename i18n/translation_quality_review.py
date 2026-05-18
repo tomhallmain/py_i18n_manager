@@ -76,7 +76,6 @@ def collect_findings_for_group(
     ctx = group.key.context or ""
     mid = group.key.msgid
     base = (group.get_translation(default_locale) or "").strip()
-    identical_to_default_locales: set[str] = set()
 
     for loc in locales:
         if loc == default_locale:
@@ -88,18 +87,6 @@ def collect_findings_for_group(
         # DEBUG PROBE DISABLED (keep helper method for quick future investigations):
         # if _base_language(loc) == "ru":
         #     _debug_heuristic_probe(mid, loc, tstrip, latin_ignore_patterns)
-        if base and tstrip == base and not _is_allowed_identical_to_english_default(
-            default_locale, loc, tstrip, latin_ignore_patterns
-        ):
-            identical_to_default_locales.add(loc)
-            findings.append(
-                QualityReviewFinding(
-                    key_msgid=mid,
-                    key_context=ctx,
-                    locale=loc,
-                    signal=QualityHeuristicKind.IDENTICAL_TO_DEFAULT,
-                )
-            )
         if Utils.is_non_latin_script_locale(loc):
             if _has_significant_latin_run(tstrip, latin_ignore_patterns):
                 h = QualityHeuristicKind.LATIN_IN_CJK_LOCALE
@@ -132,11 +119,21 @@ def collect_findings_for_group(
                 )
             )
 
+    default_match = _finding_identical_to_default_for_group(
+        group,
+        locales,
+        default_locale,
+        latin_ignore_patterns,
+        mid,
+        ctx,
+    )
+    if default_match is not None:
+        findings.append(default_match)
+
     nond = _finding_identical_to_nondefault_for_group(
         group,
         locales,
         default_locale,
-        identical_to_default_locales,
         mid,
         ctx,
     )
@@ -152,6 +149,8 @@ _EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
         {
             "AM/PM",
             "api",
+            "April",
+            "August",
             "email",
             "e-mail",
             "emoji",
@@ -162,7 +161,9 @@ _EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
             "minute",
             "name",
             "navigation",
+            "November",
             "plan",
+            "September",
             "signal",
             "status",
             "url",
@@ -179,6 +180,7 @@ _EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
             "alliances",
             "api",
             "avatar",
+            "cuisine",
             "date",
             "description",
             "descriptions",
@@ -238,6 +240,8 @@ _EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
             "json",
             "locales",
             "no",
+            "personal",
+            "terrible",
             "total",
             "url",
             "xml",
@@ -276,21 +280,57 @@ _EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
 }
 
 
+def _finding_identical_to_default_for_group(
+    group: TranslationGroup,
+    locales: List[str],
+    default_locale: str,
+    latin_ignore_patterns: Sequence[str],
+    key_msgid: str,
+    key_context: str,
+) -> Optional[QualityReviewFinding]:
+    """One group-level finding for non-default locales that copy the default locale text."""
+    matching: List[str] = []
+    base = (group.get_translation(default_locale) or "").strip()
+    if not base:
+        return None
+    for loc in locales:
+        if loc == default_locale:
+            continue
+        text = (group.get_translation(loc) or "").strip()
+        if not text:
+            continue
+        if text == base and not _is_allowed_identical_to_english_default(
+            default_locale, loc, text, latin_ignore_patterns
+        ):
+            matching.append(loc)
+    if not matching:
+        return None
+    return QualityReviewFinding(
+        key_msgid=key_msgid,
+        key_context=key_context,
+        locale="",
+        signal=QualityHeuristicKind.IDENTICAL_TO_DEFAULT,
+        notes=", ".join(sorted(matching)),
+    )
+
+
 def _finding_identical_to_nondefault_for_group(
     group: TranslationGroup,
     locales: List[str],
     default_locale: str,
-    identical_to_default_locales: AbstractSet[str],
     key_msgid: str,
     key_context: str,
 ) -> Optional[QualityReviewFinding]:
     """One group-level finding when 2+ non-default locales share the same translation text."""
+    base = (group.get_translation(default_locale) or "").strip()
     by_text: Dict[str, List[str]] = {}
     for loc in locales:
-        if loc == default_locale or loc in identical_to_default_locales:
+        if loc == default_locale:
             continue
         text = (group.get_translation(loc) or "").strip()
         if not text:
+            continue
+        if base and text == base:
             continue
         by_text.setdefault(text, []).append(loc)
 
