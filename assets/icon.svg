@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+
+  <!-- Deep blue rounded square background -->
+  <rect width="64" height="64" rx="12" fill="#1D4ED8"/>
+
+  <!-- Target language bubble (behind, light blue tint) -->
+  <rect x="28" y="10" width="32" height="26" rx="7" fill="#BFDBFE"/>
+  <text x="44" y="23"
+        text-anchor="middle" dominant-baseline="middle"
+        font-family="serif" font-size="17" font-weight="bold"
+        fill="#1D4ED8">文</text>
+
+  <!-- Source language bubble (front, white, tail pointing lower-left) -->
+  <rect x="4" y="4" width="32" height="26" rx="7" fill="white"/>
+  <polygon points="12,30 4,40 24,30" fill="white"/>
+  <text x="20" y="17"
+        text-anchor="middle" dominant-baseline="middle"
+        font-family="Georgia,'Times New Roman',serif" font-size="17" font-weight="bold"
+        fill="#1D4ED8">A</text>
+
+  <!-- Validation checkmark badge (green) -->
+  <circle cx="51" cy="51" r="10" fill="#059669"/>
+  <polyline points="45,51.5 49.5,56 57,46"
+            stroke="white" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round"
+            fill="none"/>
+
+</svg>

@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout,
                             QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                             QTextEdit, QTabWidget, QMessageBox, QFrame, QProgressDialog)
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QIcon
 
 from i18n.i18n_manager import I18NManager
 from i18n.translation_group import TranslationKey
@@ -39,6 +40,9 @@ class MainWindow(SmartMainWindow):
         super().__init__(restore_geometry=True)
         logger.debug("Initializing MainWindow")
         self.setWindowTitle(_("i18n Translation Manager"))
+        _icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.svg")
+        if os.path.exists(_icon_path):
+            self.setWindowIcon(QIcon(_icon_path))
         
         # Default size; restore_window_geometry() may override with cached position/size
         screen = QApplication.primaryScreen().geometry()
@@ -922,6 +926,9 @@ class MainWindow(SmartMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    _icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.svg")
+    if os.path.exists(_icon_path):
+        app.setWindowIcon(QIcon(_icon_path))
     AppStyle.sync_theme_from_application(app)
     window = MainWindow()
     logger.info(f"Application started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
