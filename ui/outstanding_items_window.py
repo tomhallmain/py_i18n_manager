@@ -1,8 +1,7 @@
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton,
                             QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
                             QMessageBox, QMenu, QCheckBox, QTextEdit, QStyledItemDelegate,
-                            QFileDialog,
-                            QProgressBar)
+                            QFileDialog)
 from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer, QObject
 from PyQt6.QtGui import QAction, QKeyEvent, QShortcut, QKeySequence
 from PyQt6.QtWidgets import QApplication
@@ -17,6 +16,7 @@ from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
 from utils.translations import I18N
 from ui.base_translation_window import BaseTranslationWindow
+from ui.translation_progress_dialog import TranslationProgressDialog
 from ui.llm_settings_dialog import LLMSettingsDialog
 from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 
@@ -131,98 +131,6 @@ class TranslationWorker(QObject):
             self.error.emit(str(e))
         finally:
             self.finished.emit()
-
-
-class TranslationProgressDialog(QDialog):
-    """Dialog showing translation progress with cancel option."""
-    
-    cancelled = pyqtSignal()
-    
-    def __init__(self, parent=None, title="Translation Progress", use_llm=False):
-        super().__init__(parent)
-        self.setWindowTitle(title)
-        self.setModal(True)
-        self.setMinimumWidth(400)
-        self.use_llm = use_llm
-        
-        # Prevent closing via X button while active
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowCloseButtonHint)
-        
-        self.setup_ui()
-        
-    def setup_ui(self):
-        layout = QVBoxLayout(self)
-        
-        # Method label
-        method_text = "LLM" if self.use_llm else "Argos Translate"
-        self.method_label = QLabel(f"Translation Method: {method_text}")
-        self.method_label.setStyleSheet("font-weight: bold;")
-        layout.addWidget(self.method_label)
-        
-        # Progress bar
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setMinimum(0)
-        self.progress_bar.setMaximum(100)
-        self.progress_bar.setValue(0)
-        layout.addWidget(self.progress_bar)
-        
-        # Count label
-        self.count_label = QLabel("0 / 0 translations completed")
-        layout.addWidget(self.count_label)
-        
-        # Current item label
-        self.current_label = QLabel("Preparing...")
-        self.current_label.setWordWrap(True)
-        self.current_label.setStyleSheet("color: gray;")
-        layout.addWidget(self.current_label)
-        
-        # Cancel button
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        
-        self.cancel_btn = QPushButton(_("Cancel"))
-        self.cancel_btn.clicked.connect(self.on_cancel)
-        button_layout.addWidget(self.cancel_btn)
-        
-        button_layout.addStretch()
-        layout.addLayout(button_layout)
-        
-    def update_progress(self, completed, total, current_item):
-        """Update the progress display."""
-        if total > 0:
-            percentage = int((completed / total) * 100)
-            self.progress_bar.setValue(percentage)
-        
-        self.count_label.setText(f"{completed} / {total} translations completed")
-        
-        if current_item:
-            self.current_label.setText(f"Translating: {current_item}")
-        else:
-            self.current_label.setText("Finished" if completed >= total else "Preparing...")
-    
-    def on_cancel(self):
-        """Handle cancel button click."""
-        reply = QMessageBox.question(
-            self, 
-            _("Cancel Translation"),
-            _("Are you sure you want to cancel the translation process?\n\nCompleted translations will be kept."),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        if reply == QMessageBox.StandardButton.Yes:
-            self.cancel_btn.setEnabled(False)
-            self.cancel_btn.setText(_("Cancelling..."))
-            self.current_label.setText("Cancelling translation process...")
-            self.cancelled.emit()
-    
-    def on_finished(self):
-        """Handle when translation is finished."""
-        self.cancel_btn.setText(_("Close"))
-        self.cancel_btn.setEnabled(True)
-        self.cancel_btn.clicked.disconnect()
-        self.cancel_btn.clicked.connect(self.accept)
-        # Re-enable close button
-        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowCloseButtonHint)
-        self.show()  # Refresh window flags
 
 
 class OutstandingItemsWindow(BaseTranslationWindow):
