@@ -184,6 +184,7 @@ CROSS_LANGUAGE_SHARED_IDENTICAL_VALUES: Dict[FrozenSet[str], frozenset[str]] = {
             "global",
             "no",
             "personal",
+            "social",
             "terrible",
             "total",
         }
@@ -210,7 +211,12 @@ CROSS_LANGUAGE_SHARED_IDENTICAL_VALUES: Dict[FrozenSet[str], frozenset[str]] = {
             "personal",
         }
     ),
-}
+    frozenset({"fr", "it"}): frozenset(
+        {
+            "novembre",
+        }
+    ),
+}   
 
 
 def base_language(locale: str) -> str:
