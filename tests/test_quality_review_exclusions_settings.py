@@ -62,6 +62,26 @@ class TestQualityReviewExclusionsSettings:
         loaded = self.mgr.get_quality_review_script_ignore_patterns(self.project_path)
         assert [r"(?i)\bAPI\b", r"(?i)\bJSON\b"] == loaded
 
+    def test_use_builtin_exclusions_defaults_to_true(self):
+        value = self.mgr.get_quality_review_use_builtin_exclusions(self.project_path)
+        assert value is True
+
+    def test_use_builtin_exclusions_save_false_and_reload(self):
+        ok = self.mgr.save_quality_review_use_builtin_exclusions(self.project_path, False)
+        assert ok
+        assert self.mgr.get_quality_review_use_builtin_exclusions(self.project_path) is False
+
+    def test_use_builtin_exclusions_save_true_and_reload(self):
+        self.mgr.save_quality_review_use_builtin_exclusions(self.project_path, False)
+        ok = self.mgr.save_quality_review_use_builtin_exclusions(self.project_path, True)
+        assert ok
+        assert self.mgr.get_quality_review_use_builtin_exclusions(self.project_path) is True
+
+    def test_use_builtin_exclusions_independent_per_project(self):
+        other_path = "C:/tmp/project-b"
+        self.mgr.save_quality_review_use_builtin_exclusions(self.project_path, False)
+        assert self.mgr.get_quality_review_use_builtin_exclusions(other_path) is True
+
     def test_migrates_legacy_latin_pattern_keys(self):
         legacy = {
             "project_settings": {

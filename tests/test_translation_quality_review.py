@@ -2,6 +2,7 @@ import unicodedata as u
 
 from i18n.translation_quality_review import (
     collect_findings_for_group,
+    _is_allowed_identical_copy,
     _is_latin_char,
     _has_mixed_script_latin_leakage,
     _has_significant_latin_run,
@@ -409,3 +410,228 @@ class TestLatinHeuristicsRegression:
             latin_ignore_patterns=(),
         )
         assert not findings
+
+
+class TestUseBuiltinExclusionsToggle:
+    """The use_builtin_exclusions flag gates GLOBALLY_SHARED, EN_SHARED, and CROSS_LANGUAGE checks."""
+
+    # ── _is_allowed_identical_copy: globally-shared terms ────────────────────
+
+    def test_globally_shared_term_allowed_when_builtins_on(self):
+        # "PDF" is in GLOBALLY_SHARED → allowed immediately
+        assert _is_allowed_identical_copy("en", "de", "PDF", use_builtin_exclusions=True)
+
+    def test_globally_shared_term_not_allowed_when_builtins_off(self):
+        # With builtins off, "PDF" has Latin letters and no strips apply → not allowed
+        assert not _is_allowed_identical_copy("en", "de", "PDF", use_builtin_exclusions=False)
+
+    def test_globally_shared_ok_allowed_when_builtins_on(self):
+        assert _is_allowed_identical_copy("en", "ru", "OK", use_builtin_exclusions=True)
+
+    def test_globally_shared_ok_not_allowed_when_builtins_off(self):
+        assert not _is_allowed_identical_copy("en", "ru", "OK", use_builtin_exclusions=False)
+
+    def test_globally_shared_api_allowed_when_builtins_on(self):
+        assert _is_allowed_identical_copy("en", "ja", "API", use_builtin_exclusions=True)
+
+    def test_globally_shared_api_not_allowed_when_builtins_off(self):
+        assert not _is_allowed_identical_copy("en", "ja", "API", use_builtin_exclusions=False)
+
+    # ── _is_allowed_identical_copy: EN_SHARED per-language terms ─────────────
+
+    def test_en_shared_de_loanword_allowed_when_builtins_on(self):
+        # "browser" is in EN_SHARED for "de"
+        assert _is_allowed_identical_copy("en", "de", "browser", use_builtin_exclusions=True)
+
+    def test_en_shared_de_loanword_not_allowed_when_builtins_off(self):
+        assert not _is_allowed_identical_copy("en", "de", "browser", use_builtin_exclusions=False)
+
+    def test_en_shared_nl_loanword_allowed_when_builtins_on(self):
+        assert _is_allowed_identical_copy("en", "nl", "dashboard", use_builtin_exclusions=True)
+
+    def test_en_shared_nl_loanword_not_allowed_when_builtins_off(self):
+        assert not _is_allowed_identical_copy("en", "nl", "dashboard", use_builtin_exclusions=False)
+
+    def test_en_shared_ru_term_allowed_when_builtins_on(self):
+        # "json" is in EN_SHARED for "ru"
+        assert _is_allowed_identical_copy("en", "ru", "json", use_builtin_exclusions=True)
+
+    def test_en_shared_ru_term_not_allowed_when_builtins_off(self):
+        assert not _is_allowed_identical_copy("en", "ru", "json", use_builtin_exclusions=False)
+
+    # ── User regex patterns are always honoured regardless of toggle ──────────
+
+    def test_user_pattern_still_suppresses_when_builtins_off(self):
+        # A user-configured pattern for "PDF" strips all Latin; should be allowed
+        # even when built-in exclusions are disabled.
+        assert _is_allowed_identical_copy(
+            "en", "de", "PDF",
+            latin_ignore_patterns=(r"(?i)\bPDF\b",),
+            use_builtin_exclusions=False,
+        )
+
+    # ── collect_findings_for_group: IDENTICAL_TO_DEFAULT signal ──────────────
+
+    def test_globally_shared_translation_no_finding_when_builtins_on(self):
+        class _K:
+            def __init__(self):
+                self.msgid = "fmt.export"
+                self.context = ""
+
+        class _G:
+            def __init__(self):
+                self.key = _K()
+                self._v = {"en": "JSON", "de": "JSON", "fr": "JSON"}
+
+            def get_translation(self, loc):
+                return self._v.get(loc, "")
+
+        findings = collect_findings_for_group(
+            _G(), "en", ["en", "de", "fr"],
+            use_builtin_exclusions=True,
+        )
+        assert not any(f.signal == QualityHeuristicKind.IDENTICAL_TO_DEFAULT for f in findings)
+
+    def test_globally_shared_translation_emits_finding_when_builtins_off(self):
+        class _K:
+            def __init__(self):
+                self.msgid = "fmt.export"
+                self.context = ""
+
+        class _G:
+            def __init__(self):
+                self.key = _K()
+                self._v = {"en": "JSON", "de": "JSON", "fr": "JSON"}
+
+            def get_translation(self, loc):
+                return self._v.get(loc, "")
+
+        findings = collect_findings_for_group(
+            _G(), "en", ["en", "de", "fr"],
+            use_builtin_exclusions=False,
+        )
+        assert any(f.signal == QualityHeuristicKind.IDENTICAL_TO_DEFAULT for f in findings)
+
+    def test_en_shared_loanword_no_finding_when_builtins_on(self):
+        class _K:
+            def __init__(self):
+                self.msgid = "nav.browser"
+                self.context = ""
+
+        class _G:
+            def __init__(self):
+                self.key = _K()
+                self._v = {"en": "browser", "de": "browser"}
+
+            def get_translation(self, loc):
+                return self._v.get(loc, "")
+
+        findings = collect_findings_for_group(
+            _G(), "en", ["en", "de"],
+            use_builtin_exclusions=True,
+        )
+        assert not any(f.signal == QualityHeuristicKind.IDENTICAL_TO_DEFAULT for f in findings)
+
+    def test_en_shared_loanword_emits_finding_when_builtins_off(self):
+        class _K:
+            def __init__(self):
+                self.msgid = "nav.browser"
+                self.context = ""
+
+        class _G:
+            def __init__(self):
+                self.key = _K()
+                self._v = {"en": "browser", "de": "browser"}
+
+            def get_translation(self, loc):
+                return self._v.get(loc, "")
+
+        findings = collect_findings_for_group(
+            _G(), "en", ["en", "de"],
+            use_builtin_exclusions=False,
+        )
+        assert any(f.signal == QualityHeuristicKind.IDENTICAL_TO_DEFAULT for f in findings)
+
+    # ── collect_findings_for_group: IDENTICAL_TO_NONDEFAULT signal ───────────
+
+    def test_cross_locale_cluster_no_finding_when_builtins_on(self):
+        # es and pt sharing "digital" is in the allowed {es, pt} group
+        class _K:
+            def __init__(self):
+                self.msgid = "label.digital"
+                self.context = ""
+
+        class _G:
+            def __init__(self):
+                self.key = _K()
+                self._v = {"en": "digital content", "es": "digital", "pt": "digital"}
+
+            def get_translation(self, loc):
+                return self._v.get(loc, "")
+
+        findings = collect_findings_for_group(
+            _G(), "en", ["en", "es", "pt"],
+            use_builtin_exclusions=True,
+        )
+        assert not any(f.signal == QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT for f in findings)
+
+    def test_cross_locale_cluster_emits_finding_when_builtins_off(self):
+        class _K:
+            def __init__(self):
+                self.msgid = "label.digital"
+                self.context = ""
+
+        class _G:
+            def __init__(self):
+                self.key = _K()
+                self._v = {"en": "digital content", "es": "digital", "pt": "digital"}
+
+            def get_translation(self, loc):
+                return self._v.get(loc, "")
+
+        findings = collect_findings_for_group(
+            _G(), "en", ["en", "es", "pt"],
+            use_builtin_exclusions=False,
+        )
+        assert any(f.signal == QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT for f in findings)
+
+    def test_globally_shared_nondefault_cluster_no_finding_when_builtins_on(self):
+        # All non-default locales sharing "OK" — globally shared, no finding
+        class _K:
+            def __init__(self):
+                self.msgid = "btn.confirm"
+                self.context = ""
+
+        class _G:
+            def __init__(self):
+                self.key = _K()
+                self._v = {"en": "Confirm", "de": "OK", "fr": "OK", "es": "OK"}
+
+            def get_translation(self, loc):
+                return self._v.get(loc, "")
+
+        findings = collect_findings_for_group(
+            _G(), "en", ["en", "de", "fr", "es"],
+            use_builtin_exclusions=True,
+        )
+        assert not any(f.signal == QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT for f in findings)
+
+    def test_globally_shared_nondefault_cluster_emits_finding_when_builtins_off(self):
+        class _K:
+            def __init__(self):
+                self.msgid = "btn.confirm"
+                self.context = ""
+
+        class _G:
+            def __init__(self):
+                self.key = _K()
+                self._v = {"en": "Confirm", "de": "OK", "fr": "OK", "es": "OK"}
+
+            def get_translation(self, loc):
+                return self._v.get(loc, "")
+
+        findings = collect_findings_for_group(
+            _G(), "en", ["en", "de", "fr", "es"],
+            use_builtin_exclusions=False,
+        )
+        assert any(f.signal == QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT for f in findings)
