@@ -5,6 +5,7 @@ from typing import Optional
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QGroupBox,
     QHBoxLayout,
     QInputDialog,
@@ -106,6 +107,24 @@ class QualityReviewExclusionsDialog(SmartDialog):
         patterns_layout.addLayout(patt_row)
         layout.addWidget(patterns_group, stretch=1)
 
+        builtin_group = QGroupBox(_("Built-in exclusions"))
+        builtin_layout = QVBoxLayout(builtin_group)
+        builtin_info = QLabel(
+            _(
+                "The app ships with hardcoded allowlists of cognates, loanwords, and universal "
+                "technical terms (file formats, units, protocols) that are legitimately identical "
+                "across languages. Disable this to see all identity findings without suppression."
+            )
+        )
+        builtin_info.setWordWrap(True)
+        builtin_layout.addWidget(builtin_info)
+        self._use_builtin_checkbox = QCheckBox(
+            _("Use built-in cognate/loanword exclusions during identity checks")
+        )
+        self._use_builtin_checkbox.stateChanged.connect(self._on_builtin_exclusions_toggled)
+        builtin_layout.addWidget(self._use_builtin_checkbox)
+        layout.addWidget(builtin_group)
+
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         close_btn = QPushButton(_("Close"))
@@ -122,6 +141,12 @@ class QualityReviewExclusionsDialog(SmartDialog):
                 self.project_path
             )
         )
+        use_builtin = self.settings_manager.get_quality_review_use_builtin_exclusions(
+            self.project_path
+        )
+        self._use_builtin_checkbox.blockSignals(True)
+        self._use_builtin_checkbox.setChecked(use_builtin)
+        self._use_builtin_checkbox.blockSignals(False)
         self._populate_list_widgets()
 
     def _populate_list_widgets(self) -> None:
@@ -147,6 +172,20 @@ class QualityReviewExclusionsDialog(SmartDialog):
     def _emit_saved(self) -> None:
         self.settings_saved.emit()
         self._update_buttons()
+
+    def _on_builtin_exclusions_toggled(self) -> None:
+        if not self._can_edit_settings():
+            return
+        value = self._use_builtin_checkbox.isChecked()
+        if not self.settings_manager.save_quality_review_use_builtin_exclusions(
+            self.project_path, value
+        ):
+            QMessageBox.warning(self, _("Error"), _("Could not save setting."))
+            self._use_builtin_checkbox.blockSignals(True)
+            self._use_builtin_checkbox.setChecked(not value)
+            self._use_builtin_checkbox.blockSignals(False)
+            return
+        self._emit_saved()
 
     def _on_add_exclusion(self) -> None:
         if not self._can_edit_settings():
@@ -292,3 +331,4 @@ class QualityReviewExclusionsDialog(SmartDialog):
             can_edit and self._patterns_list.currentItem() is not None
         )
         self._reset_defaults_btn.setEnabled(can_edit)
+        self._use_builtin_checkbox.setEnabled(can_edit)

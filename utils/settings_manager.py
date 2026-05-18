@@ -484,6 +484,20 @@ class SettingsManager:
         cleaned = [dict(x) for x in rules if isinstance(x, dict)]
         return self.save_project_setting(project_path, "quality_review_custom_rules", cleaned)
 
+    def get_quality_review_use_builtin_exclusions(self, project_path: str) -> bool:
+        """Whether to apply built-in cognate/loanword allowlists during the identity check."""
+        return bool(
+            self.get_project_setting(
+                project_path, "quality_review_use_builtin_exclusions", True
+            )
+        )
+
+    def save_quality_review_use_builtin_exclusions(self, project_path: str, value: bool) -> bool:
+        """Persist the built-in exclusions toggle for this project."""
+        return self.save_project_setting(
+            project_path, "quality_review_use_builtin_exclusions", bool(value)
+        )
+
     def get_quality_review_script_ignore_patterns(self, project_path: str) -> list[str]:
         """Regex patterns removed before script-based quality/character-set checks."""
         self._ensure_quality_review_script_ignore_patterns_seeded(project_path)

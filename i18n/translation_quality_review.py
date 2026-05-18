@@ -75,6 +75,7 @@ def collect_findings_for_group(
     default_locale: str,
     locales: List[str],
     latin_ignore_patterns: Sequence[str] = (),
+    use_builtin_exclusions: bool = True,
 ) -> List[QualityReviewFinding]:
     """Return advisory findings for one translation group (built-in heuristics only)."""
     findings: List[QualityReviewFinding] = []
@@ -131,6 +132,7 @@ def collect_findings_for_group(
         latin_ignore_patterns,
         mid,
         ctx,
+        use_builtin_exclusions=use_builtin_exclusions,
     )
     if default_match is not None:
         findings.append(default_match)
@@ -141,6 +143,7 @@ def collect_findings_for_group(
         default_locale,
         mid,
         ctx,
+        use_builtin_exclusions=use_builtin_exclusions,
     )
     if nond is not None:
         findings.append(nond)
@@ -156,6 +159,7 @@ def _finding_identical_to_default_for_group(
     latin_ignore_patterns: Sequence[str],
     key_msgid: str,
     key_context: str,
+    use_builtin_exclusions: bool = True,
 ) -> Optional[QualityReviewFinding]:
     """One group-level finding for non-default locales that copy the default locale text."""
     matching: List[str] = []
@@ -169,7 +173,8 @@ def _finding_identical_to_default_for_group(
         if not text:
             continue
         if text == base and not _is_allowed_identical_copy(
-            default_locale, loc, text, latin_ignore_patterns
+            default_locale, loc, text, latin_ignore_patterns,
+            use_builtin_exclusions=use_builtin_exclusions,
         ):
             matching.append(loc)
     if not matching:
@@ -189,6 +194,7 @@ def _finding_identical_to_nondefault_for_group(
     default_locale: str,
     key_msgid: str,
     key_context: str,
+    use_builtin_exclusions: bool = True,
 ) -> Optional[QualityReviewFinding]:
     """One group-level finding when 2+ non-default locales share the same translation text."""
     base = (group.get_translation(default_locale) or "").strip()
@@ -201,7 +207,7 @@ def _finding_identical_to_nondefault_for_group(
             continue
         if base and text == base:
             continue
-        if is_globally_shared_identical_value(text):
+        if use_builtin_exclusions and is_globally_shared_identical_value(text):
             continue
         by_text.setdefault(text, []).append(loc)
 
@@ -209,7 +215,7 @@ def _finding_identical_to_nondefault_for_group(
     for text, locs in by_text.items():
         if len(locs) < 2:
             continue
-        if is_allowed_cross_locale_identical_cluster(locs, text):
+        if use_builtin_exclusions and is_allowed_cross_locale_identical_cluster(locs, text):
             continue
         clusters.append(sorted(locs))
     if not clusters:
@@ -255,13 +261,14 @@ def _is_allowed_identical_copy(
     locale: str,
     text: str,
     latin_ignore_patterns: Sequence[str] = (),
+    use_builtin_exclusions: bool = True,
 ) -> bool:
     """True when copying the default locale text is expected for this locale/value."""
-    if is_globally_shared_identical_value(text):
+    if use_builtin_exclusions and is_globally_shared_identical_value(text):
         return True
 
     allowed_lang: frozenset[str] = frozenset()
-    if _base_language(default_locale) == "en":
+    if use_builtin_exclusions and _base_language(default_locale) == "en":
         allowed_lang = EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE.get(
             _base_language(locale), frozenset()
         )
@@ -277,12 +284,13 @@ def _is_allowed_identical_copy(
     if not _contains_latin_letter(scrubbed_without_patterns):
         return True
 
-    scrubbed_without_patterns = _strip_allowed_shared_terms(
-        scrubbed_without_patterns, GLOBALLY_SHARED_IDENTICAL_VALUES
-    )
-    scrubbed_without_patterns = _strip_allowed_shared_terms(
-        scrubbed_without_patterns, allowed_lang
-    )
+    if use_builtin_exclusions:
+        scrubbed_without_patterns = _strip_allowed_shared_terms(
+            scrubbed_without_patterns, GLOBALLY_SHARED_IDENTICAL_VALUES
+        )
+        scrubbed_without_patterns = _strip_allowed_shared_terms(
+            scrubbed_without_patterns, allowed_lang
+        )
     scrubbed_without_patterns = _strip_ui_label_parentheticals(scrubbed_without_patterns)
     return not _contains_latin_letter(scrubbed_without_patterns)
 
@@ -417,6 +425,7 @@ def collect_project_quality_findings(
     default_locale: str,
     excluded_msgids: AbstractSet[str] = frozenset(),
     latin_ignore_patterns: Sequence[str] = (),
+    use_builtin_exclusions: bool = True,
 ) -> TranslationQualityFindings:
     """Scan the full in-memory catalog for built-in advisory signals."""
     loc_list = list(locales)
@@ -429,6 +438,7 @@ def collect_project_quality_findings(
                 loc_list,
                 excluded,
                 tuple(latin_ignore_patterns),
+                use_builtin_exclusions=use_builtin_exclusions,
             )
         )
     return TranslationQualityFindings(findings=rows)

@@ -579,6 +579,7 @@ class TranslationGroup():
         locales: List[str],
         excluded_msgids: Set[str],
         latin_ignore_patterns: tuple[str, ...] = tuple(),
+        use_builtin_exclusions: bool = True,
     ) -> list:
         """Run advisory quality checks for this group (see :mod:`i18n.translation_quality_review`)."""
         from i18n.translation_quality_review import collect_findings_for_group
@@ -590,6 +591,7 @@ class TranslationGroup():
             default_locale,
             locales,
             latin_ignore_patterns=latin_ignore_patterns,
+            use_builtin_exclusions=use_builtin_exclusions,
         )
 
     def has_translation_changes(self, other: 'TranslationGroup') -> bool:

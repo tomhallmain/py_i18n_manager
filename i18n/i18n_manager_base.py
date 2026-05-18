@@ -67,6 +67,14 @@ class I18NManagerBase(ABC):
             )
         return tuple()
 
+    def get_quality_review_use_builtin_exclusions(self) -> bool:
+        """Whether built-in cognate/loanword allowlists are applied during identity checks."""
+        if self.settings_manager:
+            return self.settings_manager.get_quality_review_use_builtin_exclusions(
+                self._directory
+            )
+        return True
+
     def _total_locales_for_statistics(self, results: TranslationManagerResults) -> int:
         """How many locales to report on ``results`` (bundle managers use ``self.locales``)."""
         if self.locales:
@@ -92,6 +100,7 @@ class I18NManagerBase(ABC):
                 self.default_locale,
                 self.get_quality_review_excluded_msgids(),
                 self.get_quality_review_script_ignore_patterns(),
+                use_builtin_exclusions=self.get_quality_review_use_builtin_exclusions(),
             )
         else:
             results.invalid_groups = self.get_invalid_translations()

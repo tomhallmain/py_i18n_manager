@@ -2,7 +2,7 @@
 
 Three layers:
 
-1. :data:`GLOBALLY_SHARED_IDENTICAL_VALUES` — same spelling OK in every locale (units, brands).
+1. :data:`GLOBALLY_SHARED_IDENTICAL_VALUES` — same spelling OK in every locale (UI conventions, units, formats, protocols).
 2. :data:`EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE` — English default + expected loanwords per target language.
 3. :data:`CROSS_LANGUAGE_SHARED_IDENTICAL_VALUES` — non-default locales that may share the same
    translation without implying a copy error (independent of English).
@@ -15,9 +15,58 @@ from typing import Dict, FrozenSet, Sequence
 # Values that may stay identical to the default (or across locales) in any language.
 GLOBALLY_SHARED_IDENTICAL_VALUES: frozenset[str] = frozenset(
     {
+        # Temperature scales
         "celsius",
         "fahrenheit",
         "kelvin",
+        # Universal UI / product conventions (kept in Latin script in every locale,
+        # including non-Latin-script languages such as Japanese, Arabic, Russian)
+        "ok",
+        "beta",
+        "alpha",
+        "demo",
+        "wifi",
+        "bluetooth",
+        # File / data formats (used as standalone translation values, e.g. format dropdowns)
+        "csv",
+        "html",
+        "json",
+        "pdf",
+        "png",
+        "svg",
+        "xml",
+        "yaml",
+        "yml",
+        "zip",
+        # SI and digital measurement units
+        "gb",
+        "ghz",
+        "hz",
+        "kb",
+        "kg",
+        "km",
+        "mb",
+        "mhz",
+        "ms",
+        "pb",
+        "px",
+        "tb",
+        # Network / security protocols
+        "ftp",
+        "http",
+        "https",
+        "smtp",
+        "ssh",
+        "ssl",
+        "tcp",
+        "tls",
+        "udp",
+        # Universal tech identifiers used as whole translation values
+        "api",
+        "css",
+        "gps",
+        "sql",
+        "url",
     }
 )
 
