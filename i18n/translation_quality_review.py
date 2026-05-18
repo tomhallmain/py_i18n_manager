@@ -144,6 +144,18 @@ def collect_findings_for_group(
     return findings
 
 
+# Values that may stay identical to the default (or across locales) in any language.
+# Extend over time for international scientific/technical terms, brand names, etc.
+_GLOBALLY_SHARED_IDENTICAL_VALUES: frozenset[str] = frozenset(
+    {
+        "celsius",
+        "fahrenheit",
+        "kelvin",
+    }
+)
+
+# When default locale is English: loanwords / cognates per target language that may match en.
+# See also :data:`_GLOBALLY_SHARED_IDENTICAL_VALUES` for language-agnostic allowances.
 _EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
     "de": frozenset(
         {
@@ -214,8 +226,13 @@ _EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
             "participant",
             "participants",
             "plan",
+            "restaurant",
+            "restaurants",
+            "service",
+            "services",
             "signal",
             "status",
+            "terrible",
             "total",
             "type",
             "url",
@@ -299,7 +316,7 @@ def _finding_identical_to_default_for_group(
         text = (group.get_translation(loc) or "").strip()
         if not text:
             continue
-        if text == base and not _is_allowed_identical_to_english_default(
+        if text == base and not _is_allowed_identical_copy(
             default_locale, loc, text, latin_ignore_patterns
         ):
             matching.append(loc)
@@ -332,6 +349,8 @@ def _finding_identical_to_nondefault_for_group(
             continue
         if base and text == base:
             continue
+        if _is_globally_shared_identical_value(text):
+            continue
         by_text.setdefault(text, []).append(loc)
 
     clusters = [sorted(locs) for locs in by_text.values() if len(locs) >= 2]
@@ -355,20 +374,48 @@ def _base_language(locale: str) -> str:
     return locale.replace("-", "_").split("_", 1)[0].strip().lower()
 
 
-def _is_allowed_identical_to_english_default(
+_UI_LABEL_PAREN_SUFFIX = re.compile(r"\s*\((?=[^)]*[A-Za-z])[^)]*\)")
+
+
+def _is_globally_shared_identical_value(text: str) -> bool:
+    return (text or "").strip().lower() in _GLOBALLY_SHARED_IDENTICAL_VALUES
+
+
+def _strip_ui_label_parentheticals(text: str) -> str:
+    """Remove sort/filter parentheticals such as ``(A-Z)`` after shared-term stripping."""
+    return _UI_LABEL_PAREN_SUFFIX.sub("", text).strip()
+
+
+def _strip_allowed_shared_terms(
+    text: str, terms: frozenset[str], *, case_insensitive: bool = True
+) -> str:
+    scrubbed = text
+    flags = re.IGNORECASE if case_insensitive else 0
+    for term in sorted(terms, key=len, reverse=True):
+        scrubbed = re.sub(rf"\b{re.escape(term)}\b", "", scrubbed, flags=flags)
+    return scrubbed
+
+
+def _is_allowed_identical_copy(
     default_locale: str,
     locale: str,
     text: str,
     latin_ignore_patterns: Sequence[str] = (),
 ) -> bool:
-    if _base_language(default_locale) != "en":
-        return False
-    allowed = _EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE.get(_base_language(locale), frozenset())
-    normalized = (text or "").strip().lower()
-    if normalized in allowed:
+    """True when copying the default locale text is expected for this locale/value."""
+    if _is_globally_shared_identical_value(text):
         return True
 
-    # Ignore placeholder-like segments and markup tags.
+    allowed_lang: frozenset[str] = frozenset()
+    if _base_language(default_locale) == "en":
+        allowed_lang = _EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE.get(
+            _base_language(locale), frozenset()
+        )
+
+    normalized = (text or "").strip().lower()
+    if normalized in allowed_lang:
+        return True
+
     scrubbed = scrub_dynamic_segments(text or "")
 
     # Allow if user-configured Latin-ignore patterns account for all Latin characters.
@@ -376,15 +423,26 @@ def _is_allowed_identical_to_english_default(
     if not _contains_latin_letter(scrubbed_without_patterns):
         return True
 
-    # Allow if the only remaining Latin content is from accepted shared terms.
-    for term in sorted(allowed, key=len, reverse=True):
-        scrubbed_without_patterns = re.sub(
-            rf"\b{re.escape(term)}\b",
-            "",
-            scrubbed_without_patterns,
-            flags=re.IGNORECASE,
-        )
+    scrubbed_without_patterns = _strip_allowed_shared_terms(
+        scrubbed_without_patterns, _GLOBALLY_SHARED_IDENTICAL_VALUES
+    )
+    scrubbed_without_patterns = _strip_allowed_shared_terms(
+        scrubbed_without_patterns, allowed_lang
+    )
+    scrubbed_without_patterns = _strip_ui_label_parentheticals(scrubbed_without_patterns)
     return not _contains_latin_letter(scrubbed_without_patterns)
+
+
+def _is_allowed_identical_to_english_default(
+    default_locale: str,
+    locale: str,
+    text: str,
+    latin_ignore_patterns: Sequence[str] = (),
+) -> bool:
+    """Backward-compatible alias for :func:`_is_allowed_identical_copy`."""
+    return _is_allowed_identical_copy(
+        default_locale, locale, text, latin_ignore_patterns
+    )
 
 
 def _apply_latin_ignore_patterns(text: str, patterns: Sequence[str]) -> str:

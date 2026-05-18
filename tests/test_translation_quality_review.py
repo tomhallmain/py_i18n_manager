@@ -314,3 +314,56 @@ class TestLatinHeuristicsRegression:
         ]
         assert len(default_findings) == 1
         assert set(default_findings[0].notes.split(", ")) == {"de", "it"}
+
+    def test_collect_findings_skips_globally_shared_scientific_units(self):
+        class _FakeKey:
+            def __init__(self, msgid: str, context: str = ""):
+                self.msgid = msgid
+                self.context = context
+
+        class _FakeGroup:
+            def __init__(self):
+                self.key = _FakeKey("units.temp", "")
+                self._values = {
+                    "en": "Fahrenheit",
+                    "de": "Fahrenheit",
+                    "es": "Fahrenheit",
+                    "fr": "Fahrenheit",
+                    "it": "Fahrenheit",
+                }
+
+            def get_translation(self, locale: str):
+                return self._values.get(locale, "")
+
+        findings = collect_findings_for_group(
+            _FakeGroup(),
+            default_locale="en",
+            locales=["en", "de", "es", "fr", "it"],
+            latin_ignore_patterns=(),
+        )
+        assert not findings
+
+    def test_collect_findings_skips_name_with_sort_suffix_via_de_loanword(self):
+        class _FakeKey:
+            def __init__(self, msgid: str, context: str = ""):
+                self.msgid = msgid
+                self.context = context
+
+        class _FakeGroup:
+            def __init__(self):
+                self.key = _FakeKey("sort.name", "")
+                self._values = {
+                    "en": "Name (A-Z)",
+                    "de": "Name (A-Z)",
+                }
+
+            def get_translation(self, locale: str):
+                return self._values.get(locale, "")
+
+        findings = collect_findings_for_group(
+            _FakeGroup(),
+            default_locale="en",
+            locales=["en", "de"],
+            latin_ignore_patterns=(),
+        )
+        assert not findings
