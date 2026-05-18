@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, Optional
 
 from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton,
                             QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
                             QMessageBox, QLineEdit, QComboBox, QCheckBox, QMenu,
-                            QAbstractItemView)
+                            QAbstractItemView, QDialog, QFormLayout)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QAction
@@ -111,9 +112,14 @@ class AllTranslationsWindow(BaseTranslationWindow):
             _("Manage msgid exclusions and ignore regex patterns for this project.")
         )
         
+        self.find_replace_btn = QPushButton(_("Find & Replace"))
+        self.find_replace_btn.clicked.connect(self.open_find_replace_dialog)
+        self.find_replace_btn.setToolTip(_("Search and replace text within translation values"))
+
         button_layout.addWidget(save_btn)
         button_layout.addWidget(close_btn)
         button_layout.addWidget(self.exclusions_btn)
+        button_layout.addWidget(self.find_replace_btn)
         button_layout.addWidget(self.unicode_toggle)
         layout.addLayout(button_layout)
         
@@ -539,4 +545,213 @@ class AllTranslationsWindow(BaseTranslationWindow):
         self.show_escaped = not self.show_escaped
         self.update_table_display()
         # Force UI update
-        QTimer.singleShot(0, lambda: self.table.viewport().update()) 
+        QTimer.singleShot(0, lambda: self.table.viewport().update())
+
+    def open_find_replace_dialog(self):
+        if not self.all_translations or not self.all_locales:
+            QMessageBox.information(self, _("Find & Replace"), _("No translation data loaded."))
+            return
+        dialog = FindReplaceDialog(self)
+        dialog.exec()
+
+    @staticmethod
+    def _apply_replacement(
+        text: str,
+        find_text: str,
+        replace_text: str,
+        use_regex: bool,
+        case_sensitive: bool,
+    ) -> str:
+        """Return ``text`` with all occurrences of ``find_text`` replaced."""
+        if not find_text:
+            return text
+        try:
+            flags = 0 if case_sensitive else re.IGNORECASE
+            pattern = find_text if use_regex else re.escape(find_text)
+            return re.sub(pattern, replace_text, text, flags=flags)
+        except re.error:
+            return text
+
+    def collect_replace_targets(
+        self,
+        find_text: str,
+        replace_text: str,
+        use_regex: bool,
+        case_sensitive: bool,
+        scope_index: int,
+    ) -> list:
+        """Return (row, col, old_text, new_text) for every visible cell that would change.
+
+        scope_index=0 means all locale columns; any other value is the column index directly
+        (the scope combo is populated as [All locales, locale1, locale2, ...] matching column order).
+        """
+        if not find_text or not self.all_locales:
+            return []
+        col_range = (
+            range(1, self.table.columnCount())
+            if scope_index == 0
+            else range(scope_index, scope_index + 1)
+        )
+        targets = []
+        for row in range(self.table.rowCount()):
+            if self.table.isRowHidden(row):
+                continue
+            for col in col_range:
+                item = self.table.item(row, col)
+                if not item:
+                    continue
+                old_text = item.text()
+                new_text = self._apply_replacement(
+                    old_text, find_text, replace_text, use_regex, case_sensitive
+                )
+                if new_text != old_text:
+                    targets.append((row, col, old_text, new_text))
+        return targets
+
+    def apply_replace_targets(self, targets: list) -> int:
+        """Write new_text into each targeted table cell and trigger a repaint."""
+        for row, col, _old, new_text in targets:
+            item = self.table.item(row, col)
+            if item is not None:
+                item.setText(new_text)
+        QTimer.singleShot(0, lambda: self.table.viewport().update())
+        return len(targets)
+
+
+class FindReplaceDialog(QDialog):
+    """Modal dialog for finding and replacing text within translation values.
+
+    The dialog previews the match count before applying any changes, and defers
+    persistence to the parent window's existing Save Changes flow.
+    """
+
+    def __init__(self, parent: "AllTranslationsWindow"):
+        super().__init__(parent)
+        self._window = parent
+        self.setWindowTitle(_("Find & Replace"))
+        self.setMinimumWidth(480)
+        self._setup_ui()
+        self._populate_scope_combo()
+
+    def _setup_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+
+        # Find / Replace inputs (form layout keeps labels aligned)
+        form = QFormLayout()
+        self.find_box = QLineEdit()
+        self.find_box.setPlaceholderText(_("Text or pattern to find"))
+        self.find_box.textChanged.connect(self._reset_status)
+        form.addRow(_("Find:"), self.find_box)
+
+        self.replace_box = QLineEdit()
+        self.replace_box.setPlaceholderText(_("Replacement text (may be empty)"))
+        form.addRow(_("Replace:"), self.replace_box)
+        layout.addLayout(form)
+
+        # Options row
+        options_row = QHBoxLayout()
+        self.regex_checkbox = QCheckBox(_("Regex"))
+        self.regex_checkbox.setToolTip(_("Treat the find text as a regular expression"))
+        self.regex_checkbox.stateChanged.connect(self._reset_status)
+        options_row.addWidget(self.regex_checkbox)
+
+        self.match_case_checkbox = QCheckBox(_("Match Case"))
+        self.match_case_checkbox.setToolTip(_("Use case-sensitive matching"))
+        self.match_case_checkbox.stateChanged.connect(self._reset_status)
+        options_row.addWidget(self.match_case_checkbox)
+
+        options_row.addSpacing(16)
+        options_row.addWidget(QLabel(_("Scope:")))
+        self.scope_combo = QComboBox()
+        self.scope_combo.setToolTip(
+            _("Apply to all locale columns, or restrict to a single locale")
+        )
+        self.scope_combo.currentIndexChanged.connect(self._reset_status)
+        options_row.addWidget(self.scope_combo)
+        options_row.addStretch()
+        layout.addLayout(options_row)
+
+        # Status label — shows match count, errors, or post-replace confirmation
+        self.status_label = QLabel("")
+        self.status_label.setWordWrap(True)
+        layout.addWidget(self.status_label)
+
+        # Buttons
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        self.replace_btn = QPushButton(_("Replace All"))
+        self.replace_btn.setDefault(True)
+        self.replace_btn.clicked.connect(self._on_replace_all)
+        btn_row.addWidget(self.replace_btn)
+        close_btn = QPushButton(_("Close"))
+        close_btn.clicked.connect(self.accept)
+        btn_row.addWidget(close_btn)
+        layout.addLayout(btn_row)
+
+    def _populate_scope_combo(self) -> None:
+        self.scope_combo.blockSignals(True)
+        self.scope_combo.clear()
+        self.scope_combo.addItem(_("All locales"))
+        if self._window.all_locales:
+            for loc in self._window.all_locales:
+                self.scope_combo.addItem(loc)
+        self.scope_combo.blockSignals(False)
+
+    def _reset_status(self) -> None:
+        self.status_label.setText("")
+
+    def _on_replace_all(self) -> None:
+        find_text = self.find_box.text()
+        if not find_text:
+            self.status_label.setText(_("Please enter text to find."))
+            return
+
+        use_regex = self.regex_checkbox.isChecked()
+        case_sensitive = self.match_case_checkbox.isChecked()
+
+        if use_regex:
+            try:
+                re.compile(find_text, 0 if case_sensitive else re.IGNORECASE)
+            except re.error as exc:
+                self.status_label.setText(
+                    _("Invalid regex: {error}").format(error=str(exc))
+                )
+                return
+
+        scope_index = self.scope_combo.currentIndex()
+        replace_text = self.replace_box.text()
+
+        targets = self._window.collect_replace_targets(
+            find_text, replace_text, use_regex, case_sensitive, scope_index
+        )
+
+        if not targets:
+            self.status_label.setText(_("No matches found."))
+            return
+
+        affected_rows = len({t[0] for t in targets})
+        scope_label = self.scope_combo.currentText()
+
+        reply = QMessageBox.question(
+            self,
+            _("Confirm Replacement"),
+            _(
+                "Found {cell_count} match(es) across {row_count} row(s) ({scope}).\n\n"
+                "Changes are held in memory — use Save Changes to persist.\n\nProceed?"
+            ).format(
+                cell_count=len(targets),
+                row_count=affected_rows,
+                scope=scope_label,
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        count = self._window.apply_replace_targets(targets)
+        self.status_label.setText(
+            _("Replaced {count} cell(s). Use Save Changes to persist.").format(count=count)
+        )
