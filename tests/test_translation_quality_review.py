@@ -343,6 +343,48 @@ class TestLatinHeuristicsRegression:
         )
         assert not findings
 
+    def test_collect_findings_skips_nondefault_when_cross_language_allowlist(self):
+        cases = [
+            (
+                "good.msg",
+                {"en": "Good", "es": "Bien", "fr": "Bien"},
+                ["en", "es", "fr"],
+            ),
+            (
+                "profile.msg",
+                {"en": "Profile", "de": "Profil", "fr": "Profil"},
+                ["en", "de", "fr"],
+            ),
+            (
+                "share.msg",
+                {"en": "Share", "es": "Compartir", "it": "Compartir"},
+                ["en", "es", "it"],
+            ),
+        ]
+        for msgid, values, locales in cases:
+            class _FakeKey:
+                def __init__(self, mid: str, context: str = ""):
+                    self.msgid = mid
+                    self.context = context
+
+            class _FakeGroup:
+                def __init__(self, mid: str, vals: dict):
+                    self.key = _FakeKey(mid, "")
+                    self._values = vals
+
+                def get_translation(self, locale: str):
+                    return self._values.get(locale, "")
+
+            findings = collect_findings_for_group(
+                _FakeGroup(msgid, values),
+                default_locale="en",
+                locales=locales,
+                latin_ignore_patterns=(),
+            )
+            assert QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT not in {
+                f.signal for f in findings
+            }, msgid
+
     def test_collect_findings_skips_name_with_sort_suffix_via_de_loanword(self):
         class _FakeKey:
             def __init__(self, msgid: str, context: str = ""):

@@ -26,7 +26,12 @@ if TYPE_CHECKING:
 from .invalid_translation_groups import QualityReviewFinding, TranslationQualityFindings
 from .text_scrub import scrub_dynamic_segments
 from .translation_group import TranslationGroup, TranslationKey
-
+from .valid_exclusions_by_language import (
+    EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE,
+    GLOBALLY_SHARED_IDENTICAL_VALUES,
+    is_allowed_cross_locale_identical_cluster,
+    is_globally_shared_identical_value,
+)
 
 
 
@@ -144,159 +149,6 @@ def collect_findings_for_group(
     return findings
 
 
-# Values that may stay identical to the default (or across locales) in any language.
-# Extend over time for international scientific/technical terms, brand names, etc.
-_GLOBALLY_SHARED_IDENTICAL_VALUES: frozenset[str] = frozenset(
-    {
-        "celsius",
-        "fahrenheit",
-        "kelvin",
-    }
-)
-
-# When default locale is English: loanwords / cognates per target language that may match en.
-# See also :data:`_GLOBALLY_SHARED_IDENTICAL_VALUES` for language-agnostic allowances.
-_EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
-    "de": frozenset(
-        {
-            "AM/PM",
-            "api",
-            "April",
-            "August",
-            "email",
-            "e-mail",
-            "emoji",
-            "global",
-            "id",
-            "json",
-            "info",
-            "minute",
-            "name",
-            "navigation",
-            "November",
-            "plan",
-            "September",
-            "signal",
-            "status",
-            "url",
-            "version",
-            "xml",
-        }
-    ),
-    "fr": frozenset(
-        {
-            "absent",
-            "action",
-            "actions",
-            "alliance",
-            "alliances",
-            "api",
-            "avatar",
-            "cuisine",
-            "date",
-            "description",
-            "descriptions",
-            "document",
-            "documentation",
-            "documents",
-            "e-mail",
-            "email",
-            "emoji",
-            "etc",
-            "exclusion",
-            "exclusions",
-            "format",
-            "id",
-            "info",
-            "json",
-            "locale",
-            "locales",
-            "menu",
-            "messages",
-            "messsage",
-            "minute",
-            "minutes",
-            "navigation",
-            "note",
-            "notes",
-            "notification",
-            "notifications",
-            "page",
-            "pages",
-            "participant",
-            "participants",
-            "plan",
-            "restaurant",
-            "restaurants",
-            "service",
-            "services",
-            "signal",
-            "status",
-            "terrible",
-            "total",
-            "type",
-            "url",
-            "version",
-            "vote",
-            "votes",
-            "xml",
-        }
-    ),
-    "es": frozenset(
-        {
-            "api",
-            "email",
-            "e-mail",
-            "emoji",
-            "error",
-            "etc",
-            "general",
-            "global",
-            "id",
-            "info",
-            "json",
-            "locales",
-            "no",
-            "personal",
-            "terrible",
-            "total",
-            "url",
-            "xml",
-        }
-    ),
-    "it": frozenset(
-        {
-            "AM/PM",
-            "api",
-            "email",
-            "e-mail",
-            "emoji",
-            "id",
-            "info",
-            "json",
-            "no",
-            "password",
-            "status",
-            "url",
-            "xml",
-        }
-    ),
-    "pt": frozenset(
-        {
-            "AM/PM",
-            "api",
-            "email",
-            "e-mail",
-            "emoji",
-            "id",
-            "info",
-            "json",
-            "no",
-        }
-    ),
-}
-
-
 def _finding_identical_to_default_for_group(
     group: TranslationGroup,
     locales: List[str],
@@ -349,11 +201,17 @@ def _finding_identical_to_nondefault_for_group(
             continue
         if base and text == base:
             continue
-        if _is_globally_shared_identical_value(text):
+        if is_globally_shared_identical_value(text):
             continue
         by_text.setdefault(text, []).append(loc)
 
-    clusters = [sorted(locs) for locs in by_text.values() if len(locs) >= 2]
+    clusters: List[List[str]] = []
+    for text, locs in by_text.items():
+        if len(locs) < 2:
+            continue
+        if is_allowed_cross_locale_identical_cluster(locs, text):
+            continue
+        clusters.append(sorted(locs))
     if not clusters:
         return None
 
@@ -375,10 +233,6 @@ def _base_language(locale: str) -> str:
 
 
 _UI_LABEL_PAREN_SUFFIX = re.compile(r"\s*\((?=[^)]*[A-Za-z])[^)]*\)")
-
-
-def _is_globally_shared_identical_value(text: str) -> bool:
-    return (text or "").strip().lower() in _GLOBALLY_SHARED_IDENTICAL_VALUES
 
 
 def _strip_ui_label_parentheticals(text: str) -> str:
@@ -403,12 +257,12 @@ def _is_allowed_identical_copy(
     latin_ignore_patterns: Sequence[str] = (),
 ) -> bool:
     """True when copying the default locale text is expected for this locale/value."""
-    if _is_globally_shared_identical_value(text):
+    if is_globally_shared_identical_value(text):
         return True
 
     allowed_lang: frozenset[str] = frozenset()
     if _base_language(default_locale) == "en":
-        allowed_lang = _EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE.get(
+        allowed_lang = EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE.get(
             _base_language(locale), frozenset()
         )
 
@@ -424,7 +278,7 @@ def _is_allowed_identical_copy(
         return True
 
     scrubbed_without_patterns = _strip_allowed_shared_terms(
-        scrubbed_without_patterns, _GLOBALLY_SHARED_IDENTICAL_VALUES
+        scrubbed_without_patterns, GLOBALLY_SHARED_IDENTICAL_VALUES
     )
     scrubbed_without_patterns = _strip_allowed_shared_terms(
         scrubbed_without_patterns, allowed_lang
