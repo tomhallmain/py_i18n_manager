@@ -480,6 +480,10 @@ class JavaScriptI18NManager(I18NManagerBase):
                         prefix = content[max(0, match.start() - 60):match.start()]
                         if any(token in prefix for token in ("t(", "i18n.t(", "translate(")):
                             continue
+                        # Skip strings with no alphabetic content (symbols, numbers,
+                        # punctuation-only placeholders).
+                        if not any(c.isalpha() for c in text):
+                            continue
                         strings.append(text)
 
                     if strings:

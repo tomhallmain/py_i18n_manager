@@ -544,6 +544,10 @@ class JavaI18NManager(I18NManagerBase):
                             continue
                         if "getString(" in content[max(0, match.start() - 40):match.start() + 5]:
                             continue
+                        # Skip strings with no alphabetic content (symbols, numbers,
+                        # punctuation-only placeholders).
+                        if not any(c.isalpha() for c in text):
+                            continue
                         strings.append(text)
                     if strings:
                         results[os.path.relpath(file_path, project_dir)] = strings

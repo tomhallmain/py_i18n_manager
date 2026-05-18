@@ -1727,8 +1727,9 @@ msgstr ""
                             if not re.search(r'_(?:\(["\']' + re.escape(string) + r'["\']\)|["\']' + re.escape(string) + r'["\'])', content):
                                 # Skip if already wrapped in Rails i18n calls
                                 if not re.search(r't\(["\']' + re.escape(string) + r'["\']\)', content):
-                                    # Skip strings that are just whitespace, numbers, or symbols
-                                    if string.strip() and not string.strip().isdigit():
+                                    # Skip strings with no alphabetic content (symbols, numbers,
+                                    # punctuation-only placeholders).
+                                    if string.strip() and any(c.isalpha() for c in string):
                                         strings.append(string)
                     
                     if strings:

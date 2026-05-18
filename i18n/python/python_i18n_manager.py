@@ -802,56 +802,46 @@ msgstr ""
         # Get the project root directory
         project_dir = self._get_project_root()
             
-        # Patterns that suggest UI text
+        # Patterns that suggest unwrapped UI text.
+        # (?!_\() negative lookahead rejects arguments already inside _().
         ui_patterns = [
-            r'QLabel\(["\']([^"\']+)["\']\)',
-            r'QPushButton\(["\']([^"\']+)["\']\)',
-            r'setWindowTitle\(["\']([^"\']+)["\']\)',
-            r'setText\(["\']([^"\']+)["\']\)',
-            r'setTitle\(["\']([^"\']+)["\']\)',
-            r'setPlaceholderText\(["\']([^"\']+)["\']\)',
-            r'QMessageBox\.(?:information|warning|critical|question)\([^,]+,["\']([^"\']+)["\'],["\']([^"\']+)["\']\)',
-            r'addTab\([^,]+,["\']([^"\']+)["\']\)'
+            r'QLabel\((?!_\()["\']([^"\']+)["\']\)',
+            r'QPushButton\((?!_\()["\']([^"\']+)["\']\)',
+            r'setWindowTitle\((?!_\()["\']([^"\']+)["\']\)',
+            r'setText\((?!_\()["\']([^"\']+)["\']\)',
+            r'setTitle\((?!_\()["\']([^"\']+)["\']\)',
+            r'setPlaceholderText\((?!_\()["\']([^"\']+)["\']\)',
+            r'QMessageBox\.(?:information|warning|critical|question)\([^,]+,(?!_\()["\']([^"\']+)["\']\s*,(?!_\()["\']([^"\']+)["\']\)',
+            r'addTab\([^,]+,(?!_\()["\']([^"\']+)["\']\)',
         ]
-        
-        # Combine patterns
+
         combined_pattern = '|'.join(ui_patterns)
-        
-        # Store results
         results = {}
-        
-        # Walk through Python files
+
         for root, _, files in os.walk(project_dir):
             for file in files:
                 if not file.endswith('.py'):
                     continue
-                    
+
                 file_path = os.path.join(root, file)
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:
                         content = f.read()
-                        
-                    # Find all potential UI strings
-                    matches = re.finditer(combined_pattern, content)
+
                     strings = []
-                    
-                    for match in matches:
-                        # Get all capturing groups from the match
-                        groups = [g for g in match.groups() if g]
-                        for string in groups:
-                            # Skip if already wrapped in _()
-                            if not re.search(r'_\(["\']' + re.escape(string) + r'["\']\)', content):
-                                # Skip strings that are just whitespace, numbers, or symbols
-                                if string.strip() and not string.strip().isdigit():
-                                    strings.append(string)
-                    
+                    for match in re.finditer(combined_pattern, content):
+                        for string in (g for g in match.groups() if g):
+                            # Skip strings that have no alphabetic content (symbols, numbers,
+                            # punctuation-only placeholders like "-", "--", "×", "1.0").
+                            if string.strip() and any(c.isalpha() for c in string):
+                                strings.append(string)
+
                     if strings:
-                        rel_path = os.path.relpath(file_path, project_dir)
-                        results[rel_path] = strings
-                        
+                        results[os.path.relpath(file_path, project_dir)] = strings
+
                 except Exception as e:
                     logger.error(f"Error processing file {file_path}: {e}")
-                    
+
         return results
 
     def check_translations_changed(self, include_stale_translations: bool = False) -> bool:
