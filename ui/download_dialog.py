@@ -2,6 +2,9 @@ from PyQt6.QtWidgets import QVBoxLayout, QLabel, QProgressBar, QApplication
 from PyQt6.QtCore import Qt, QTimer
 
 from lib.multi_display import SmartDialog
+from utils.translations import I18N
+
+_ = I18N._
 
 
 class DownloadDialog(SmartDialog):
@@ -11,7 +14,7 @@ class DownloadDialog(SmartDialog):
         super().__init__(
             parent=parent,
             position_parent=parent,
-            title="Downloading Translation Model",
+            title=_("Downloading Translation Model"),
             geometry="300x150",
             offset_x=50,
             offset_y=50,
@@ -35,7 +38,7 @@ class DownloadDialog(SmartDialog):
         layout.addWidget(self.loading_label)
         
         # Add status label
-        self.status_label = QLabel("Preparing download...")
+        self.status_label = QLabel(_("Preparing download..."))
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.status_label)
         
@@ -53,7 +56,7 @@ class DownloadDialog(SmartDialog):
     def _update_loading_dots(self):
         """Update the loading animation dots."""
         self.loading_dots = (self.loading_dots + 1) % 4
-        self.loading_label.setText("Loading" + "." * self.loading_dots)
+        self.loading_label.setText(_("Loading") + "." * self.loading_dots)
         QApplication.processEvents()  # Process events for the animation
         
     def update_status(self, message):

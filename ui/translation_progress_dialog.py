@@ -71,7 +71,9 @@ class TranslationProgressDialog(QDialog):
 
         # Method label
         method_text = "LLM" if self.use_llm else "Argos Translate"
-        self.method_label = QLabel(f"Translation Method: {method_text}")
+        self.method_label = QLabel(
+            _("Translation Method: {method}").format(method=method_text)
+        )
         self.method_label.setStyleSheet("font-weight: bold;")
         layout.addWidget(self.method_label)
 
@@ -83,7 +85,9 @@ class TranslationProgressDialog(QDialog):
         layout.addWidget(self.progress_bar)
 
         # Count label
-        self.count_label = QLabel("0 / 0 translations completed")
+        self.count_label = QLabel(
+            _("{completed} / {total} translations completed").format(completed=0, total=0)
+        )
         layout.addWidget(self.count_label)
 
         # ETA label
@@ -92,7 +96,7 @@ class TranslationProgressDialog(QDialog):
         layout.addWidget(self.eta_label)
 
         # Current item label
-        self.current_label = QLabel("Preparing...")
+        self.current_label = QLabel(_("Preparing..."))
         self.current_label.setWordWrap(True)
         self.current_label.setStyleSheet("color: gray;")
         layout.addWidget(self.current_label)
@@ -114,7 +118,11 @@ class TranslationProgressDialog(QDialog):
             percentage = int((completed / total) * 100)
             self.progress_bar.setValue(percentage)
 
-        self.count_label.setText(f"{completed} / {total} translations completed")
+        self.count_label.setText(
+            _("{completed} / {total} translations completed").format(
+                completed=completed, total=total
+            )
+        )
 
         self._eta.record(completed)
         remaining = total - completed
@@ -124,23 +132,25 @@ class TranslationProgressDialog(QDialog):
         elif eta_secs is None:
             self.eta_label.setText(_("Estimating time remaining…"))
         else:
-            self.eta_label.setText(f"~{self._format_eta(eta_secs)} remaining")
+            self.eta_label.setText(
+                _("~{eta} remaining").format(eta=self._format_eta(eta_secs))
+            )
 
         if current_item:
-            self.current_label.setText(f"Translating: {current_item}")
+            self.current_label.setText(_("Translating: {item}").format(item=current_item))
         else:
-            self.current_label.setText("Finished" if completed >= total else "Preparing...")
+            self.current_label.setText(_("Finished") if completed >= total else _("Preparing..."))
 
     @staticmethod
     def _format_eta(secs: float) -> str:
         s = int(secs)
         if s < 60:
-            return f"{s} sec"
+            return _("{s} sec").format(s=s)
         m, s = divmod(s, 60)
         if m < 60:
-            return f"{m} min {s:02d} sec"
+            return _("{m} min {s} sec").format(m=m, s=f"{s:02d}")
         h, m = divmod(m, 60)
-        return f"{h} hr {m:02d} min"
+        return _("{h} hr {m} min").format(h=h, m=f"{m:02d}")
 
     def on_cancel(self):
         """Handle cancel button click."""
@@ -153,7 +163,7 @@ class TranslationProgressDialog(QDialog):
         if reply == QMessageBox.StandardButton.Yes:
             self.cancel_btn.setEnabled(False)
             self.cancel_btn.setText(_("Cancelling..."))
-            self.current_label.setText("Cancelling translation process...")
+            self.current_label.setText(_("Cancelling translation process..."))
             self.cancelled.emit()
 
     def on_finished(self):

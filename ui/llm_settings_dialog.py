@@ -205,10 +205,10 @@ class LLMSettingsDialog(SmartDialog):
             self.preview_text.setText(preview)
             self.preview_text.setStyleSheet("background-color: #f5f5f5;")
         except KeyError as e:
-            self.preview_text.setText(f"Error: Unknown variable {e}")
+            self.preview_text.setText(_("Error: Unknown variable {var}").format(var=e))
             self.preview_text.setStyleSheet("background-color: #ffe0e0;")
         except Exception as e:
-            self.preview_text.setText(f"Error: {str(e)}")
+            self.preview_text.setText(_("Error: {error}").format(error=str(e)))
             self.preview_text.setStyleSheet("background-color: #ffe0e0;")
     
     def reset_to_default(self):
