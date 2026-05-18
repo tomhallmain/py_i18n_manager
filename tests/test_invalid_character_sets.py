@@ -497,3 +497,99 @@ class TestInvalidCharacterSet:
         # Shared "SD" token appears in all locales and should be suppressed,
         # but Korean text still contains dominant Japanese script and must remain invalid.
         assert "ko" in invalid
+
+    # --- Uniform non-Latin single-script group suppression ---
+
+    def test_uniform_cyrillic_all_cyrillic_locales_not_flagged(self):
+        # A Cyrillic proper noun appearing identically across all Cyrillic-script locales
+        # is a quality-review concern (identical values), not a charset concern.
+        values = {
+            "ru": "Яндекс",
+            "uk": "Яндекс",
+            "bg": "Яндекс",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        assert invalid == []
+
+    def test_uniform_cyrillic_flags_non_cyrillic_locales(self):
+        # When a Latin-script locale is in the group, it must still be flagged even
+        # though all values are identical Cyrillic.
+        values = {
+            "ru": "Яндекс",
+            "uk": "Яндекс",
+            "de": "Яндекс",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        assert "de" in invalid
+        assert "ru" not in invalid
+        assert "uk" not in invalid
+
+    def test_uniform_arabic_all_arabic_script_locales_not_flagged(self):
+        values = {
+            "ar": "مرحبا",
+            "fa": "مرحبا",
+            "ur": "مرحبا",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        assert invalid == []
+
+    def test_uniform_arabic_flags_non_arabic_locale(self):
+        values = {
+            "ar": "مرحبا",
+            "fa": "مرحبا",
+            "de": "مرحبا",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        assert "de" in invalid
+        assert "ar" not in invalid
+        assert "fa" not in invalid
+
+    def test_uniform_greek_all_greek_locale_not_flagged(self):
+        values = {
+            "el": "Ελληνικά",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        assert invalid == []
+
+    def test_uniform_greek_flags_non_greek_locale(self):
+        values = {
+            "el": "Ελληνικά",
+            "de": "Ελληνικά",
+            "fr": "Ελληνικά",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        assert "de" in invalid
+        assert "fr" in invalid
+        assert "el" not in invalid
+
+    def test_uniform_devanagari_all_devanagari_locales_not_flagged(self):
+        values = {
+            "hi": "नमस्ते",
+            "mr": "नमस्ते",
+            "ne": "नमस्ते",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        assert invalid == []
+
+    def test_uniform_devanagari_flags_non_devanagari_locale(self):
+        values = {
+            "hi": "नमस्ते",
+            "mr": "नमस्ते",
+            "de": "नमस्ते",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        assert "de" in invalid
+        assert "hi" not in invalid
+        assert "mr" not in invalid
+
+    def test_mixed_script_uniform_group_not_suppressed_by_non_latin_path(self):
+        # Mixed Cyrillic+Latin text (e.g. "Привет PDF") spans two scripts;
+        # the non-Latin suppression must not apply; normal analysis runs.
+        values = {
+            "ru": "Привет PDF",
+            "uk": "Привет PDF",
+            "de": "Привет PDF",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        # de should still be flagged because it has dominant Cyrillic
+        assert "de" in invalid

@@ -272,6 +272,32 @@ class InvalidCharacterSetAnalyzer:
         return set(ratios.keys()).issubset({"latin"})
 
     @classmethod
+    def _get_uniform_single_non_latin_script(
+        cls, scrubbed_by_locale: Dict[str, str]
+    ) -> str | None:
+        """Return the script family when all locales share identical single-non-Latin-script text.
+
+        Returns ``None`` when values differ, are empty, contain Latin, or span multiple scripts.
+        Used to skip the charset check for locales that legitimately expect the shared script
+        while still flagging locales that do not.
+        """
+        normalized_values = {
+            (text or "").strip().casefold() for text in scrubbed_by_locale.values()
+        }
+        if len(normalized_values) != 1:
+            return None
+        only_value = next(iter(normalized_values), "")
+        if not only_value:
+            return None
+        ratios = cls._script_family_ratios(only_value)
+        if not ratios:
+            return None
+        scripts = set(ratios.keys())
+        if "latin" in scripts or len(scripts) != 1:
+            return None
+        return next(iter(scripts))
+
+    @classmethod
     def analyze_locale(
         cls,
         locale: str,
@@ -347,6 +373,11 @@ class InvalidCharacterSetAnalyzer:
         if cls._is_uniform_latin_only_group(scrubbed_by_locale):
             return []
 
+        # If every locale shares the same single non-Latin script text (e.g. a Cyrillic proper
+        # noun across ru/uk/bg), skip the charset check for any locale that expects that script.
+        # Locales that do not expect it (e.g. de in a Cyrillic-uniform group) are still analysed.
+        uniform_non_latin_script = cls._get_uniform_single_non_latin_script(scrubbed_by_locale)
+
         shared_token_patterns: tuple[str, ...] = tuple()
         # Only suppress shared unexpected parts when locale-specific scripts are truly represented.
         if len(represented_expected_scripts) >= 2:
@@ -355,6 +386,10 @@ class InvalidCharacterSetAnalyzer:
         merged_ignore_patterns = tuple(ignore_patterns) + shared_token_patterns
         invalid: List[str] = []
         for locale, text in values_by_locale.items():
+            if uniform_non_latin_script is not None:
+                allowed = cls._allowed_script_families(cls._locale_expected_script(locale))
+                if uniform_non_latin_script in allowed:
+                    continue
             if cls.analyze_locale(locale, text, threshold_ratio, merged_ignore_patterns):
                 invalid.append(locale)
         return invalid
