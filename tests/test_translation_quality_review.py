@@ -635,3 +635,90 @@ class TestUseBuiltinExclusionsToggle:
             use_builtin_exclusions=False,
         )
         assert any(f.signal == QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT for f in findings)
+
+    # ── Sub-cluster splitting ─────────────────────────────────────────────────
+
+    def test_partial_cluster_outsider_alone_suppressed(self):
+        # es/pt sharing "digital" is approved; de is the only outsider → no finding
+        # (IDENTICAL_TO_NONDEFAULT requires 2+ unapproved locales)
+        class _K:
+            def __init__(self):
+                self.msgid = "tag.digital"
+                self.context = ""
+
+        class _G:
+            def __init__(self):
+                self.key = _K()
+                self._v = {"en": "digital media", "es": "digital", "pt": "digital", "de": "digital"}
+
+            def get_translation(self, loc):
+                return self._v.get(loc, "")
+
+        findings = collect_findings_for_group(
+            _G(), "en", ["en", "es", "pt", "de"],
+            use_builtin_exclusions=True,
+        )
+        assert not any(f.signal == QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT for f in findings)
+
+    def test_partial_cluster_two_outsiders_flagged(self):
+        # es/pt sharing "digital" is approved; de and fr are both outsiders → finding for de+fr
+        class _K:
+            def __init__(self):
+                self.msgid = "tag.digital"
+                self.context = ""
+
+        class _G:
+            def __init__(self):
+                self.key = _K()
+                self._v = {
+                    "en": "digital media",
+                    "es": "digital", "pt": "digital",
+                    "de": "digital", "fr": "digital",
+                }
+
+            def get_translation(self, loc):
+                return self._v.get(loc, "")
+
+        findings = collect_findings_for_group(
+            _G(), "en", ["en", "es", "pt", "de", "fr"],
+            use_builtin_exclusions=True,
+        )
+        nondefault = [f for f in findings if f.signal == QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT]
+        assert len(nondefault) == 1
+        notes = nondefault[0].notes
+        assert "de" in notes
+        assert "fr" in notes
+        # Approved pair should NOT appear in the finding
+        assert "es" not in notes
+        assert "pt" not in notes
+
+    def test_partial_cluster_outsiders_flagged_builtins_off_shows_full_cluster(self):
+        # Same data as above but builtins off → full cluster flagged (no splitting)
+        class _K:
+            def __init__(self):
+                self.msgid = "tag.digital"
+                self.context = ""
+
+        class _G:
+            def __init__(self):
+                self.key = _K()
+                self._v = {
+                    "en": "digital media",
+                    "es": "digital", "pt": "digital",
+                    "de": "digital", "fr": "digital",
+                }
+
+            def get_translation(self, loc):
+                return self._v.get(loc, "")
+
+        findings = collect_findings_for_group(
+            _G(), "en", ["en", "es", "pt", "de", "fr"],
+            use_builtin_exclusions=False,
+        )
+        nondefault = [f for f in findings if f.signal == QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT]
+        assert len(nondefault) == 1
+        notes = nondefault[0].notes
+        assert "es" in notes
+        assert "pt" in notes
+        assert "de" in notes
+        assert "fr" in notes

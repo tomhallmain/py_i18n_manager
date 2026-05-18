@@ -1,6 +1,7 @@
 from i18n.valid_exclusions_by_language import (
     is_allowed_cross_locale_identical_cluster,
     is_globally_shared_identical_value,
+    get_unapproved_locale_remainder,
     EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE,
 )
 
@@ -243,6 +244,19 @@ class TestEnSharedNewLanguages:
         assert "dashboard" not in ru
         assert "plugin" not in ru
 
+    # --- German ---
+
+    def test_de_tech_loanwords_allowed(self):
+        de = EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE["de"]
+        for term in ("app", "browser", "cache", "chat", "data", "download",
+                     "email", "plugin", "server", "software", "upload"):
+            assert term in de, f"de missing: {term}"
+
+    def test_de_time_notation_terms_allowed(self):
+        de = EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE["de"]
+        assert "am" in de
+        assert "pm" in de
+
     # --- Cross-language independence ---
 
     def test_nl_terms_not_in_ru(self):
@@ -349,3 +363,64 @@ class TestCrossLanguageNewGroups:
 
     def test_existing_de_fr_group_unchanged(self):
         assert is_allowed_cross_locale_identical_cluster(["de", "fr"], "Profil")
+
+
+class TestGetUnapprovedLocaleRemainder:
+    """Sub-cluster splitting: approved pairs are removed, leaving only the suspicious locales."""
+
+    def test_all_approved_returns_empty(self):
+        # es/pt is an approved pair for "digital"
+        result = get_unapproved_locale_remainder(["es", "pt"], "digital")
+        assert result == []
+
+    def test_one_outsider_returned(self):
+        # es/pt approved; de is the outsider
+        result = get_unapproved_locale_remainder(["es", "pt", "de"], "digital")
+        assert "de" in result
+        assert "es" not in result
+        assert "pt" not in result
+
+    def test_two_outsiders_returned(self):
+        # es/pt approved; de and fr are outsiders → finding still possible
+        result = get_unapproved_locale_remainder(["es", "pt", "de", "fr"], "digital")
+        assert sorted(result) == ["de", "fr"]
+
+    def test_scandinavian_group_approved_outsider_flagged(self):
+        # sv/no/da approved for "system"; de is the outsider
+        result = get_unapproved_locale_remainder(["sv", "no", "da", "de"], "system")
+        assert result == ["de"]
+        assert "sv" not in result
+        assert "no" not in result
+        assert "da" not in result
+
+    def test_no_approved_group_returns_all(self):
+        # "hola" is not in any group — all locales returned unchanged
+        result = get_unapproved_locale_remainder(["es", "pt", "de"], "hola")
+        assert sorted(result) == ["de", "es", "pt"]
+
+    def test_empty_text_returns_all(self):
+        result = get_unapproved_locale_remainder(["es", "pt"], "")
+        assert sorted(result) == ["es", "pt"]
+
+    def test_empty_locales_returns_empty(self):
+        assert get_unapproved_locale_remainder([], "digital") == []
+
+    def test_two_overlapping_approved_groups(self):
+        # de/nl approved, es/pt approved; if all four present, all should be covered
+        result = get_unapproved_locale_remainder(["de", "nl", "es", "pt"], "browser")
+        assert result == []
+
+    def test_locale_variants_resolved_to_base_language(self):
+        # es-ES and pt-BR should resolve to es and pt
+        result = get_unapproved_locale_remainder(["es-ES", "pt-BR", "de-DE"], "digital")
+        assert "de-DE" in result
+        assert "es-ES" not in result
+        assert "pt-BR" not in result
+
+    def test_pl_cs_sk_approved_outsider_returned(self):
+        result = get_unapproved_locale_remainder(["pl", "cs", "sk", "hu"], "browser")
+        assert result == ["hu"]
+
+    def test_id_ms_approved_outsider_returned(self):
+        result = get_unapproved_locale_remainder(["id", "ms", "tr"], "app")
+        assert result == ["tr"]

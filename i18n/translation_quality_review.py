@@ -29,6 +29,8 @@ from .translation_group import TranslationGroup, TranslationKey
 from .valid_exclusions_by_language import (
     EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE,
     GLOBALLY_SHARED_IDENTICAL_VALUES,
+    base_language,
+    get_unapproved_locale_remainder,
     is_allowed_cross_locale_identical_cluster,
     is_globally_shared_identical_value,
 )
@@ -91,7 +93,7 @@ def collect_findings_for_group(
             continue
         tstrip = text.strip()
         # DEBUG PROBE DISABLED (keep helper method for quick future investigations):
-        # if _base_language(loc) == "ru":
+        # if base_language(loc) == "ru":
         #     _debug_heuristic_probe(mid, loc, tstrip, latin_ignore_patterns)
         if Utils.is_non_latin_script_locale(loc):
             if _has_significant_latin_run(tstrip, latin_ignore_patterns):
@@ -217,6 +219,10 @@ def _finding_identical_to_nondefault_for_group(
             continue
         if use_builtin_exclusions and is_allowed_cross_locale_identical_cluster(locs, text):
             continue
+        if use_builtin_exclusions:
+            locs = get_unapproved_locale_remainder(locs, text)
+            if len(locs) < 2:
+                continue
         clusters.append(sorted(locs))
     if not clusters:
         return None
@@ -230,12 +236,6 @@ def _finding_identical_to_nondefault_for_group(
         signal=QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT,
         notes=notes,
     )
-
-
-def _base_language(locale: str) -> str:
-    if not locale:
-        return ""
-    return locale.replace("-", "_").split("_", 1)[0].strip().lower()
 
 
 _UI_LABEL_PAREN_SUFFIX = re.compile(r"\s*\((?=[^)]*[A-Za-z])[^)]*\)")
@@ -268,9 +268,9 @@ def _is_allowed_identical_copy(
         return True
 
     allowed_lang: frozenset[str] = frozenset()
-    if use_builtin_exclusions and _base_language(default_locale) == "en":
+    if use_builtin_exclusions and base_language(default_locale) == "en":
         allowed_lang = EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE.get(
-            _base_language(locale), frozenset()
+            base_language(locale), frozenset()
         )
 
     normalized = (text or "").strip().lower()

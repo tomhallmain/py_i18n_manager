@@ -79,7 +79,8 @@ EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
     "de": frozenset(
         {
             # existing (preserved as-is)
-            "AM/PM",
+            "am",
+            "pm",
             "api",
             "April",
             "August",
@@ -2971,3 +2972,27 @@ def is_allowed_cross_locale_identical_cluster(
         if langs <= group_langs and normalized in allowed_values:
             return True
     return False
+
+
+def get_unapproved_locale_remainder(locales: Sequence[str], text: str) -> list[str]:
+    """Return locales from *locales* not covered by any approved cross-locale group for *text*.
+
+    Used for sub-cluster splitting: when only part of a cluster is allowlisted (e.g. {es, pt}
+    is approved but {de} is not), this returns the locales whose co-occurrence is not explained
+    by any allowlisted group so callers can emit a narrower finding.
+    """
+    normalized = (text or "").strip().lower()
+    if not normalized:
+        return list(locales)
+    covered: set[str] = set()
+    for group_langs, allowed_values in CROSS_LANGUAGE_SHARED_IDENTICAL_VALUES.items():
+        if normalized not in allowed_values:
+            continue
+        in_group = [loc for loc in locales if base_language(loc) in group_langs]
+        if len(in_group) < 2:
+            continue
+        base_langs = [base_language(loc) for loc in in_group]
+        if len(set(base_langs)) != len(base_langs):
+            continue  # duplicate base languages in group — skip
+        covered.update(in_group)
+    return [loc for loc in locales if loc not in covered]
