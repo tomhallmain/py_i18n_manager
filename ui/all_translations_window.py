@@ -112,14 +112,19 @@ class AllTranslationsWindow(BaseTranslationWindow):
             _("Manage msgid exclusions and ignore regex patterns for this project.")
         )
         
-        self.find_replace_btn = QPushButton(_("Find & Replace"))
+        self.find_replace_btn = QPushButton(_("Find && Replace"))
         self.find_replace_btn.clicked.connect(self.open_find_replace_dialog)
         self.find_replace_btn.setToolTip(_("Search and replace text within translation values"))
+
+        self.revert_btn = QPushButton(_("Revert Changes"))
+        self.revert_btn.clicked.connect(self.revert_changes)
+        self.revert_btn.setToolTip(_("Restore all translations to their last saved state, discarding any unsaved edits"))
 
         button_layout.addWidget(save_btn)
         button_layout.addWidget(close_btn)
         button_layout.addWidget(self.exclusions_btn)
         button_layout.addWidget(self.find_replace_btn)
+        button_layout.addWidget(self.revert_btn)
         button_layout.addWidget(self.unicode_toggle)
         layout.addLayout(button_layout)
         
@@ -547,6 +552,54 @@ class AllTranslationsWindow(BaseTranslationWindow):
         # Force UI update
         QTimer.singleShot(0, lambda: self.table.viewport().update())
 
+    def _has_unsaved_changes(self) -> bool:
+        """Return True if any table cell differs from the underlying translation model value."""
+        if not self.all_translations or not self.all_locales:
+            return False
+        for row in range(self.table.rowCount()):
+            key_item = self.table.item(row, 0)
+            key = key_item.data(Qt.ItemDataRole.UserRole) if key_item else None
+            if key is None:
+                key = key_item.text() if key_item else ""
+            group = self.all_translations.get(key)
+            if not group:
+                continue
+            for col in range(1, self.table.columnCount()):
+                locale_header = self.table.horizontalHeaderItem(col)
+                if not locale_header:
+                    continue
+                locale = locale_header.text()
+                cell = self.table.item(row, col)
+                if not cell:
+                    continue
+                original = (
+                    group.get_translation_escaped_as_text(locale)
+                    if self.show_escaped
+                    else group.get_translation_unescaped_as_text(locale)
+                )
+                if cell.text() != original:
+                    return True
+        return False
+
+    def revert_changes(self):
+        """Reload the table from the translation model, discarding any unsaved cell edits."""
+        if not self.all_translations or not self.all_locales:
+            return
+        if self._has_unsaved_changes():
+            reply = QMessageBox.question(
+                self,
+                _("Revert Changes"),
+                _(
+                    "You have unsaved changes that will be lost.\n\n"
+                    "Restore all translations to their last saved state?"
+                ),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+        self.load_data(self.all_translations, self.all_locales)
+
     def open_find_replace_dialog(self):
         if not self.all_translations or not self.all_locales:
             QMessageBox.information(self, _("Find & Replace"), _("No translation data loaded."))
@@ -671,6 +724,17 @@ class FindReplaceDialog(QDialog):
         options_row.addWidget(self.scope_combo)
         options_row.addStretch()
         layout.addLayout(options_row)
+
+        # Informational note about visible-row scoping
+        scope_note = QLabel(
+            _(
+                "Only visible rows are searched and replaced. Use the Search box "
+                "and Status Filter in the main window to narrow the scope before replacing."
+            )
+        )
+        scope_note.setWordWrap(True)
+        scope_note.setStyleSheet("color: gray; font-style: italic;")
+        layout.addWidget(scope_note)
 
         # Status label — shows match count, errors, or post-replace confirmation
         self.status_label = QLabel("")
