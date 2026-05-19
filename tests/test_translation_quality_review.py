@@ -293,9 +293,9 @@ class TestLatinHeuristicsRegression:
             def __init__(self):
                 self.key = _FakeKey("msg.ok", "")
                 self._values = {
-                    "en": "OK:",
-                    "de": "OK:",
-                    "it": "OK:",
+                    "en": "Confirm:",
+                    "de": "Confirm:",
+                    "it": "Confirm:",
                 }
 
             def get_translation(self, locale: str):
