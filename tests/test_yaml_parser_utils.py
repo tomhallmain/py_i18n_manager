@@ -3,8 +3,10 @@
 import io
 import os
 import tempfile
+import textwrap
 
 import pytest
+import yaml
 
 from i18n.ruby.yaml_parser_utils import (
     RUAMEL_AVAILABLE,
@@ -147,6 +149,139 @@ class TestRubyYamlYesNoKeyQuoting:
             with open(abs_path, encoding="utf-8") as f:
                 text = f.read()
             assert '"yes":' in text
+
+
+class TestYamlAliasAndMergeKeys:
+    """PyYAML read and ruamel round-trip behaviour for anchors, aliases, and merge keys."""
+
+    # ------------------------------------------------------------------
+    # PyYAML read path (I18NStringKeyLoader)
+    # ------------------------------------------------------------------
+
+    def test_scalar_alias_read_resolves_to_concrete_value(self):
+        """*alias references are resolved to their concrete string during load."""
+        from i18n.ruby.ruby_i18n_manager import I18NStringKeyLoader
+
+        src = textwrap.dedent("""\
+            en:
+              shared:
+                save: &save_btn "Save"
+              form:
+                button: *save_btn
+              admin:
+                action: *save_btn
+        """)
+        data = yaml.load(src, Loader=I18NStringKeyLoader)
+        assert data["en"]["form"]["button"] == "Save"
+        assert data["en"]["admin"]["action"] == "Save"
+
+    def test_merge_key_read_merged_keys_present_and_overrides_win(self):
+        """<<: merge keys are resolved; local keys take precedence over merged ones."""
+        from i18n.ruby.ruby_i18n_manager import I18NStringKeyLoader
+
+        src = textwrap.dedent("""\
+            en:
+              defaults: &defaults
+                cancel: "Cancel"
+                save: "Save"
+              form:
+                <<: *defaults
+                save: "Create"
+        """)
+        data = yaml.load(src, Loader=I18NStringKeyLoader)
+        assert data["en"]["form"]["cancel"] == "Cancel"  # from merge
+        assert data["en"]["form"]["save"] == "Create"    # local override wins
+
+    # ------------------------------------------------------------------
+    # ruamel round-trip (write path)
+    # ------------------------------------------------------------------
+
+    @pytest.mark.skipif(not RUAMEL_AVAILABLE, reason="ruamel.yaml required")
+    def test_scalar_alias_unedited_preserves_anchor_and_alias_syntax(self):
+        """A round-trip with no edits keeps &anchor / *alias in the output."""
+        ryaml = ruby_roundtrip_yaml()
+        src = textwrap.dedent("""\
+            en:
+              shared:
+                save: &save_btn "Save"
+              form:
+                button: *save_btn
+        """)
+        data = ryaml.load(src)
+        buf = io.StringIO()
+        ryaml.dump(data, buf)
+        out = buf.getvalue()
+        assert "&save_btn" in out
+        assert "*save_btn" in out
+
+    @pytest.mark.skipif(not RUAMEL_AVAILABLE, reason="ruamel.yaml required")
+    def test_scalar_alias_edited_key_becomes_concrete_others_unaffected(self):
+        """Editing one aliased key replaces its alias with a concrete value; remaining alias refs survive."""
+        ryaml = ruby_roundtrip_yaml()
+        src = textwrap.dedent("""\
+            en:
+              shared:
+                save: &save_btn "Save"
+              form:
+                button: *save_btn
+              admin:
+                action: *save_btn
+        """)
+        data = ryaml.load(src)
+        merge_ruamel_data(data["en"]["form"], quote_string_values({"button": "Speichern"}))
+        buf = io.StringIO()
+        ryaml.dump(data, buf)
+        out = buf.getvalue()
+
+        assert "Speichern" in out
+        assert "*save_btn" in out  # admin.action alias still present
+
+        data2 = ryaml.load(out)
+        assert str(data2["en"]["form"]["button"]) == "Speichern"
+        assert str(data2["en"]["admin"]["action"]) == "Save"
+
+    @pytest.mark.skipif(not RUAMEL_AVAILABLE, reason="ruamel.yaml required")
+    def test_merge_key_expanded_key_becomes_direct_override_merge_preserved(self):
+        """Writing to a merge-expanded key adds a direct entry that shadows the merge; <<: stays for unedited keys."""
+        ryaml = ruby_roundtrip_yaml()
+        src = textwrap.dedent("""\
+            en:
+              defaults: &defaults
+                cancel: "Cancel"
+                save: "Save"
+              form:
+                <<: *defaults
+        """)
+        data = ryaml.load(src)
+        merge_ruamel_data(data["en"]["form"], quote_string_values({"cancel": "Close"}))
+        buf = io.StringIO()
+        ryaml.dump(data, buf)
+        out = buf.getvalue()
+
+        assert "<<:" in out  # merge key preserved for the unedited `save` key
+
+        data2 = ryaml.load(out)
+        assert str(data2["en"]["form"]["cancel"]) == "Close"   # direct override
+        assert str(data2["en"]["form"]["save"]) == "Save"      # still from merge
+
+    @pytest.mark.skipif(not RUAMEL_AVAILABLE, reason="ruamel.yaml required")
+    def test_mapping_alias_edit_propagates_to_all_alias_sites(self):
+        """Editing a child of a mapping alias modifies the shared object, updating all alias references."""
+        ryaml = ruby_roundtrip_yaml()
+        src = textwrap.dedent("""\
+            en:
+              defaults: &defs
+                cancel: "Cancel"
+              section_a:
+                nav: *defs
+              section_b:
+                nav: *defs
+        """)
+        data = ryaml.load(src)
+        # Both nav keys point to the same CommentedMap; editing one updates all.
+        merge_ruamel_data(data["en"]["section_a"]["nav"], quote_string_values({"cancel": "Close"}))
+        assert str(data["en"]["section_a"]["nav"]["cancel"]) == "Close"
+        assert str(data["en"]["section_b"]["nav"]["cancel"]) == "Close"
 
 
 @pytest.mark.skipif(not RUAMEL_AVAILABLE, reason="ruamel.yaml required")

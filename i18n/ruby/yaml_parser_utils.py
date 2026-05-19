@@ -152,12 +152,33 @@ def quote_string_values_in_place(data: Any) -> Any:
     return data
 
 
+def _resolve_ruamel_key(mapping: Any, part: str) -> Any | None:
+    """Resolve key *part* in a possibly-merged ruamel ``CommentedMap``.
+
+    ruamel's round-trip loader preserves ``<<:`` merge keys as a special attribute
+    rather than expanding the merged entries into the direct key set.  Merged keys
+    may be accessible via ``__getitem__`` but absent from ``__iter__`` / ``.keys()``,
+    making them invisible to :func:`~utils.nested_mapping.resolve_nested_dict_key`'s
+    iteration fallback.  This helper tries the standard resolver first (which handles
+    bool-key type variants), then falls back to a direct ``[]`` access so that
+    merge-expanded keys are found and can be shadowed with a new direct entry.
+    """
+    resolved = resolve_nested_dict_key(mapping, part)
+    if resolved is not None:
+        return resolved
+    try:
+        mapping[part]  # merge-expanded key: accessible via [] but not via .keys()
+        return part
+    except (KeyError, TypeError):
+        return None
+
+
 def merge_ruamel_data(original: Any, new: Any) -> None:
     """Deep-merge ``new`` into ``original`` (both mappings), quoting new string leaves.
 
-    Keys are matched with :func:`~utils.nested_mapping.resolve_nested_dict_key` so
-    ruamel/PyYAML trees (e.g. boolean ``true`` keys) merge with dot-path strings
-    (``\"true\"``) instead of inserting a parallel branch that leaves old leaves unchanged.
+    Keys are matched with :func:`_resolve_ruamel_key` so ruamel/PyYAML trees (e.g.
+    boolean ``true`` keys, ``<<:`` merge-expanded keys) merge with dot-path strings
+    instead of inserting a parallel branch that leaves old leaves unchanged.
 
     YAML sequences (lists) are merged/replaced with quoted sequence content; a scalar
     string is never written over an existing sequence (avoids ``str(list)`` one-liners).
@@ -169,7 +190,7 @@ def merge_ruamel_data(original: Any, new: Any) -> None:
 
     for key, value in new.items():
         key_str = str(key)
-        resolved = resolve_nested_dict_key(original, key_str)
+        resolved = _resolve_ruamel_key(original, key_str)
 
         if resolved is not None:
             existing = original[resolved]

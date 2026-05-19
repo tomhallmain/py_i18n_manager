@@ -47,6 +47,9 @@ I18NStringKeyLoader.yaml_implicit_resolvers = {
     ]
     for first_char, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
 }
+# Merge key (<<:) support is inherited from SafeLoader and requires no explicit
+# registration: PyYAML ≤5 registers it as a constructor; PyYAML ≥6 handles it
+# inline inside construct_mapping. Either way I18NStringKeyLoader gets it for free.
 
 class RubyI18NManager(I18NManagerBase):
     """Manages the Ruby/Rails internationalization (i18n) workflow for YAML translation files.
