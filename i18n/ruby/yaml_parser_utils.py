@@ -26,6 +26,22 @@ loading and dumping, which fits i18n files where formatting matters.
 This module centralizes ruamel round-trip settings, merge/quote helpers, the PyYAML fallback
 dumper, and utilities used by :class:`~i18n.ruby.ruby_i18n_manager.RubyI18nManager` and
 :mod:`~i18n.ruby.i18n_tasks_sync`.
+
+**YAML anchor / alias / merge key policy**
+
+Rails locale files sometimes use ``&anchor`` / ``*alias`` and ``<<: *merge`` to keep translations
+DRY.  The read path (PyYAML ``I18NStringKeyLoader``) resolves all of these to concrete values
+before key extraction, so the translation manager sees a flat dict regardless of YAML source
+structure.  Merge key support (``<<:``) is inherited from ``SafeLoader`` in all PyYAML versions
+and requires no explicit registration.
+
+The write path (ruamel round-trip) preserves anchors and aliases for keys that are **not**
+edited.  When a user edits a key whose value was an alias, the alias for that slot is replaced
+with a concrete string; the anchor and any other alias references remain intact.  Keys that
+exist only via a ``<<:`` merge expansion are added as direct entries that shadow the merge when
+written — valid YAML semantics, though slightly less DRY than the original.  This "break alias
+only at the edited slot" behaviour is intentional; full alias reconstruction through edits is
+not attempted.
 """
 
 from __future__ import annotations

@@ -9,10 +9,16 @@ from .invalid_translation_groups import InvalidTranslationGroups
 
 class I18NManagerBase(ABC):
     """Abstract base class for i18n managers that defines the common interface.
-    
+
     This class defines the contract that all project-specific i18n managers must implement.
     Each manager handles the specific requirements of their project type (Python, Ruby, etc.)
     while providing a consistent interface for the main application.
+
+    Naming note: several abstract methods carry Python/gettext PO-file terminology from the
+    application's origins (``get_pot_file_path``, ``get_po_file_path``, ``write_po_files``,
+    ``generate_pot_file``).  All language managers implement these generically — Ruby returns
+    YAML paths, Java returns ``.properties`` paths, and so on.  The names are legacy and do
+    not imply the file format used by any specific manager.
     """
     
     def __init__(self, directory: str, locales: List[str] = None, intro_details: Dict = None, settings_manager = None):

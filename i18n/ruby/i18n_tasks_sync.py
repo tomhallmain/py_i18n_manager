@@ -8,6 +8,23 @@
 
 ``RubyI18nManager.generate_pot_file()`` runs :func:`sync_base_from_missing` then
 :func:`sync_base_from_unused` for Gemfile projects.
+
+**Intentional scope limits for sync_base_from_missing**
+
+Only rows whose Locale column is ``all`` are processed (key not present in any locale).
+Rows listing specific locales (e.g. ``de es``) mean the key exists in the base locale but
+is missing for those non-base locales; those gaps belong to the outstanding-items translation
+workflow, not to "sync base."
+
+Pluralization/ICU rows (e.g. a single-locale row whose third column contains ``few, many``)
+are also skipped because they require language-specific stub structures rather than a plain
+empty string. They will appear as outstanding items once their base key is present.
+
+**Why ``missing`` and not ``add-missing``**
+
+``i18n-tasks add-missing`` rewrites locale files in bulk with its own formatting choices.
+``i18n-tasks missing`` is read-only; the Python side handles targeted YAML edits with
+comment preservation via ruamel.yaml, giving the application control over file formatting.
 """
 
 from __future__ import annotations
