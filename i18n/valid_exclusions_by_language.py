@@ -67,6 +67,33 @@ GLOBALLY_SHARED_IDENTICAL_VALUES: frozenset[str] = frozenset(
         "gps",
         "sql",
         "url",
+        # Math
+        "false",
+        "true",
+        "null",
+        "undefined",
+        "nan",
+        "infinity",
+        # Tech
+        "cd",
+        "dvd",
+        # Programming Languages
+        "python",
+        "javascript",
+        "java",
+        "c",
+        "c++",
+        "c#",
+        "php",
+        "ruby",
+        "swift",
+        "kotlin",
+        "typescript",
+        "go",
+        "rust",
+        "scala",
+        "haskell",
+        "erlang",
     }
 )
 
@@ -170,6 +197,7 @@ EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
             "port",
             "portal",
             "print",
+            "regex",
             "reset",
             "router",
             "script",
@@ -813,6 +841,7 @@ EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
             "portal",
             "print",
             "profile",
+            "prototype",
             "reset",
             "router",
             "script",
@@ -913,6 +942,7 @@ EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
             "layout",
             "link",
             "list",
+            "local",
             "login",
             "logout",
             "logo",
@@ -939,6 +969,7 @@ EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
             "portal",
             "print",
             "profile",
+            "removable",
             "reset",
             "router",
             "script",
@@ -1161,6 +1192,7 @@ EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
             "layout",
             "link",
             "list",
+            "local",
             "login",
             "logout",
             "logo",
@@ -2299,7 +2331,6 @@ EN_SHARED_IDENTICAL_TERMS_BY_LANGUAGE: Dict[str, frozenset[str]] = {
 # (even when they differ from the English default). Extend with real project findings.
 # The lookup uses `langs <= group_langs`, so adding a larger group also covers all subsets.
 CROSS_LANGUAGE_SHARED_IDENTICAL_VALUES: Dict[FrozenSet[str], frozenset[str]] = {
-    # ── existing pairs (preserved as-is) ────────────────────────────────────
     frozenset({"de", "fr"}): frozenset(
         {
             "minute",
@@ -2311,9 +2342,16 @@ CROSS_LANGUAGE_SHARED_IDENTICAL_VALUES: Dict[FrozenSet[str], frozenset[str]] = {
             "service",
         }
     ),
+    frozenset({"de", "es"}): frozenset(
+        {
+            "autor",
+        }
+    ),
     frozenset({"es", "fr"}): frozenset(
         {
             "bien",
+            "disponible",
+            "disponibles",
             "error",
             "general",
             "global",
@@ -2322,14 +2360,22 @@ CROSS_LANGUAGE_SHARED_IDENTICAL_VALUES: Dict[FrozenSet[str], frozenset[str]] = {
             "social",
             "terrible",
             "total",
+            "variable",
+            "variables",
         }
     ),
     frozenset({"es", "it"}): frozenset(
         {
             "compartir",
+            "completo",
+            "filtro",
+            "ninguno",
             "no",
             "personal",
+            "prototipo",
+            "restante",
             "terrible",
+            "tipo",
         }
     ),
     frozenset({"es", "fr", "it"}): frozenset(
@@ -2594,9 +2640,12 @@ CROSS_LANGUAGE_SHARED_IDENTICAL_VALUES: Dict[FrozenSet[str], frozenset[str]] = {
             # native Romance cognates spelled identically in both languages
             "banco",
             "canal",
+            "cancelar",
             "capital",
             "central",
+            "copiado",
             "cultural",
+            "detectado",
             "digital",
             "empresa",
             "especial",
@@ -2608,12 +2657,17 @@ CROSS_LANGUAGE_SHARED_IDENTICAL_VALUES: Dict[FrozenSet[str], frozenset[str]] = {
             "local",
             "manual",
             "material",
+            "movido",
             "nacional",
             "natural",
+            "negativo",
+            "negativos",
             "normal",
             "nota",
             "oficial",
             "original",
+            "positivo",
+            "positivos",
             "principal",
             "regional",
             "social",
