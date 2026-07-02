@@ -94,9 +94,10 @@ class LLMSettingsDialog(SmartDialog):
 
         model_note = QLabel(
             _("Models are Ollama model names (Ollama supports both local and cloud-hosted "
-              "models). The default for \"all locales per key\" is {model}, a capable model on "
-              "Ollama's free cloud tier that follows multi-locale JSON instructions more "
-              "reliably than typical local models.").format(
+              "models). The default for \"all locales per key\" is {model}, a capable model "
+              "on Ollama's cloud tier (officially supported there for commercial use) that "
+              "follows multi-locale JSON instructions more reliably than typical local "
+              "models.").format(
                 model=SettingsManager.DEFAULT_LLM_MODEL_MULTI_LOCALE
             )
         )

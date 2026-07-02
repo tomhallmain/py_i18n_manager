@@ -109,6 +109,14 @@ class TranslationProgressDialog(QDialog):
         self.current_label.setStyleSheet("color: gray;")
         layout.addWidget(self.current_label)
 
+        # Error label - hidden until the batch stops early (e.g. rate limited); stays visible
+        # so the user has to notice and manually close the dialog (see show_stopped_early_error).
+        self.error_label = QLabel("")
+        self.error_label.setWordWrap(True)
+        self.error_label.setStyleSheet("color: #c0392b; font-weight: bold;")
+        self.error_label.hide()
+        layout.addWidget(self.error_label)
+
         # Cancel button
         button_layout = QHBoxLayout()
         button_layout.addStretch()
@@ -146,8 +154,24 @@ class TranslationProgressDialog(QDialog):
 
         if current_item:
             self.current_label.setText(_("Translating: {item}").format(item=current_item))
+        elif completed >= total:
+            self.current_label.setText(_("Finished"))
+        elif completed > 0:
+            # Stopped before finishing (cancelled, or an error - see show_stopped_early_error).
+            self.current_label.setText(_("Stopped"))
         else:
-            self.current_label.setText(_("Finished") if completed >= total else _("Preparing..."))
+            self.current_label.setText(_("Preparing..."))
+
+    def show_stopped_early_error(self, message: str) -> None:
+        """Display a persistent error explaining why the batch stopped before completing.
+
+        The dialog is left open rather than auto-closing - on_finished() (called right after
+        this, once the worker's finished signal arrives) turns Cancel into Close, so the user
+        has to notice this message and dismiss the dialog themselves. The completed/total count
+        already shown above this label reflects how many items finished before the stop.
+        """
+        self.error_label.setText(message)
+        self.error_label.show()
 
     @staticmethod
     def _format_eta(secs: float) -> str:

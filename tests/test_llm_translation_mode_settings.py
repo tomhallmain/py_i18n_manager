@@ -129,11 +129,11 @@ class TestLLMTranslationModeAndModelSettings:
             == SettingsManager.DEFAULT_LLM_MODEL_MULTI_LOCALE
         )
 
-    def test_multi_locale_model_default_is_a_distinct_free_cloud_model(self):
+    def test_multi_locale_model_default_is_a_distinct_cloud_model(self):
         # Regression: per-key mode must not silently reuse the (often local/unreliable-at-JSON)
         # single-locale model default.
         assert SettingsManager.DEFAULT_LLM_MODEL_MULTI_LOCALE != SettingsManager.DEFAULT_LLM_MODEL
-        assert SettingsManager.DEFAULT_LLM_MODEL_MULTI_LOCALE.endswith("-cloud")
+        assert "cloud" in SettingsManager.DEFAULT_LLM_MODEL_MULTI_LOCALE
 
     def test_global_model_round_trip(self):
         assert self.settings_manager.save_llm_model("qwen3:8b")

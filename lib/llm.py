@@ -8,6 +8,7 @@ import threading
 import time
 from typing import Optional, List
 from urllib import request
+from urllib.error import HTTPError
 
 from utils.logging_setup import get_logger
 from utils.utils import Utils
@@ -16,6 +17,16 @@ logger = get_logger(__name__)
 
 class LLMResponseException(Exception):
     """Raised when LLM call fails"""
+    pass
+
+
+class LLMRateLimitException(LLMResponseException):
+    """Raised when the LLM provider responds with HTTP 429 (rate limited).
+
+    A distinct type from the generic :class:`LLMResponseException` so callers that need to stop
+    (rather than retry/skip-and-continue) can catch it specifically instead of treating a rate
+    limit the same as a malformed response or a network error.
+    """
     pass
 
 
@@ -260,10 +271,41 @@ class LLM:
             else:
                 raise LLMResponseException("LLM response is invalid!")
             return result
+        except HTTPError as e:
+            self.increment_failure_count()
+            if e.code == 429:
+                message = self._build_rate_limit_message(e)
+                logger.error(f"Rate limited by LLM provider (model {self.model_name}): {message}")
+                raise LLMRateLimitException(message) from e
+            logger.error(f"Failed to generate LLM response: {e}")
+            raise LLMResponseException(f"Failed to generate LLM response: {e}")
         except Exception as e:
             logger.error(f"Failed to generate LLM response: {e}")
             self.increment_failure_count()  # Increment on LLM failure
             raise LLMResponseException(f"Failed to generate LLM response: {e}")
+
+    @staticmethod
+    def _build_rate_limit_message(error: HTTPError) -> str:
+        """Build a human-readable message for a 429 response, using the server's error body
+        and Retry-After header when available."""
+        server_message = ""
+        try:
+            body = error.read().decode("utf-8")
+            if body:
+                parsed = json.loads(body)
+                if isinstance(parsed, dict) and parsed.get("error"):
+                    server_message = str(parsed["error"])
+        except Exception:
+            pass
+
+        retry_after = error.headers.get("Retry-After") if error.headers else None
+
+        parts = ["Rate limited by the LLM provider (HTTP 429)."]
+        if server_message:
+            parts.append(server_message)
+        if retry_after:
+            parts.append(f"Retry after {retry_after} seconds.")
+        return " ".join(parts)
 
     def generate_response_async(self, query, timeout=DEFAULT_TIMEOUT, context=None, system_prompt=None,
                                 system_prompt_drop_rate=DEFAULT_SYSTEM_PROMPT_DROP_RATE,
@@ -323,6 +365,10 @@ class LLM:
         # Handle the result
         if self._exception:
             logger.error(f"Failed to generate LLM response: {self._exception}")
+            if isinstance(self._exception, LLMRateLimitException):
+                # Re-raise as-is so callers can distinguish "rate limited" from other
+                # failures; wrapping it below would lose that type.
+                raise self._exception
             raise LLMResponseException(f"Failed to generate LLM response: {self._exception}")
         
         return self._result
