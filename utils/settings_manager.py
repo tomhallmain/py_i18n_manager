@@ -22,10 +22,10 @@ class SettingsManager:
     DEFAULT_LLM_MODEL = "deepseek-r1:14b"
     # Default model for LLMTranslationMode.PER_KEY_ALL_LOCALES requests. That mode asks the model
     # to return one JSON object covering several locales at once, which small/local models handle
-    # unreliably. minimax-m2.7:cloud is a capable model on Ollama's cloud tier (officially licensed
-    # for commercial use on Ollama) that follows structured JSON-output instructions well, so it's
-    # used as the default here.
-    DEFAULT_LLM_MODEL_MULTI_LOCALE = "minimax-m2.7:cloud"
+    # unreliably, so this mode needs a more capable cloud model. Some Ollama cloud models require
+    # a paid subscription (minimax-m2.7:cloud was tried here first and hit a 403 "requires a
+    # subscription" error) - glm-4.7:cloud is used instead as one that's confirmed accessible.
+    DEFAULT_LLM_MODEL_MULTI_LOCALE = "glm-4.7:cloud"
     DEFAULT_QUALITY_REVIEW_SCRIPT_IGNORE_PATTERNS = [
         # Keyboard shortcuts / key combos (e.g. Ctrl+S, Cmd+Shift+P).
         r"(?i)\b(?:Ctrl|Cmd|Shift)(?:(?:\+Shift)?\+[A-Za-z])?\b",

@@ -1,8 +1,11 @@
-"""Tests that a rate limit from the LLM provider propagates all the way to a stopped batch.
+"""Tests that a provider error that shouldn't be retried per-item propagates all the way to a
+stopped batch: rate limiting (HTTP 429) and forbidden/subscription-required (HTTP 403) both
+raise a subclass of LLMBatchStoppingException.
 
-Covers the chain: LLM raises LLMRateLimitException -> TranslationService re-raises it (instead
-of swallowing it like other failures) -> TranslationWorker stops the queue and emits a dedicated
-signal instead of continuing to hammer the endpoint.
+Covers the chain: LLM raises the exception -> TranslationService re-raises it (instead of
+swallowing it like other failures) -> TranslationWorker stops the queue and emits a dedicated
+signal instead of continuing to hammer the endpoint with a request that will keep failing the
+same way.
 
 lib.translation_service imports lib.argos_translate, which is a PyQt6 QObject, and
 ui.outstanding_items_window is a PyQt6 module, so this follows the same PyQt6-availability
@@ -26,7 +29,7 @@ from test_utils import isolated_settings_and_cache_env
 
 
 @pytest.mark.skipif(not _HAS_PYQT6, reason="PyQt6 not installed in this environment")
-class TestTranslationServicePropagatesRateLimit:
+class TestTranslationServicePropagatesBatchStoppingErrors:
     @classmethod
     def setup_class(cls):
         cls._app = QApplication.instance() or QApplication([])
@@ -43,42 +46,52 @@ class TestTranslationServicePropagatesRateLimit:
         del self.service
         self._env_ctx.__exit__(None, None, None)
 
-    def test_translate_with_llm_propagates_rate_limit(self):
-        from lib.llm import LLMRateLimitException
+    @pytest.mark.parametrize("exc_name", ["LLMRateLimitException", "LLMForbiddenException"])
+    def test_translate_with_llm_propagates(self, exc_name):
+        import lib.llm as llm_module
+
+        exc_type = getattr(llm_module, exc_name)
 
         def fake_generate_json_get_value(**kwargs):
-            raise LLMRateLimitException("Rate limited by the LLM provider (HTTP 429).")
+            raise exc_type("provider error")
 
         self.service.llm.generate_json_get_value = fake_generate_json_get_value
 
-        with pytest.raises(LLMRateLimitException):
+        with pytest.raises(exc_type):
             self.service.translate_with_llm("Hello", "es")
 
-    def test_translate_dispatcher_propagates_rate_limit_when_using_llm(self):
-        from lib.llm import LLMRateLimitException
+    @pytest.mark.parametrize("exc_name", ["LLMRateLimitException", "LLMForbiddenException"])
+    def test_translate_dispatcher_propagates_when_using_llm(self, exc_name):
+        import lib.llm as llm_module
+
+        exc_type = getattr(llm_module, exc_name)
 
         def fake_generate_json_get_value(**kwargs):
-            raise LLMRateLimitException("Rate limited by the LLM provider (HTTP 429).")
+            raise exc_type("provider error")
 
         self.service.llm.generate_json_get_value = fake_generate_json_get_value
 
-        with pytest.raises(LLMRateLimitException):
+        with pytest.raises(exc_type):
             self.service.translate("Hello", "es", use_llm=True)
 
-    def test_translate_with_llm_multi_locale_propagates_rate_limit(self):
-        from lib.llm import LLMRateLimitException
+    @pytest.mark.parametrize("exc_name", ["LLMRateLimitException", "LLMForbiddenException"])
+    def test_translate_with_llm_multi_locale_propagates(self, exc_name):
+        import lib.llm as llm_module
+
+        exc_type = getattr(llm_module, exc_name)
 
         def fake_generate_json_dict(**kwargs):
-            raise LLMRateLimitException("Rate limited by the LLM provider (HTTP 429).")
+            raise exc_type("provider error")
 
         self.service.llm_multi.generate_json_dict = fake_generate_json_dict
 
-        with pytest.raises(LLMRateLimitException):
+        with pytest.raises(exc_type):
             self.service.translate_with_llm_multi_locale("Hello", ["es", "fr"])
 
-    def test_non_rate_limit_failures_still_swallowed(self):
-        """Regression guard: only rate limiting should propagate; other failures keep the
-        existing best-effort behavior (return empty string/dict, no exception to the caller)."""
+    def test_non_batch_stopping_failures_still_swallowed(self):
+        """Regression guard: only rate-limit/forbidden errors should propagate; other failures
+        keep the existing best-effort behavior (return empty string/dict, no exception to the
+        caller)."""
 
         def fake_generate_json_get_value(**kwargs):
             raise RuntimeError("some other failure")
@@ -89,23 +102,25 @@ class TestTranslationServicePropagatesRateLimit:
 
 
 @pytest.mark.skipif(not _HAS_PYQT6, reason="PyQt6 not installed in this environment")
-class TestTranslationWorkerStopsOnRateLimit:
+class TestTranslationWorkerStopsOnBatchStoppingErrors:
     @classmethod
     def setup_class(cls):
         cls._app = QApplication.instance() or QApplication([])
 
-    def test_stops_batch_and_emits_rate_limited_without_processing_remaining_queue(self):
-        from lib.llm import LLMRateLimitException
+    @pytest.mark.parametrize("exc_name", ["LLMRateLimitException", "LLMForbiddenException"])
+    def test_stops_batch_and_emits_signal_without_processing_remaining_queue(self, exc_name):
+        import lib.llm as llm_module
         from ui.outstanding_items_window import TranslationWorker
         from utils.globals import LLMTranslationMode
 
+        exc_type = getattr(llm_module, exc_name)
         calls = []
 
         class _FakeTranslationService:
             def translate(self, text, target_locale, context=None, use_llm=False):
                 calls.append(target_locale)
                 if target_locale == "fr":
-                    raise LLMRateLimitException("Rate limited by the LLM provider (HTTP 429).")
+                    raise exc_type("provider error (fr)")
                 return f"[{target_locale}] {text}"
 
         queue = [
@@ -118,30 +133,30 @@ class TestTranslationWorkerStopsOnRateLimit:
         )
 
         completed_signals = []
-        rate_limited_messages = []
+        stopped_error_messages = []
         error_messages = []
         finished_count = []
 
         worker.translation_completed.connect(lambda row, col, text: completed_signals.append((row, col, text)))
-        worker.rate_limited.connect(lambda msg: rate_limited_messages.append(msg))
+        worker.batch_stopped_error.connect(lambda msg: stopped_error_messages.append(msg))
         worker.error.connect(lambda msg: error_messages.append(msg))
         worker.finished.connect(lambda: finished_count.append(1))
 
         worker.run()
 
-        # "es" succeeded before the rate limit hit on "fr"; "de" was never attempted.
+        # "es" succeeded before the error hit on "fr"; "de" was never attempted.
         assert calls == ["es", "fr"]
         assert completed_signals == [(0, 1, "[es] Hello")]
-        assert len(rate_limited_messages) == 1
-        assert "429" in rate_limited_messages[0]
-        assert error_messages == []  # no duplicate generic-error popup on top of the rate-limit one
+        assert len(stopped_error_messages) == 1
+        assert "fr" in stopped_error_messages[0]
+        assert error_messages == []  # no duplicate generic-error popup on top of the dedicated one
         assert finished_count == [1]  # worker still finishes cleanly so the UI can react
-        assert worker.completed == 1  # the rate-limited item itself isn't counted as completed
+        assert worker.completed == 1  # the failed item itself isn't counted as completed
         # "de" is still sitting in the queue, untouched - the batch stopped rather than continuing.
         assert worker.queue == [(0, 3, "key1", "de", "Hello")]
 
-    def test_multi_locale_mode_also_stops_on_rate_limit(self):
-        from lib.llm import LLMRateLimitException
+    def test_multi_locale_mode_also_stops_on_forbidden(self):
+        from lib.llm import LLMForbiddenException
         from ui.outstanding_items_window import TranslationWorker
         from utils.globals import LLMTranslationMode
 
@@ -150,7 +165,9 @@ class TestTranslationWorkerStopsOnRateLimit:
         class _FakeTranslationService:
             def translate_with_llm_multi_locale(self, text, target_locales, context=None):
                 calls.append(tuple(target_locales))
-                raise LLMRateLimitException("Rate limited by the LLM provider (HTTP 429).")
+                raise LLMForbiddenException(
+                    "Forbidden by the LLM provider (HTTP 403). this model requires a subscription"
+                )
 
         queue = [
             (0, "key1", "Hello", [(1, "es"), (2, "fr")]),
@@ -164,12 +181,13 @@ class TestTranslationWorkerStopsOnRateLimit:
             total=4,
         )
 
-        rate_limited_messages = []
-        worker.rate_limited.connect(lambda msg: rate_limited_messages.append(msg))
+        stopped_error_messages = []
+        worker.batch_stopped_error.connect(lambda msg: stopped_error_messages.append(msg))
 
         worker.run()
 
         assert calls == [("es", "fr")]  # second key's request never went out
-        assert len(rate_limited_messages) == 1
+        assert len(stopped_error_messages) == 1
+        assert "subscription" in stopped_error_messages[0]
         # key2 is still sitting in the queue, untouched.
         assert worker.queue == [(1, "key2", "World", [(1, "es"), (2, "fr")])]

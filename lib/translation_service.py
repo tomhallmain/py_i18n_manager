@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 
-from lib.llm import LLM, LLMRateLimitException
+from lib.llm import LLM, LLMBatchStoppingException
 from lib.argos_translate import ArgosTranslate
 from concurrent.futures import ThreadPoolExecutor
 from utils.settings_manager import SettingsManager
@@ -143,9 +143,9 @@ Return only the JSON object, no additional text."""
             )
             raw = result.response if result else ""
             return normalize_translation_trailing_stop(text, raw, target_locale)
-        except LLMRateLimitException:
-            # Let rate limiting propagate - callers (e.g. the bulk translation worker) need to
-            # stop rather than silently treat it like an empty/failed translation.
+        except LLMBatchStoppingException:
+            # Let rate-limit/forbidden errors propagate - callers (e.g. the bulk translation
+            # worker) need to stop rather than silently treat it like an empty/failed translation.
             raise
         except Exception as e:
             logger.error(f"LLM translation failed: {e}")
@@ -189,8 +189,8 @@ Return only the JSON object, no additional text."""
                 # CJK check is disabled here; each locale's text is filtered individually below.
                 cjk_reject_threshold_percentage=None,
             )
-        except LLMRateLimitException:
-            # Let rate limiting propagate - see translate_with_llm.
+        except LLMBatchStoppingException:
+            # Let rate-limit/forbidden errors propagate - see translate_with_llm.
             raise
         except Exception as e:
             logger.error(f"LLM multi-locale translation failed: {e}")

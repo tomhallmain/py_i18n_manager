@@ -20,12 +20,23 @@ class LLMResponseException(Exception):
     pass
 
 
-class LLMRateLimitException(LLMResponseException):
-    """Raised when the LLM provider responds with HTTP 429 (rate limited).
+class LLMBatchStoppingException(LLMResponseException):
+    """Base class for LLM failures that mean a caller running a batch of requests (e.g. bulk
+    translation) should stop entirely rather than skip this item and continue - the condition
+    won't resolve by moving on to the next call, so continuing would just repeat the same
+    failure for every remaining item.
+    """
+    pass
 
-    A distinct type from the generic :class:`LLMResponseException` so callers that need to stop
-    (rather than retry/skip-and-continue) can catch it specifically instead of treating a rate
-    limit the same as a malformed response or a network error.
+
+class LLMRateLimitException(LLMBatchStoppingException):
+    """Raised when the LLM provider responds with HTTP 429 (rate limited)."""
+    pass
+
+
+class LLMForbiddenException(LLMBatchStoppingException):
+    """Raised when the LLM provider responds with HTTP 403 (forbidden) - e.g. the model requires
+    a paid subscription the account doesn't have, or the client isn't authenticated/signed in.
     """
     pass
 
@@ -274,9 +285,17 @@ class LLM:
         except HTTPError as e:
             self.increment_failure_count()
             if e.code == 429:
-                message = self._build_rate_limit_message(e)
+                message = self._build_http_error_message(
+                    "Rate limited by the LLM provider (HTTP 429).", e, include_retry_after=True
+                )
                 logger.error(f"Rate limited by LLM provider (model {self.model_name}): {message}")
                 raise LLMRateLimitException(message) from e
+            if e.code == 403:
+                message = self._build_http_error_message(
+                    "Forbidden by the LLM provider (HTTP 403).", e
+                )
+                logger.error(f"Forbidden by LLM provider (model {self.model_name}): {message}")
+                raise LLMForbiddenException(message) from e
             logger.error(f"Failed to generate LLM response: {e}")
             raise LLMResponseException(f"Failed to generate LLM response: {e}")
         except Exception as e:
@@ -285,9 +304,10 @@ class LLM:
             raise LLMResponseException(f"Failed to generate LLM response: {e}")
 
     @staticmethod
-    def _build_rate_limit_message(error: HTTPError) -> str:
-        """Build a human-readable message for a 429 response, using the server's error body
-        and Retry-After header when available."""
+    def _build_http_error_message(prefix: str, error: HTTPError, include_retry_after: bool = False) -> str:
+        """Build a human-readable message for an HTTP error response, using the server's JSON
+        error body (Ollama's error responses are ``{"error": "..."}"``) and, for rate limiting,
+        the Retry-After header, when available."""
         server_message = ""
         try:
             body = error.read().decode("utf-8")
@@ -298,13 +318,13 @@ class LLM:
         except Exception:
             pass
 
-        retry_after = error.headers.get("Retry-After") if error.headers else None
-
-        parts = ["Rate limited by the LLM provider (HTTP 429)."]
+        parts = [prefix]
         if server_message:
             parts.append(server_message)
-        if retry_after:
-            parts.append(f"Retry after {retry_after} seconds.")
+        if include_retry_after:
+            retry_after = error.headers.get("Retry-After") if error.headers else None
+            if retry_after:
+                parts.append(f"Retry after {retry_after} seconds.")
         return " ".join(parts)
 
     def generate_response_async(self, query, timeout=DEFAULT_TIMEOUT, context=None, system_prompt=None,
@@ -365,9 +385,9 @@ class LLM:
         # Handle the result
         if self._exception:
             logger.error(f"Failed to generate LLM response: {self._exception}")
-            if isinstance(self._exception, LLMRateLimitException):
-                # Re-raise as-is so callers can distinguish "rate limited" from other
-                # failures; wrapping it below would lose that type.
+            if isinstance(self._exception, LLMBatchStoppingException):
+                # Re-raise as-is so callers can distinguish "should stop" failures (rate limit,
+                # forbidden/subscription) from other failures; wrapping it below would lose that.
                 raise self._exception
             raise LLMResponseException(f"Failed to generate LLM response: {self._exception}")
         

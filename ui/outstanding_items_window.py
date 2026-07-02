@@ -10,7 +10,7 @@ import random
 import string
 
 from ui.app_style import AppStyle
-from lib.llm import LLMRateLimitException
+from lib.llm import LLMBatchStoppingException
 from utils.globals import config_manager
 from utils.globals import LLMTranslationMode
 from utils.globals import TranslationStatus
@@ -92,7 +92,9 @@ class TranslationWorker(QObject):
     translation_completed = pyqtSignal(int, int, str)  # row, col, translated_text
     finished = pyqtSignal()
     error = pyqtSignal(str)
-    rate_limited = pyqtSignal(str)  # message; emitted when the batch stops early due to a 429
+    # message; emitted when the batch stops early due to a provider error that won't resolve by
+    # continuing (rate limited, or forbidden e.g. the model requires a paid subscription)
+    batch_stopped_error = pyqtSignal(str)
 
     def __init__(self, translation_service, queue, use_llm=False,
                  mode=LLMTranslationMode.PER_LOCALE, total=None):
@@ -124,11 +126,11 @@ class TranslationWorker(QObject):
                         self._run_multi_locale_item()
                     else:
                         self._run_single_locale_item()
-                except LLMRateLimitException as e:
-                    # Stop the batch rather than hammering a rate-limited endpoint through the
-                    # rest of the queue. Items already applied via translation_completed are kept.
+                except LLMBatchStoppingException as e:
+                    # Stop the batch rather than hammering a blocked endpoint through the rest of
+                    # the queue. Items already applied via translation_completed are kept.
                     logger.warning(f"Stopping translation batch: {e}")
-                    self.rate_limited.emit(str(e))
+                    self.batch_stopped_error.emit(str(e))
                     break
 
             self.progress_updated.emit(self.completed, self.total, "")
@@ -160,7 +162,7 @@ class TranslationWorker(QObject):
             if translated and not self._cancelled:
                 self.translation_completed.emit(row, col, translated)
 
-        except LLMRateLimitException:
+        except LLMBatchStoppingException:
             raise
         except Exception as e:
             logger.error(f"Translation failed for {key} to {locale}: {e}")
@@ -192,7 +194,7 @@ class TranslationWorker(QObject):
                 if translated and not self._cancelled:
                     self.translation_completed.emit(row, col, translated)
 
-        except LLMRateLimitException:
+        except LLMBatchStoppingException:
             raise
         except Exception as e:
             logger.error(f"Multi-locale translation failed for {key}: {e}")
@@ -679,7 +681,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self._translation_worker.translation_completed.connect(self._on_translation_completed)
         self._translation_worker.finished.connect(self._on_translation_finished)
         self._translation_worker.error.connect(self._on_translation_error)
-        self._translation_worker.rate_limited.connect(self._on_translation_rate_limited)
+        self._translation_worker.batch_stopped_error.connect(self._on_translation_batch_stopped_error)
 
         # Start the thread
         self._translation_thread.start()
@@ -720,19 +722,20 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         QMessageBox.warning(self, _("Translation Error"),
                           _("An error occurred during translation:\n{error}").format(error=error_msg))
 
-    def _on_translation_rate_limited(self, message):
-        """Handle the batch stopping early because the LLM provider rate-limited us.
+    def _on_translation_batch_stopped_error(self, message):
+        """Handle the batch stopping early because of a provider error that won't resolve by
+        continuing (rate limited, or forbidden e.g. the model requires a paid subscription).
 
         The worker already stopped the queue (see TranslationWorker.run). Rather than popping a
         separate dialog, annotate the progress dialog - it already shows how many items completed
         before the stop - with why it stopped, and leave it open for the user to close manually.
         """
-        logger.warning(f"Translation batch stopped due to rate limiting: {message}")
+        logger.warning(f"Translation batch stopped early: {message}")
         if self._progress_dialog:
             self._progress_dialog.show_stopped_early_error(
                 _(
                     "Translation stopped early: {message}\n\n"
-                    "Items completed before the limit was hit (shown above) were kept."
+                    "Items completed before this happened (shown above) were kept."
                 ).format(message=message)
             )
 
