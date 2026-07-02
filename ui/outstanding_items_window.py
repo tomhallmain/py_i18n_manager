@@ -11,6 +11,7 @@ import string
 
 from ui.app_style import AppStyle
 from utils.globals import config_manager
+from utils.globals import LLMTranslationMode
 from utils.globals import TranslationStatus
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
@@ -62,75 +63,128 @@ class MultilineItemDelegate(QStyledItemDelegate):
         return super().eventFilter(editor, event)
 
 
+def _display_key(key, max_len=40):
+    """Human-readable form of a translation key for progress labels."""
+    text = key if isinstance(key, str) else key[1] if isinstance(key, tuple) else str(key)
+    if len(text) > max_len:
+        text = text[: max_len - 3] + "..."
+    return text
+
+
+def _context_for_key(key, source_text):
+    """Only include the key as context when it differs from the source text itself."""
+    key_str = key if isinstance(key, str) else key[1] if isinstance(key, tuple) else str(key)
+    return f"Translation key: {key_str}" if key_str != source_text else None
+
+
 class TranslationWorker(QObject):
-    """Worker for running translation tasks in a separate thread."""
+    """Worker for running translation tasks in a separate thread.
+
+    ``queue`` holds either per-cell items ``(row, col, key, locale, source_text)`` (Argos, or LLM
+    in :attr:`LLMTranslationMode.PER_LOCALE` mode - one request per cell), or per-key items
+    ``(row, key, source_text, [(col, locale), ...])`` when ``mode`` is
+    :attr:`LLMTranslationMode.PER_KEY_ALL_LOCALES` - one LLM request per key covering every
+    missing locale for that key at once. ``total`` counts individual missing cells either way, so
+    progress reporting is consistent between modes.
+    """
     progress_updated = pyqtSignal(int, int, str)  # completed, total, current_key
     translation_completed = pyqtSignal(int, int, str)  # row, col, translated_text
     finished = pyqtSignal()
     error = pyqtSignal(str)
-    
-    def __init__(self, translation_service, queue, use_llm=False):
+
+    def __init__(self, translation_service, queue, use_llm=False,
+                 mode=LLMTranslationMode.PER_LOCALE, total=None):
         super().__init__()
         self.translation_service = translation_service
         self.queue = queue
         self.use_llm = use_llm
+        self.mode = mode
         self._cancelled = False
-        self.total = len(queue)
+        self.total = total if total is not None else len(queue)
         self.completed = 0
-        
+
     def cancel(self):
         """Cancel the translation process."""
         self._cancelled = True
-        # Also cancel any ongoing LLM generation
+        # Also cancel any ongoing LLM generation (both single- and multi-locale clients)
         if self.use_llm and hasattr(self.translation_service, 'llm'):
             self.translation_service.llm.cancel_generation()
-    
+        if self.use_llm and hasattr(self.translation_service, 'llm_multi'):
+            self.translation_service.llm_multi.cancel_generation()
+
     def run(self):
         """Process the translation queue."""
         try:
+            is_multi_locale = self.use_llm and self.mode == LLMTranslationMode.PER_KEY_ALL_LOCALES
             while self.queue and not self._cancelled:
-                row, col, key, locale, source_text = self.queue.pop(0)
-                
-                # Display key for progress
-                display_key = key if isinstance(key, str) else key[1] if isinstance(key, tuple) else str(key)
-                if len(display_key) > 40:
-                    display_key = display_key[:37] + "..."
-                
-                self.progress_updated.emit(self.completed, self.total, f"{display_key} -> {locale}")
-                
-                if self._cancelled:
-                    break
-                
-                # Build smart context - only include key if it differs from source text
-                key_str = key if isinstance(key, str) else key[1] if isinstance(key, tuple) else str(key)
-                if key_str != source_text:
-                    context = f"Translation key: {key_str}"
+                if is_multi_locale:
+                    self._run_multi_locale_item()
                 else:
-                    context = None  # Key is same as source, no extra context needed
-                
-                # Perform translation
-                try:
-                    translated = self.translation_service.translate(
-                        text=source_text,
-                        target_locale=locale,
-                        context=context,
-                        use_llm=self.use_llm
-                    )
-                    
-                    if translated and not self._cancelled:
-                        self.translation_completed.emit(row, col, translated)
-                        
-                except Exception as e:
-                    logger.error(f"Translation failed for {key} to {locale}: {e}")
-                
-                self.completed += 1
-                
+                    self._run_single_locale_item()
+
             self.progress_updated.emit(self.completed, self.total, "")
-            
+
         except Exception as e:
             self.error.emit(str(e))
         finally:
             self.finished.emit()
+
+    def _run_single_locale_item(self):
+        """Translate one (row, col) cell - one LLM/Argos request per missing locale."""
+        row, col, key, locale, source_text = self.queue.pop(0)
+
+        self.progress_updated.emit(self.completed, self.total, f"{_display_key(key)} -> {locale}")
+
+        if self._cancelled:
+            return
+
+        context = _context_for_key(key, source_text)
+
+        try:
+            translated = self.translation_service.translate(
+                text=source_text,
+                target_locale=locale,
+                context=context,
+                use_llm=self.use_llm
+            )
+
+            if translated and not self._cancelled:
+                self.translation_completed.emit(row, col, translated)
+
+        except Exception as e:
+            logger.error(f"Translation failed for {key} to {locale}: {e}")
+
+        self.completed += 1
+
+    def _run_multi_locale_item(self):
+        """Translate every missing locale for one key with a single LLM request."""
+        row, key, source_text, locale_cols = self.queue.pop(0)
+        locales = [locale for _, locale in locale_cols]
+
+        self.progress_updated.emit(
+            self.completed, self.total, f"{_display_key(key)} -> {', '.join(locales)}"
+        )
+
+        if self._cancelled:
+            return
+
+        context = _context_for_key(key, source_text)
+
+        try:
+            translations = self.translation_service.translate_with_llm_multi_locale(
+                text=source_text,
+                target_locales=locales,
+                context=context,
+            )
+            for col, locale in locale_cols:
+                translated = translations.get(locale, "")
+                if translated and not self._cancelled:
+                    self.translation_completed.emit(row, col, translated)
+
+        except Exception as e:
+            logger.error(f"Multi-locale translation failed for {key}: {e}")
+
+        self.completed += len(locale_cols)
 
 
 class OutstandingItemsWindow(BaseTranslationWindow):
@@ -496,70 +550,113 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         Args:
             use_llm (bool): If True, use LLM for translation; otherwise use Argos Translate.
         """
-        # Create a list of items to translate with source text
-        translation_queue = []
         default_locale = config_manager.get('translation.default_locale', 'en')
-        
+
+        # Group missing cells by row (key) so LLM per-key mode can request every locale for a
+        # key in one call. Argos and LLM per-locale mode simply flatten this back to per-cell.
+        row_entries = []  # (row, key, source_text, [(col, locale), ...])
         for row in range(self.table.rowCount()):
             key = self._get_key_from_row(row)
-            
+
             # Get source text for this key
             source_text = None
             if key in self.translations:
                 g = self.translations[key]
                 raw = g.get_translation('en') or g.get_translation(default_locale)
                 source_text = g.value_as_text(raw)
-            
+
             if not source_text:
                 continue
-                
+
+            missing_cols = []
             for col in range(1, self.table.columnCount()):
                 locale = self.table.horizontalHeaderItem(col).text()
                 item = self.table.item(row, col)
-                
+
                 # Skip if item exists and has content
                 if item and item.text().strip():
                     continue
-                    
-                translation_queue.append((row, col, key, locale, source_text))
-        
-        if not translation_queue:
+
+                missing_cols.append((col, locale))
+
+            if missing_cols:
+                row_entries.append((row, key, source_text, missing_cols))
+
+        total_missing = sum(len(cols) for _, _, _, cols in row_entries)
+        if total_missing == 0:
             QMessageBox.information(self, _("No Items"), _("No missing translations found."))
             return
-        
+
+        mode = LLMTranslationMode.PER_LOCALE
+        if use_llm:
+            mode = self.settings_manager.get_llm_translation_mode(self.project_path)
+
+        if use_llm and mode == LLMTranslationMode.PER_KEY_ALL_LOCALES:
+            translation_queue = list(row_entries)
+            method_name = _("LLM (all locales per key)")
+            confirm_note = _(
+                "\n\nThis will make {count} LLM request(s), one per key covering all its "
+                "missing locales at once, using model \"{model}\"."
+            ).format(count=len(row_entries), model=self.translation_service.llm_multi.model_name)
+        else:
+            translation_queue = [
+                (row, col, key, locale, source_text)
+                for row, key, source_text, cols in row_entries
+                for col, locale in cols
+            ]
+            method_name = "LLM" if use_llm else "Argos Translate"
+            confirm_note = ""
+            if use_llm:
+                confirm_note = _(
+                    "\n\nThis will make one LLM request per missing locale, using model \"{model}\"."
+                ).format(model=self.translation_service.llm.model_name)
+
         # Show confirmation
-        method_name = "LLM" if use_llm else "Argos Translate"
         reply = QMessageBox.question(
             self,
             _("Confirm Translation"),
             _("This will translate {count} missing items using {method}.\n\n"
               "LLM translations are higher quality but slower.\n"
-              "Argos translations are faster but may be less accurate.\n\n"
-              "Continue?").format(count=len(translation_queue), method=method_name),
+              "Argos translations are faster but may be less accurate."
+              "{confirm_note}\n\n"
+              "Continue?").format(count=total_missing, method=method_name, confirm_note=confirm_note),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
-        
+
         if reply != QMessageBox.StandardButton.Yes:
             return
-        
+
         self.is_translating = True
         self.translate_all_argos_btn.setEnabled(False)
         self.translate_all_llm_btn.setEnabled(False)
-        
+
         # Create and show progress dialog
+        mode_label = None
+        if use_llm and mode == LLMTranslationMode.PER_KEY_ALL_LOCALES:
+            mode_label = _("Mode: all locales per key (model: {model})").format(
+                model=self.translation_service.llm_multi.model_name
+            )
+        elif use_llm:
+            mode_label = _("Mode: one locale at a time (model: {model})").format(
+                model=self.translation_service.llm.model_name
+            )
+
         self._progress_dialog = TranslationProgressDialog(
-            self, 
-            title=_("Translation Progress"), 
-            use_llm=use_llm
+            self,
+            title=_("Translation Progress"),
+            use_llm=use_llm,
+            mode_label=mode_label,
         )
         self._progress_dialog.cancelled.connect(self._cancel_translation_worker)
-        
+
         # Create worker and thread
         self._translation_thread = QThread()
         self._translation_worker = TranslationWorker(
-            self.translation_service, 
-            translation_queue, 
-            use_llm=use_llm
+            self.translation_service,
+            translation_queue,
+            use_llm=use_llm,
+            mode=mode,
+            total=total_missing,
         )
         self._translation_worker.moveToThread(self._translation_thread)
         

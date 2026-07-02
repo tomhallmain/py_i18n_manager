@@ -8,6 +8,7 @@ from typing import Optional, Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from utils.globals import ProjectType
 
+from utils.globals import LLMTranslationMode
 from utils.logging_setup import get_logger
 from utils.utils import Utils
 
@@ -16,6 +17,14 @@ logger = get_logger("settings_manager")
 class SettingsManager:
     MAX_RECENT_PROJECTS = 10
     DEFAULT_LLM_CJK_REJECT_THRESHOLD_PERCENTAGE = 30
+
+    # Default model for one-locale-at-a-time requests (mirrors lib.llm.LLM's own default).
+    DEFAULT_LLM_MODEL = "deepseek-r1:14b"
+    # Default model for LLMTranslationMode.PER_KEY_ALL_LOCALES requests. That mode asks the model
+    # to return one JSON object covering several locales at once, which small/local models handle
+    # unreliably. gpt-oss:20b-cloud is a capable model on Ollama's free-tier cloud models that
+    # follows structured JSON-output instructions well, so it's used as the default here.
+    DEFAULT_LLM_MODEL_MULTI_LOCALE = "gpt-oss:20b-cloud"
     DEFAULT_QUALITY_REVIEW_SCRIPT_IGNORE_PATTERNS = [
         # Keyboard shortcuts / key combos (e.g. Ctrl+S, Cmd+Shift+P).
         r"(?i)\b(?:Ctrl|Cmd|Shift)(?:(?:\+Shift)?\+[A-Za-z])?\b",
@@ -666,38 +675,50 @@ class SettingsManager:
             from utils.config import config_manager
             return config_manager.set('translation.llm_prompt_template', template)
     
-    def clear_project_llm_prompt_template(self, project_path: str) -> bool:
-        """Clear the project-specific LLM prompt template (revert to global default).
-        
+    def _clear_project_setting_key(self, project_path: str, key: str) -> bool:
+        """Remove a single key from a project's settings block, if present.
+
         Args:
             project_path (str): Path to the project
-            
+            key (str): Setting key to remove
+
         Returns:
-            bool: True if successful, False otherwise
+            bool: True if successful (including if the key was already absent), False otherwise
         """
         try:
             if not self.settings_file.exists():
                 return True
-                
+
             with open(self.settings_file, 'r') as f:
                 settings = json.load(f)
-            
+
             project_settings = settings.get('project_settings', {})
             project_config = project_settings.get(project_path, {})
-            
-            if 'llm_prompt_template' in project_config:
-                del project_config['llm_prompt_template']
+
+            if key in project_config:
+                del project_config[key]
                 settings['project_settings'][project_path] = project_config
-                
+
                 with open(self.settings_file, 'w') as f:
                     json.dump(settings, f, indent=4)
-            
+
             return True
-            
+
         except Exception as e:
-            logger.error(f"Error clearing project LLM prompt template for {project_path}: {e}")
+            logger.error(f"Error clearing project setting {key} for {project_path}: {e}")
             return False
-    
+
+    def clear_project_llm_prompt_template(self, project_path: str) -> bool:
+        """Clear the project-specific LLM prompt template (revert to global default).
+
+        Args:
+            project_path (str): Path to the project
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        return self._clear_project_setting_key(project_path, 'llm_prompt_template')
+
     def has_project_llm_prompt_template(self, project_path: str) -> bool:
         """Check if a project has a custom LLM prompt template override.
         
@@ -744,33 +765,127 @@ class SettingsManager:
 
     def clear_project_llm_cjk_reject_threshold(self, project_path: str) -> bool:
         """Clear the project-specific CJK rejection threshold override."""
-        try:
-            if not self.settings_file.exists():
-                return True
-
-            with open(self.settings_file, 'r') as f:
-                settings = json.load(f)
-
-            project_settings = settings.get('project_settings', {})
-            project_config = project_settings.get(project_path, {})
-
-            if 'llm_cjk_reject_threshold_percentage' in project_config:
-                del project_config['llm_cjk_reject_threshold_percentage']
-                settings['project_settings'][project_path] = project_config
-
-                with open(self.settings_file, 'w') as f:
-                    json.dump(settings, f, indent=4)
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Error clearing project CJK threshold for {project_path}: {e}")
-            return False
+        return self._clear_project_setting_key(project_path, 'llm_cjk_reject_threshold_percentage')
 
     def has_project_llm_cjk_reject_threshold(self, project_path: str) -> bool:
         """Check if a project has a CJK rejection threshold override."""
         return self.get_project_setting(project_path, 'llm_cjk_reject_threshold_percentage') is not None
-    
+
+    def get_llm_translation_mode(self, project_path: Optional[str] = None) -> LLMTranslationMode:
+        """Get the LLM translation mode used by "Translate All (LLM)".
+
+        Args:
+            project_path (str, optional): Path to project for project-specific override.
+
+        Returns:
+            LLMTranslationMode: PER_LOCALE (one request per key/locale pair, the original
+                                 behavior) or PER_KEY_ALL_LOCALES (one request per key covering
+                                 every missing locale at once).
+        """
+        mode_value = None
+        if project_path:
+            mode_value = self.get_project_setting(project_path, 'llm_translation_mode')
+
+        if mode_value is None:
+            from utils.config import config_manager
+            mode_value = config_manager.get(
+                'translation.llm_translation_mode', LLMTranslationMode.PER_LOCALE.value
+            )
+
+        return LLMTranslationMode.from_value(mode_value)
+
+    def save_llm_translation_mode(self, mode, project_path: Optional[str] = None) -> bool:
+        """Save the LLM translation mode.
+
+        Args:
+            mode: A LLMTranslationMode (or its string value) to save.
+            project_path (str, optional): If provided, saves as project-specific override.
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        mode = LLMTranslationMode.from_value(mode)
+        if project_path:
+            return self.save_project_setting(project_path, 'llm_translation_mode', mode.value)
+        from utils.config import config_manager
+        return config_manager.set('translation.llm_translation_mode', mode.value)
+
+    def clear_project_llm_translation_mode(self, project_path: str) -> bool:
+        """Clear the project-specific LLM translation mode override."""
+        return self._clear_project_setting_key(project_path, 'llm_translation_mode')
+
+    def has_project_llm_translation_mode(self, project_path: str) -> bool:
+        """Check if a project has a translation mode override."""
+        return self.get_project_setting(project_path, 'llm_translation_mode') is not None
+
+    def get_llm_model(self, project_path: Optional[str] = None) -> str:
+        """Get the LLM model used for one-locale-at-a-time translation requests.
+
+        Args:
+            project_path (str, optional): Path to project for project-specific override.
+
+        Returns:
+            str: The Ollama model name.
+        """
+        model = None
+        if project_path:
+            model = self.get_project_setting(project_path, 'llm_model')
+        if not model:
+            from utils.config import config_manager
+            model = config_manager.get('translation.llm_model', self.DEFAULT_LLM_MODEL)
+        return model or self.DEFAULT_LLM_MODEL
+
+    def save_llm_model(self, model_name: str, project_path: Optional[str] = None) -> bool:
+        """Save the LLM model used for one-locale-at-a-time translation requests."""
+        model_name = (model_name or "").strip() or self.DEFAULT_LLM_MODEL
+        if project_path:
+            return self.save_project_setting(project_path, 'llm_model', model_name)
+        from utils.config import config_manager
+        return config_manager.set('translation.llm_model', model_name)
+
+    def clear_project_llm_model(self, project_path: str) -> bool:
+        """Clear the project-specific single-locale LLM model override."""
+        return self._clear_project_setting_key(project_path, 'llm_model')
+
+    def has_project_llm_model(self, project_path: str) -> bool:
+        """Check if a project has a single-locale LLM model override."""
+        return self.get_project_setting(project_path, 'llm_model') is not None
+
+    def get_llm_model_multi_locale(self, project_path: Optional[str] = None) -> str:
+        """Get the LLM model used for LLMTranslationMode.PER_KEY_ALL_LOCALES translation requests.
+
+        Args:
+            project_path (str, optional): Path to project for project-specific override.
+
+        Returns:
+            str: The Ollama model name.
+        """
+        model = None
+        if project_path:
+            model = self.get_project_setting(project_path, 'llm_model_multi_locale')
+        if not model:
+            from utils.config import config_manager
+            model = config_manager.get(
+                'translation.llm_model_multi_locale', self.DEFAULT_LLM_MODEL_MULTI_LOCALE
+            )
+        return model or self.DEFAULT_LLM_MODEL_MULTI_LOCALE
+
+    def save_llm_model_multi_locale(self, model_name: str, project_path: Optional[str] = None) -> bool:
+        """Save the LLM model used for per-key/all-locales translation requests."""
+        model_name = (model_name or "").strip() or self.DEFAULT_LLM_MODEL_MULTI_LOCALE
+        if project_path:
+            return self.save_project_setting(project_path, 'llm_model_multi_locale', model_name)
+        from utils.config import config_manager
+        return config_manager.set('translation.llm_model_multi_locale', model_name)
+
+    def clear_project_llm_model_multi_locale(self, project_path: str) -> bool:
+        """Clear the project-specific per-key/all-locales LLM model override."""
+        return self._clear_project_setting_key(project_path, 'llm_model_multi_locale')
+
+    def has_project_llm_model_multi_locale(self, project_path: str) -> bool:
+        """Check if a project has a per-key/all-locales LLM model override."""
+        return self.get_project_setting(project_path, 'llm_model_multi_locale') is not None
+
     @staticmethod
     def get_default_llm_prompt_template() -> str:
         """Get the hardcoded default LLM prompt template.

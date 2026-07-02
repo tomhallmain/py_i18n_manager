@@ -69,6 +69,51 @@ class ProjectType(Enum):
             return cls.JAVASCRIPT
         raise ValueError(f"Unknown project type: {display_name}")
 
+class LLMTranslationMode(str, Enum):
+    """How "Translate All (LLM)" batches requests.
+
+    PER_LOCALE issues one LLM request per (key, locale) pair - the original behavior, which
+    works better with small/local models that are less reliable at following structured
+    multi-value output instructions.
+
+    PER_KEY_ALL_LOCALES issues one LLM request per key, asking for every missing locale's
+    translation at once. This is much faster (far fewer requests) but needs a model that
+    reliably returns a JSON object covering multiple locales in one response.
+    """
+    PER_LOCALE = "per_locale"
+    PER_KEY_ALL_LOCALES = "per_key_all_locales"
+
+    def get_display_name(self) -> str:
+        """Get the display name for this mode.
+
+        Returns:
+            str: The display name
+        """
+        if self == LLMTranslationMode.PER_LOCALE:
+            return _("One locale at a time")
+        elif self == LLMTranslationMode.PER_KEY_ALL_LOCALES:
+            return _("All locales for a key at once")
+        return self.value
+
+    @classmethod
+    def from_value(cls, value, default: Optional['LLMTranslationMode'] = None) -> 'LLMTranslationMode':
+        """Coerce a raw string (e.g. loaded from settings) into a mode, tolerating bad/missing values.
+
+        Args:
+            value: A LLMTranslationMode, its string value, or an unrecognized/None value
+            default: Mode to fall back to; defaults to PER_LOCALE if not given
+
+        Returns:
+            LLMTranslationMode: The matching mode, or the default/fallback
+        """
+        if isinstance(value, cls):
+            return value
+        try:
+            return cls(value)
+        except (ValueError, TypeError):
+            return default if default is not None else cls.PER_LOCALE
+
+
 class TranslationStatus(Enum):
     """Enum for different translation status types."""
     MISSING = "Missing"

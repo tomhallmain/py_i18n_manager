@@ -555,16 +555,16 @@ class TestUseBuiltinExclusionsToggle:
     # ── collect_findings_for_group: IDENTICAL_TO_NONDEFAULT signal ───────────
 
     def test_cross_locale_cluster_no_finding_when_builtins_on(self):
-        # es and pt sharing "digital" is in the allowed {es, pt} group
+        # es and pt sharing "banco" is in the allowed {es, pt} group
         class _K:
             def __init__(self):
-                self.msgid = "label.digital"
+                self.msgid = "label.banco"
                 self.context = ""
 
         class _G:
             def __init__(self):
                 self.key = _K()
-                self._v = {"en": "digital content", "es": "digital", "pt": "digital"}
+                self._v = {"en": "bank content", "es": "banco", "pt": "banco"}
 
             def get_translation(self, loc):
                 return self._v.get(loc, "")
@@ -639,17 +639,17 @@ class TestUseBuiltinExclusionsToggle:
     # ── Sub-cluster splitting ─────────────────────────────────────────────────
 
     def test_partial_cluster_outsider_alone_suppressed(self):
-        # es/pt sharing "digital" is approved; de is the only outsider → no finding
+        # es/pt sharing "banco" is approved; de is the only outsider → no finding
         # (IDENTICAL_TO_NONDEFAULT requires 2+ unapproved locales)
         class _K:
             def __init__(self):
-                self.msgid = "tag.digital"
+                self.msgid = "tag.banco"
                 self.context = ""
 
         class _G:
             def __init__(self):
                 self.key = _K()
-                self._v = {"en": "digital media", "es": "digital", "pt": "digital", "de": "digital"}
+                self._v = {"en": "bank media", "es": "banco", "pt": "banco", "de": "banco"}
 
             def get_translation(self, loc):
                 return self._v.get(loc, "")
@@ -661,19 +661,19 @@ class TestUseBuiltinExclusionsToggle:
         assert not any(f.signal == QualityHeuristicKind.IDENTICAL_TO_NONDEFAULT for f in findings)
 
     def test_partial_cluster_two_outsiders_flagged(self):
-        # es/pt sharing "digital" is approved; de and fr are both outsiders → finding for de+fr
+        # es/pt sharing "banco" is approved; de and fr are both outsiders → finding for de+fr
         class _K:
             def __init__(self):
-                self.msgid = "tag.digital"
+                self.msgid = "tag.banco"
                 self.context = ""
 
         class _G:
             def __init__(self):
                 self.key = _K()
                 self._v = {
-                    "en": "digital media",
-                    "es": "digital", "pt": "digital",
-                    "de": "digital", "fr": "digital",
+                    "en": "bank media",
+                    "es": "banco", "pt": "banco",
+                    "de": "banco", "fr": "banco",
                 }
 
             def get_translation(self, loc):

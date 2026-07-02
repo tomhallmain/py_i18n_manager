@@ -1,12 +1,14 @@
 """Dialog for configuring LLM translation prompt template."""
 
-from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, 
+from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton,
                             QLabel, QTextEdit, QFrame, QCheckBox,
-                            QMessageBox, QGroupBox, QScrollArea, QWidget, QSpinBox)
+                            QMessageBox, QGroupBox, QScrollArea, QWidget, QSpinBox,
+                            QRadioButton, QButtonGroup, QLineEdit)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 
 from lib.multi_display import SmartDialog
+from utils.globals import LLMTranslationMode
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
 from utils.translations import I18N
@@ -53,7 +55,57 @@ class LLMSettingsDialog(SmartDialog):
         )
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
-        
+
+        # Translation mode + model settings
+        mode_group = QGroupBox(_("Translation Mode & Model"))
+        mode_layout = QVBoxLayout(mode_group)
+
+        mode_info = QLabel(
+            _("Choose how \"Translate All (LLM)\" issues requests. Translating all locales for "
+              "a key at once is much faster (far fewer requests), but needs a model that "
+              "reliably returns structured JSON covering multiple locales in one response - "
+              "local models are often unreliable at this. Translating one locale at a time is "
+              "slower but works better with small/local models.")
+        )
+        mode_info.setWordWrap(True)
+        mode_layout.addWidget(mode_info)
+
+        self.mode_button_group = QButtonGroup(self)
+        self.per_locale_radio = QRadioButton(_("Translate one locale at a time (default)"))
+        self.per_key_radio = QRadioButton(_("Translate all locales for a key at once"))
+        self.mode_button_group.addButton(self.per_locale_radio)
+        self.mode_button_group.addButton(self.per_key_radio)
+        mode_layout.addWidget(self.per_locale_radio)
+        mode_layout.addWidget(self.per_key_radio)
+
+        single_model_layout = QHBoxLayout()
+        single_model_layout.addWidget(QLabel(_("Model (one locale at a time):")))
+        self.single_model_edit = QLineEdit()
+        self.single_model_edit.setPlaceholderText(SettingsManager.DEFAULT_LLM_MODEL)
+        single_model_layout.addWidget(self.single_model_edit)
+        mode_layout.addLayout(single_model_layout)
+
+        multi_model_layout = QHBoxLayout()
+        multi_model_layout.addWidget(QLabel(_("Model (all locales per key):")))
+        self.multi_model_edit = QLineEdit()
+        self.multi_model_edit.setPlaceholderText(SettingsManager.DEFAULT_LLM_MODEL_MULTI_LOCALE)
+        multi_model_layout.addWidget(self.multi_model_edit)
+        mode_layout.addLayout(multi_model_layout)
+
+        model_note = QLabel(
+            _("Models are Ollama model names (Ollama supports both local and cloud-hosted "
+              "models). The default for \"all locales per key\" is {model}, a capable model on "
+              "Ollama's free cloud tier that follows multi-locale JSON instructions more "
+              "reliably than typical local models.").format(
+                model=SettingsManager.DEFAULT_LLM_MODEL_MULTI_LOCALE
+            )
+        )
+        model_note.setWordWrap(True)
+        model_note.setStyleSheet("color: gray;")
+        mode_layout.addWidget(model_note)
+
+        layout.addWidget(mode_group)
+
         # Variables reference section
         variables_group = QGroupBox(_("Available Variables"))
         variables_layout = QVBoxLayout(variables_group)
@@ -169,19 +221,30 @@ class LLMSettingsDialog(SmartDialog):
         self.template_editor.setText(template)
         threshold = self.settings_manager.get_llm_cjk_reject_threshold_percentage(self.project_path)
         self.cjk_threshold_spinbox.setValue(threshold)
-        
+
+        mode = self.settings_manager.get_llm_translation_mode(self.project_path)
+        if mode == LLMTranslationMode.PER_KEY_ALL_LOCALES:
+            self.per_key_radio.setChecked(True)
+        else:
+            self.per_locale_radio.setChecked(True)
+        self.single_model_edit.setText(self.settings_manager.get_llm_model(self.project_path))
+        self.multi_model_edit.setText(self.settings_manager.get_llm_model_multi_locale(self.project_path))
+
         # Set checkbox state if project path is set
         if self.project_path and self.project_override_checkbox:
             has_override = (
                 self.settings_manager.has_project_llm_prompt_template(self.project_path) or
-                self.settings_manager.has_project_llm_cjk_reject_threshold(self.project_path)
+                self.settings_manager.has_project_llm_cjk_reject_threshold(self.project_path) or
+                self.settings_manager.has_project_llm_translation_mode(self.project_path) or
+                self.settings_manager.has_project_llm_model(self.project_path) or
+                self.settings_manager.has_project_llm_model_multi_locale(self.project_path)
             )
             self.project_override_checkbox.setChecked(has_override)
-            
+
             # Update clear override button state
             if hasattr(self, 'clear_override_btn'):
                 self.clear_override_btn.setEnabled(has_override)
-        
+
         self.update_preview()
     
     def on_template_changed(self):
@@ -224,7 +287,10 @@ class LLMSettingsDialog(SmartDialog):
             default_template = SettingsManager.get_default_llm_prompt_template()
             self.template_editor.setText(default_template)
             self.cjk_threshold_spinbox.setValue(SettingsManager.DEFAULT_LLM_CJK_REJECT_THRESHOLD_PERCENTAGE)
-    
+            self.per_locale_radio.setChecked(True)
+            self.single_model_edit.setText(SettingsManager.DEFAULT_LLM_MODEL)
+            self.multi_model_edit.setText(SettingsManager.DEFAULT_LLM_MODEL_MULTI_LOCALE)
+
     def clear_project_override(self):
         """Clear the project-specific template override."""
         if not self.project_path:
@@ -241,13 +307,24 @@ class LLMSettingsDialog(SmartDialog):
         if reply == QMessageBox.StandardButton.Yes:
             clear_template_ok = self.settings_manager.clear_project_llm_prompt_template(self.project_path)
             clear_threshold_ok = self.settings_manager.clear_project_llm_cjk_reject_threshold(self.project_path)
-            if clear_template_ok and clear_threshold_ok:
+            clear_mode_ok = self.settings_manager.clear_project_llm_translation_mode(self.project_path)
+            clear_model_ok = self.settings_manager.clear_project_llm_model(self.project_path)
+            clear_model_multi_ok = self.settings_manager.clear_project_llm_model_multi_locale(self.project_path)
+            if clear_template_ok and clear_threshold_ok and clear_mode_ok and clear_model_ok and clear_model_multi_ok:
                 # Reload with global template
                 global_template = self.settings_manager.get_llm_prompt_template(None)
                 self.template_editor.setText(global_template)
                 global_threshold = self.settings_manager.get_llm_cjk_reject_threshold_percentage(None)
                 self.cjk_threshold_spinbox.setValue(global_threshold)
-                
+
+                global_mode = self.settings_manager.get_llm_translation_mode(None)
+                if global_mode == LLMTranslationMode.PER_KEY_ALL_LOCALES:
+                    self.per_key_radio.setChecked(True)
+                else:
+                    self.per_locale_radio.setChecked(True)
+                self.single_model_edit.setText(self.settings_manager.get_llm_model(None))
+                self.multi_model_edit.setText(self.settings_manager.get_llm_model_multi_locale(None))
+
                 if self.project_override_checkbox:
                     self.project_override_checkbox.setChecked(False)
                 
@@ -270,7 +347,14 @@ class LLMSettingsDialog(SmartDialog):
         """Save the current settings."""
         template = self.template_editor.toPlainText().strip()
         cjk_threshold = self.cjk_threshold_spinbox.value()
-        
+        mode = (
+            LLMTranslationMode.PER_KEY_ALL_LOCALES
+            if self.per_key_radio.isChecked()
+            else LLMTranslationMode.PER_LOCALE
+        )
+        single_model = self.single_model_edit.text().strip() or SettingsManager.DEFAULT_LLM_MODEL
+        multi_model = self.multi_model_edit.text().strip() or SettingsManager.DEFAULT_LLM_MODEL_MULTI_LOCALE
+
         if not template:
             QMessageBox.warning(
                 self,
@@ -304,12 +388,21 @@ class LLMSettingsDialog(SmartDialog):
         if save_to_project:
             success_template = self.settings_manager.save_llm_prompt_template(template, self.project_path)
             success_threshold = self.settings_manager.save_llm_cjk_reject_threshold_percentage(cjk_threshold, self.project_path)
+            success_mode = self.settings_manager.save_llm_translation_mode(mode, self.project_path)
+            success_single_model = self.settings_manager.save_llm_model(single_model, self.project_path)
+            success_multi_model = self.settings_manager.save_llm_model_multi_locale(multi_model, self.project_path)
             location = _("project")
         else:
             success_template = self.settings_manager.save_llm_prompt_template(template, None)
             success_threshold = self.settings_manager.save_llm_cjk_reject_threshold_percentage(cjk_threshold, None)
+            success_mode = self.settings_manager.save_llm_translation_mode(mode, None)
+            success_single_model = self.settings_manager.save_llm_model(single_model, None)
+            success_multi_model = self.settings_manager.save_llm_model_multi_locale(multi_model, None)
             location = _("global")
-        success = success_template and success_threshold
+        success = (
+            success_template and success_threshold and success_mode
+            and success_single_model and success_multi_model
+        )
         
         if success:
             logger.info(f"LLM prompt template saved to {location} settings")

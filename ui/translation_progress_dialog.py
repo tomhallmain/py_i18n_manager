@@ -53,12 +53,13 @@ class TranslationProgressDialog(QDialog):
 
     cancelled = pyqtSignal()
 
-    def __init__(self, parent=None, title="Translation Progress", use_llm=False):
+    def __init__(self, parent=None, title="Translation Progress", use_llm=False, mode_label: str | None = None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
         self.setMinimumWidth(400)
         self.use_llm = use_llm
+        self.mode_label_text = mode_label
         self._eta = ETATracker()
 
         # Prevent closing via X button while active
@@ -76,6 +77,13 @@ class TranslationProgressDialog(QDialog):
         )
         self.method_label.setStyleSheet("font-weight: bold;")
         layout.addWidget(self.method_label)
+
+        # Mode label (e.g. per-locale vs per-key/all-locales, and the model in use)
+        if self.mode_label_text:
+            self.mode_label = QLabel(self.mode_label_text)
+            self.mode_label.setStyleSheet("color: gray;")
+            self.mode_label.setWordWrap(True)
+            layout.addWidget(self.mode_label)
 
         # Progress bar
         self.progress_bar = QProgressBar()

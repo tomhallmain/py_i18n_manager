@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Dict, List, Optional
 
 from lib.llm import LLM
 from lib.argos_translate import ArgosTranslate
@@ -31,10 +31,31 @@ Rules:
 
 Return only the JSON object, no additional text."""
 
+    # Default prompt template for LLMTranslationMode.PER_KEY_ALL_LOCALES: one LLM call per key,
+    # requesting translations for every missing locale at once as a single JSON object.
+    DEFAULT_MULTI_LOCALE_PROMPT_TEMPLATE = """Translate the following text from {source_locale} into every one of the target locales listed below.
+Return the response as a single JSON object whose keys are exactly the target locale codes listed below and whose values are the translated text for that locale.
+
+Source text: {source_text}
+
+Target locales (use exactly these as the JSON keys): {target_locales}
+
+{context}
+
+Rules:
+1. Maintain any placeholders like {{0}}, {{1}}, %s, %d, etc.
+2. Preserve any special characters or formatting
+3. Keep the same tone and style as the original
+4. If the text contains technical terms, translate them appropriately for each target language
+5. Return exactly one key per target locale listed above, and no other keys
+
+Return only the JSON object, no additional text."""
+
     def __init__(self, default_locale='en', prompt_template: Optional[str] = None,
-                 cjk_reject_threshold_percentage: Optional[int] = None, project_path: Optional[str] = None):
+                 cjk_reject_threshold_percentage: Optional[int] = None, project_path: Optional[str] = None,
+                 llm_model: Optional[str] = None, llm_model_multi_locale: Optional[str] = None):
         """Initialize the translation service.
-        
+
         Args:
             default_locale (str, optional): Default source locale for translations. Defaults to 'en'.
             prompt_template (str, optional): Custom prompt template for LLM translations.
@@ -42,6 +63,10 @@ Return only the JSON object, no additional text."""
             cjk_reject_threshold_percentage (int, optional): CJK rejection threshold percentage for
                                                             non-CJK locales.
             project_path (str, optional): Project path for project-specific LLM settings.
+            llm_model (str, optional): Ollama model for one-locale-at-a-time requests. If None,
+                                        resolved from settings.
+            llm_model_multi_locale (str, optional): Ollama model for per-key/all-locales requests.
+                                                     If None, resolved from settings.
         """
         self.default_locale = default_locale
         self.prompt_template = prompt_template
@@ -51,13 +76,19 @@ Return only the JSON object, no additional text."""
             self.cjk_reject_threshold_percentage = self.settings_manager.get_llm_cjk_reject_threshold_percentage(project_path)
         else:
             self.cjk_reject_threshold_percentage = int(cjk_reject_threshold_percentage)
-        self.llm = LLM()
+        llm_model = llm_model or self.settings_manager.get_llm_model(project_path)
+        llm_model_multi_locale = llm_model_multi_locale or self.settings_manager.get_llm_model_multi_locale(project_path)
+        # Separate LLM instances (and failure-tracking state) per mode, since they typically use
+        # different models (e.g. a local model vs. an Ollama cloud model) with independent
+        # reliability characteristics.
+        self.llm = LLM(model_name=llm_model, state_key=llm_model)
+        self.llm_multi = LLM(model_name=llm_model_multi_locale, state_key=llm_model_multi_locale)
         self.argos = ArgosTranslate()
         self._executor = ThreadPoolExecutor(max_workers=4)
-    
+
     def set_prompt_template(self, template: Optional[str]):
         """Update the prompt template used for LLM translations.
-        
+
         Args:
             template (str, optional): The new prompt template, or None to use default
         """
@@ -66,7 +97,17 @@ Return only the JSON object, no additional text."""
     def set_cjk_reject_threshold_percentage(self, threshold_percentage: int):
         """Update CJK rejection threshold percentage used for non-CJK locales."""
         self.cjk_reject_threshold_percentage = max(0, min(100, int(threshold_percentage)))
-        
+
+    def set_llm_model(self, model_name: str):
+        """Update the model used for one-locale-at-a-time LLM translation requests."""
+        if model_name:
+            self.llm.model_name = model_name
+
+    def set_llm_model_multi_locale(self, model_name: str):
+        """Update the model used for per-key/all-locales LLM translation requests."""
+        if model_name:
+            self.llm_multi.model_name = model_name
+
     def __del__(self):
         """Cleanup when the service is destroyed."""
         if hasattr(self, '_executor'):
@@ -105,7 +146,77 @@ Return only the JSON object, no additional text."""
         except Exception as e:
             logger.error(f"LLM translation failed: {e}")
             return ""
-            
+
+    def translate_with_llm_multi_locale(self, text, target_locales: List[str], context=None) -> Dict[str, str]:
+        """Translate text into several target locales with a single LLM call.
+
+        Used by LLMTranslationMode.PER_KEY_ALL_LOCALES: one request per source key instead of
+        one request per (key, locale) pair. This is much faster but requires a model that
+        reliably follows structured JSON-object instructions covering multiple locales at
+        once - local/small models are often unreliable here, which is why this mode uses a
+        separate, more capable model by default (see ``llm_multi``).
+
+        Args:
+            text (str): The source text to translate
+            target_locales (list[str]): Target locale codes (e.g. ['es', 'fr'])
+            context (str, optional): Additional context about the text
+
+        Returns:
+            dict[str, str]: Mapping of target locale -> translated text. Locales the model
+                             omitted, or whose text failed CJK filtering, map to "".
+        """
+        target_locales = list(target_locales)
+        results = {locale: "" for locale in target_locales}
+        if not target_locales:
+            return results
+
+        prompt = self._create_multi_locale_translation_prompt(
+            text=text,
+            source_locale=self.default_locale,
+            target_locales=target_locales,
+            context=context,
+        )
+
+        try:
+            parsed = self.llm_multi.generate_json_dict(
+                query=prompt,
+                timeout=90,
+                # A batch response legitimately mixes CJK and non-CJK locales, so the blanket
+                # CJK check is disabled here; each locale's text is filtered individually below.
+                cjk_reject_threshold_percentage=None,
+            )
+        except Exception as e:
+            logger.error(f"LLM multi-locale translation failed: {e}")
+            return results
+
+        if not parsed:
+            return results
+
+        for locale in target_locales:
+            raw = self._extract_locale_value(parsed, locale)
+            if not raw:
+                continue
+            cjk_reject_threshold = self._get_cjk_reject_threshold_for_locale(locale)
+            if cjk_reject_threshold is not None and Utils.get_cjk_character_ratio(raw, cjk_reject_threshold):
+                continue
+            results[locale] = normalize_translation_trailing_stop(text, raw, locale)
+
+        return results
+
+    @staticmethod
+    def _extract_locale_value(parsed: dict, locale: str) -> str:
+        """Look up a locale's translation in the parsed response, tolerating case/format drift."""
+        if locale in parsed:
+            return str(parsed[locale] or "")
+        lowered = locale.lower()
+        for key, value in parsed.items():
+            if isinstance(key, str) and key.lower() == lowered:
+                return str(value or "")
+        for key, value in parsed.items():
+            if isinstance(key, str) and Utils.is_similar_str(locale, key):
+                return str(value or "")
+        return ""
+
     def translate_with_argos(self, text, target_locale, source_locale=None):
         """Translate text to the target locale using Argos Translate.
         
@@ -182,6 +293,30 @@ Return only the JSON object, no additional text."""
             )
         
         return prompt
+
+    def _create_multi_locale_translation_prompt(self, text, source_locale, target_locales: List[str], context=None):
+        """Create a prompt requesting translations for several target locales in one JSON object.
+
+        Uses ``DEFAULT_MULTI_LOCALE_PROMPT_TEMPLATE`` (not user-configurable, unlike the
+        single-locale template, since its output shape - one JSON key per locale - is required
+        by :meth:`translate_with_llm_multi_locale`).
+
+        Args:
+            text (str): The text to translate
+            source_locale (str): Source language code
+            target_locales (list[str]): Target language codes
+            context (str, optional): Additional context about the text
+
+        Returns:
+            str: The formatted prompt
+        """
+        context_str = f"Context: {context}" if context else ""
+        return self.DEFAULT_MULTI_LOCALE_PROMPT_TEMPLATE.format(
+            source_locale=source_locale,
+            target_locales=", ".join(target_locales),
+            source_text=text,
+            context=context_str,
+        )
 
     def _get_cjk_reject_threshold_for_locale(self, target_locale: str) -> Optional[int]:
         """Return CJK reject threshold for non-CJK locales, None for CJK locales."""

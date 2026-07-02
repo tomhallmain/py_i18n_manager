@@ -105,15 +105,19 @@ class BaseTranslationWindow(SmartWindow):
         cjk_reject = self.settings_manager.get_llm_cjk_reject_threshold_percentage(
             self.project_path
         )
+        llm_model = self.settings_manager.get_llm_model(self.project_path)
+        llm_model_multi_locale = self.settings_manager.get_llm_model_multi_locale(self.project_path)
         self.translation_service = TranslationService(
             default_locale=self.default_locale,
             prompt_template=prompt_template,
             cjk_reject_threshold_percentage=cjk_reject,
             project_path=self.project_path,
+            llm_model=llm_model,
+            llm_model_multi_locale=llm_model_multi_locale,
         )
 
     def reload_translation_service_settings(self) -> None:
-        """Reload LLM prompt / CJK threshold on the active translation service."""
+        """Reload LLM prompt / CJK threshold / models on the active translation service."""
         if not getattr(self, "translation_service", None) or not getattr(
             self, "settings_manager", None
         ):
@@ -122,6 +126,10 @@ class BaseTranslationWindow(SmartWindow):
         cjk = self.settings_manager.get_llm_cjk_reject_threshold_percentage(self.project_path)
         self.translation_service.set_prompt_template(pt)
         self.translation_service.set_cjk_reject_threshold_percentage(cjk)
+        self.translation_service.set_llm_model(self.settings_manager.get_llm_model(self.project_path))
+        self.translation_service.set_llm_model_multi_locale(
+            self.settings_manager.get_llm_model_multi_locale(self.project_path)
+        )
         logger.info("LLM translation settings reloaded")
 
     def copy_text_to_clipboard(self, text: str) -> None:

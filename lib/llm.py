@@ -58,10 +58,13 @@ class LLMResult:
             return False
         return True
 
-    def _get_json_attr(self, attr_name):
+    def get_json_dict(self):
+        """Parse the raw response into a JSON object, tolerating code fences and a leading "json" tag.
+
+        Returns:
+            Optional[dict]: The parsed JSON object, or None if the response is empty/malformed.
+        """
         try:
-            if attr_name is None or attr_name.strip() == "":
-                raise Exception(f"Invalid attr name: \"{attr_name}\"")
             json_str = self.response
             if json_str is None or json_str.strip() == "" or ("{" not in json_str or "}" not in json_str or ":" not in json_str):
                 raise Exception("No or malformed JSON object found in JSON string!")
@@ -69,16 +72,29 @@ class LLMResult:
             if json_str.startswith("json"):
                 json_str = json_str[4:].strip()
             json_obj = json.loads(json_str)
-            assert(isinstance(json_obj, dict))
+            assert isinstance(json_obj, dict)
+            return json_obj
+        except Exception as e:
+            logger.error(f"{e} - Failed to parse JSON object from response: {self.response}")
+            return None
+
+    def _get_json_attr(self, attr_name):
+        try:
+            if attr_name is None or attr_name.strip() == "":
+                raise Exception(f"Invalid attr name: \"{attr_name}\"")
+            json_obj = self.get_json_dict()
+            if json_obj is None:
+                return None
             if attr_name not in json_obj:
                 for key in json_obj.keys():
-                    if Utils.is_similar_strings(attr_name, key):
+                    if Utils.is_similar_str(attr_name, key):
                         self.response = json_obj[key]
                         return self
+                raise Exception(f"Key \"{attr_name}\" not found in JSON response")
             self.response = json_obj[attr_name]
             return self
         except Exception as e:
-            logger.error(f"{e} - Failed to get json attr {attr_name} from json response: {json}")
+            logger.error(f"{e} - Failed to get json attr {attr_name} from json response: {self.response}")
             return None
 
 
@@ -326,6 +342,27 @@ class LLM:
         if result is None:
             raise LLMResponseException("Failed to generate LLM response - Result is None")
         return result._get_json_attr(json_key)
+
+    def generate_json_dict(self, query, timeout=DEFAULT_TIMEOUT, context=None, system_prompt=None,
+                           system_prompt_drop_rate=DEFAULT_SYSTEM_PROMPT_DROP_RATE,
+                           cjk_reject_threshold_percentage=DEFAULT_CJK_REJECT_THRESHOLD_PERCENTAGE):
+        """Generate a response and parse it as a JSON object, e.g. one key per requested locale.
+
+        Unlike :meth:`generate_json_get_value`, this returns the whole parsed object rather than
+        a single key's value, so callers can request several results (such as translations for
+        multiple locales) in a single LLM call.
+        """
+        result = self.generate_response_async(
+            query,
+            timeout=timeout,
+            context=context,
+            system_prompt=system_prompt,
+            system_prompt_drop_rate=system_prompt_drop_rate,
+            cjk_reject_threshold_percentage=cjk_reject_threshold_percentage,
+        )
+        if result is None:
+            raise LLMResponseException("Failed to generate LLM response - Result is None")
+        return result.get_json_dict()
 
     def _is_thinking_model(self) -> bool:
         """Check if the current model is a thinking model that uses internal prompts."""

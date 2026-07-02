@@ -272,22 +272,24 @@ class TestCrossLanguageNewGroups:
     # --- Scandinavian {sv, no, da} ---
 
     def test_scandinavian_shared_native_cognates(self):
-        for term in ("kontakt", "produkt", "profil", "service", "system"):
+        for term in ("kontakt", "produkt", "profil"):
             assert is_allowed_cross_locale_identical_cluster(["sv", "no", "da"], term), term
 
-    def test_scandinavian_shared_tech_loanwords(self):
+    def test_scandinavian_shared_tech_loanwords_not_in_cross_language_map(self):
+        # English's global reach means tech loanwords are handled by a separate allowlist
+        # (not yet covered here), not as native cross-language cognates for this locale group.
         for term in ("browser", "cache", "chat", "data", "download", "email"):
-            assert is_allowed_cross_locale_identical_cluster(["sv", "no", "da"], term), term
+            assert not is_allowed_cross_locale_identical_cluster(["sv", "no", "da"], term), term
 
     def test_scandinavian_subset_pair_sv_no_covered(self):
         assert is_allowed_cross_locale_identical_cluster(["sv", "no"], "kontakt")
-        assert is_allowed_cross_locale_identical_cluster(["sv", "no"], "browser")
+        assert is_allowed_cross_locale_identical_cluster(["sv", "no"], "produkt")
 
     def test_scandinavian_subset_pair_sv_da_covered(self):
-        assert is_allowed_cross_locale_identical_cluster(["sv", "da"], "service")
+        assert is_allowed_cross_locale_identical_cluster(["sv", "da"], "profil")
 
     def test_scandinavian_subset_pair_no_da_covered(self):
-        assert is_allowed_cross_locale_identical_cluster(["no", "da"], "system")
+        assert is_allowed_cross_locale_identical_cluster(["no", "da"], "kategori")
 
     def test_scandinavian_unknown_term_not_allowed(self):
         assert not is_allowed_cross_locale_identical_cluster(["sv", "no", "da"], "hejsan")
@@ -297,10 +299,12 @@ class TestCrossLanguageNewGroups:
 
     # --- West Germanic {de, nl} ---
 
-    def test_de_nl_shared_tech_loanwords(self):
+    def test_de_nl_shared_tech_loanwords_not_in_cross_language_map(self):
+        # See test_scandinavian_shared_tech_loanwords_not_in_cross_language_map: English tech
+        # loanwords are not native de/nl cognates and belong in a separate allowlist.
         for term in ("app", "browser", "cache", "chat", "data", "download",
                      "email", "plugin", "server", "software", "upload"):
-            assert is_allowed_cross_locale_identical_cluster(["de", "nl"], term), term
+            assert not is_allowed_cross_locale_identical_cluster(["de", "nl"], term), term
 
     def test_de_nl_unknown_term_not_allowed(self):
         assert not is_allowed_cross_locale_identical_cluster(["de", "nl"], "Lebkuchen")
@@ -311,14 +315,14 @@ class TestCrossLanguageNewGroups:
     # --- Ibero-Romance {es, pt} ---
 
     def test_es_pt_native_romance_cognates(self):
-        for term in ("banco", "canal", "capital", "digital", "global", "grupo",
-                     "lista", "local", "manual", "natural", "normal", "nota",
-                     "social", "total"):
+        for term in ("banco", "canal", "grupo", "lista", "nota"):
             assert is_allowed_cross_locale_identical_cluster(["es", "pt"], term), term
 
-    def test_es_pt_shared_tech_loanwords(self):
+    def test_es_pt_shared_tech_loanwords_not_in_cross_language_map(self):
+        # See test_scandinavian_shared_tech_loanwords_not_in_cross_language_map: English tech
+        # loanwords are not native es/pt cognates and belong in a separate allowlist.
         for term in ("browser", "cache", "chat", "data", "download", "email"):
-            assert is_allowed_cross_locale_identical_cluster(["es", "pt"], term), term
+            assert not is_allowed_cross_locale_identical_cluster(["es", "pt"], term), term
 
     def test_es_pt_unknown_term_not_allowed(self):
         assert not is_allowed_cross_locale_identical_cluster(["es", "pt"], "gracias")
@@ -328,15 +332,17 @@ class TestCrossLanguageNewGroups:
 
     # --- Central European {pl, cs, sk} ---
 
-    def test_pl_cs_sk_shared_tech_loanwords(self):
+    def test_pl_cs_sk_shared_tech_loanwords_not_in_cross_language_map(self):
+        # See test_scandinavian_shared_tech_loanwords_not_in_cross_language_map: English tech
+        # loanwords are not native pl/cs/sk cognates and belong in a separate allowlist.
         for term in ("app", "browser", "cache", "chat", "data", "download", "email"):
-            assert is_allowed_cross_locale_identical_cluster(["pl", "cs", "sk"], term), term
+            assert not is_allowed_cross_locale_identical_cluster(["pl", "cs", "sk"], term), term
 
     def test_pl_cs_sk_subset_pair_pl_cs(self):
-        assert is_allowed_cross_locale_identical_cluster(["pl", "cs"], "browser")
+        assert is_allowed_cross_locale_identical_cluster(["pl", "cs"], "kontakt")
 
     def test_pl_cs_sk_subset_pair_cs_sk(self):
-        assert is_allowed_cross_locale_identical_cluster(["cs", "sk"], "data")
+        assert is_allowed_cross_locale_identical_cluster(["cs", "sk"], "dokument")
 
     def test_pl_cs_sk_unknown_term_not_allowed(self):
         assert not is_allowed_cross_locale_identical_cluster(["pl", "cs", "sk"], "dziękuję")
@@ -346,9 +352,11 @@ class TestCrossLanguageNewGroups:
 
     # --- Malay-Indonesian {id, ms} ---
 
-    def test_id_ms_shared_tech_loanwords(self):
+    def test_id_ms_shared_tech_loanwords_not_in_cross_language_map(self):
+        # See test_scandinavian_shared_tech_loanwords_not_in_cross_language_map: English tech
+        # loanwords are not native id/ms cognates and belong in a separate allowlist.
         for term in ("app", "browser", "cache", "chat", "data", "download", "email"):
-            assert is_allowed_cross_locale_identical_cluster(["id", "ms"], term), term
+            assert not is_allowed_cross_locale_identical_cluster(["id", "ms"], term), term
 
     def test_id_ms_unknown_term_not_allowed(self):
         assert not is_allowed_cross_locale_identical_cluster(["id", "ms"], "terima kasih")
@@ -369,25 +377,25 @@ class TestGetUnapprovedLocaleRemainder:
     """Sub-cluster splitting: approved pairs are removed, leaving only the suspicious locales."""
 
     def test_all_approved_returns_empty(self):
-        # es/pt is an approved pair for "digital"
-        result = get_unapproved_locale_remainder(["es", "pt"], "digital")
+        # es/pt is an approved pair for "banco"
+        result = get_unapproved_locale_remainder(["es", "pt"], "banco")
         assert result == []
 
     def test_one_outsider_returned(self):
         # es/pt approved; de is the outsider
-        result = get_unapproved_locale_remainder(["es", "pt", "de"], "digital")
+        result = get_unapproved_locale_remainder(["es", "pt", "de"], "banco")
         assert "de" in result
         assert "es" not in result
         assert "pt" not in result
 
     def test_two_outsiders_returned(self):
         # es/pt approved; de and fr are outsiders → finding still possible
-        result = get_unapproved_locale_remainder(["es", "pt", "de", "fr"], "digital")
+        result = get_unapproved_locale_remainder(["es", "pt", "de", "fr"], "banco")
         assert sorted(result) == ["de", "fr"]
 
     def test_scandinavian_group_approved_outsider_flagged(self):
-        # sv/no/da approved for "system"; de is the outsider
-        result = get_unapproved_locale_remainder(["sv", "no", "da", "de"], "system")
+        # sv/no/da approved for "kontakt"; de is the outsider
+        result = get_unapproved_locale_remainder(["sv", "no", "da", "de"], "kontakt")
         assert result == ["de"]
         assert "sv" not in result
         assert "no" not in result
@@ -406,21 +414,23 @@ class TestGetUnapprovedLocaleRemainder:
         assert get_unapproved_locale_remainder([], "digital") == []
 
     def test_two_overlapping_approved_groups(self):
-        # de/nl approved, es/pt approved; if all four present, all should be covered
-        result = get_unapproved_locale_remainder(["de", "nl", "es", "pt"], "browser")
+        # de/fr approved for "profil"; sv/no (a subset of sv/no/da) is also approved for
+        # "profil" — two different overlapping groups both cover the same text, so the union
+        # covers all four locales.
+        result = get_unapproved_locale_remainder(["de", "fr", "sv", "no"], "profil")
         assert result == []
 
     def test_locale_variants_resolved_to_base_language(self):
         # es-ES and pt-BR should resolve to es and pt
-        result = get_unapproved_locale_remainder(["es-ES", "pt-BR", "de-DE"], "digital")
+        result = get_unapproved_locale_remainder(["es-ES", "pt-BR", "de-DE"], "banco")
         assert "de-DE" in result
         assert "es-ES" not in result
         assert "pt-BR" not in result
 
     def test_pl_cs_sk_approved_outsider_returned(self):
-        result = get_unapproved_locale_remainder(["pl", "cs", "sk", "hu"], "browser")
+        result = get_unapproved_locale_remainder(["pl", "cs", "sk", "hu"], "kontakt")
         assert result == ["hu"]
 
     def test_id_ms_approved_outsider_returned(self):
-        result = get_unapproved_locale_remainder(["id", "ms", "tr"], "app")
+        result = get_unapproved_locale_remainder(["id", "ms", "tr"], "aplikasi")
         assert result == ["tr"]

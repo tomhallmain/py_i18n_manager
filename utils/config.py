@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 from utils.utils import Utils
@@ -6,7 +7,8 @@ from utils.utils import Utils
 
 class ConfigManager:
     def __init__(self):
-        self.config_dir = Path("configs")
+        override_dir = os.environ.get("PY_I18N_MANAGER_CONFIG_DIR", "").strip()
+        self.config_dir = Path(override_dir) if override_dir else Path("configs")
         self.default_config_path = self.config_dir / "default_config.json"
         self.user_config_path = self.config_dir / "user_config.json"
         self.config = self.load_config()
