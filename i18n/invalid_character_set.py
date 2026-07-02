@@ -228,10 +228,38 @@ class InvalidCharacterSetAnalyzer:
         if not text:
             return set()
         # Focus on compact ASCII words/acronyms often reused intentionally across locales.
+        # Leading underscore is allowed so a token like "_edit" is captured whole rather than
+        # losing its underscore to a subsequent boundary check (see _IDENTIFIER_RUN_PATTERN).
         return {
             m.group(0).casefold()
-            for m in re.finditer(r"[A-Za-z][A-Za-z0-9_]{1,31}", text)
+            for m in re.finditer(r"[A-Za-z_][A-Za-z0-9_]{1,31}", text)
         }
+
+    # Maximal runs of identifier-like characters (letters, digits, underscore). Unlike
+    # _extract_ascii_word_tokens (used for cross-locale shared-token suppression), this is
+    # evaluated per-locale and per-run so it also catches snake_case/CamelCase identifiers that
+    # only appear in one locale's text (e.g. a technical term left untranslated).
+    _IDENTIFIER_RUN_PATTERN = re.compile(r"[A-Za-z0-9_]+")
+    # A lowercase letter directly followed by an uppercase letter marks a genuine camelCase/
+    # PascalCase "hump" (e.g. "RelatedImageCondition"), as opposed to a plain acronym like "PDFs"
+    # or "IPAdapter" which only transition uppercase-to-lowercase.
+    _CAMEL_CASE_HUMP_PATTERN = re.compile(r"[a-z][A-Z]")
+
+    @classmethod
+    def _is_ignorable_identifier_run(cls, run: str) -> bool:
+        """Snake_case or CamelCase/PascalCase identifiers are expected to stay untranslated
+        verbatim (e.g. config keys, class names), so they should not count toward script-mismatch
+        detection."""
+        if "_" in run:
+            return True
+        return bool(cls._CAMEL_CASE_HUMP_PATTERN.search(run))
+
+    @classmethod
+    def _strip_ignorable_identifier_runs(cls, text: str) -> str:
+        return cls._IDENTIFIER_RUN_PATTERN.sub(
+            lambda m: "" if cls._is_ignorable_identifier_run(m.group(0)) else m.group(0),
+            text,
+        )
 
     @classmethod
     def _build_shared_token_ignore_patterns(
@@ -309,6 +337,7 @@ class InvalidCharacterSetAnalyzer:
             return False
         scrubbed = scrub_dynamic_segments(text)
         scrubbed = cls._apply_ignore_patterns(scrubbed, ignore_patterns)
+        scrubbed = cls._strip_ignorable_identifier_runs(scrubbed)
         if not scrubbed.strip():
             return False
         threshold_ratio = max(0.0, min(1.0, float(threshold_ratio)))
@@ -345,11 +374,13 @@ class InvalidCharacterSetAnalyzer:
         values_by_locale: Dict[str, str],
         threshold_ratio: float = DEFAULT_THRESHOLD_RATIO,
         ignore_patterns: Sequence[str] = (),
+        default_locale: str | None = None,
     ) -> List[str]:
         return cls.find_invalid_locales_for_group(
             values_by_locale,
             threshold_ratio=threshold_ratio,
             ignore_patterns=ignore_patterns,
+            default_locale=default_locale,
         )
 
     @classmethod
@@ -358,14 +389,18 @@ class InvalidCharacterSetAnalyzer:
         values_by_locale: Dict[str, str],
         threshold_ratio: float = DEFAULT_THRESHOLD_RATIO,
         ignore_patterns: Sequence[str] = (),
+        default_locale: str | None = None,
     ) -> List[str]:
         scrubbed_by_locale: Dict[str, str] = {}
         represented_expected_scripts: set[str] = set()
+        has_own_script_by_locale: Dict[str, bool] = {}
         for locale, raw_text in values_by_locale.items():
             scrubbed = scrub_dynamic_segments(raw_text or "")
             scrubbed = cls._apply_ignore_patterns(scrubbed, ignore_patterns)
             scrubbed_by_locale[locale] = scrubbed
-            if cls._has_expected_script_representation(locale, scrubbed):
+            has_own_script = cls._has_expected_script_representation(locale, scrubbed)
+            has_own_script_by_locale[locale] = has_own_script
+            if has_own_script:
                 represented_expected_scripts.add(cls._locale_expected_script(locale))
 
         # If every locale has the same Latin-only text, keep this as a quality-review
@@ -383,13 +418,37 @@ class InvalidCharacterSetAnalyzer:
         if len(represented_expected_scripts) >= 2:
             shared_token_patterns = cls._build_shared_token_ignore_patterns(scrubbed_by_locale)
 
-        merged_ignore_patterns = tuple(ignore_patterns) + shared_token_patterns
+        # Tokens present verbatim in the default/source locale's text (e.g. "Enter", "Escape",
+        # a brand name). Requiring a match against *every* locale (shared_token_patterns above)
+        # is fragile: one unrelated locale phrasing a word differently breaks suppression for
+        # every other locale, even ones that legitimately kept the same source word. So a token
+        # is also allowed per-locale if it appears in the default locale's text -- but only for
+        # locales that already show some of their own expected script (has_own_script_by_locale),
+        # so a locale whose value is just an untouched copy of the source text is not masked.
+        default_tokens: set[str] = set()
+        if default_locale and default_locale in scrubbed_by_locale:
+            default_tokens = {
+                tok
+                for tok in cls._extract_ascii_word_tokens(scrubbed_by_locale[default_locale])
+                if 2 <= len(tok) <= 16
+            }
+
+        base_ignore_patterns = tuple(ignore_patterns) + shared_token_patterns
         invalid: List[str] = []
         for locale, text in values_by_locale.items():
             if uniform_non_latin_script is not None:
                 allowed = cls._allowed_script_families(cls._locale_expected_script(locale))
                 if uniform_non_latin_script in allowed:
                     continue
+            merged_ignore_patterns = base_ignore_patterns
+            if default_tokens and locale != default_locale and has_own_script_by_locale.get(locale):
+                local_tokens = cls._extract_ascii_word_tokens(scrubbed_by_locale[locale])
+                locale_shared_with_default = local_tokens & default_tokens
+                if locale_shared_with_default:
+                    merged_ignore_patterns = merged_ignore_patterns + tuple(
+                        rf"(?i)(?<![A-Za-z0-9_]){re.escape(tok)}(?![A-Za-z0-9_])"
+                        for tok in sorted(locale_shared_with_default)
+                    )
             if cls.analyze_locale(locale, text, threshold_ratio, merged_ignore_patterns):
                 invalid.append(locale)
         return invalid

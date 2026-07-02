@@ -200,8 +200,13 @@ class PlaceholderSignature:
 
         # Use real printf conversion letters and ensure the token does not spill
         # into an adjacent word (e.g. "100% de" must not count as "%d").
-        printf_named_pattern = r"%\(([A-Za-z_][A-Za-z0-9_]*)\)[#0\- +]?(?:\d+)?(?:\.\d+)?[diouxXeEfFgGcrs](?![A-Za-z0-9_])"
-        printf_positional_pattern = r"(?<!%)%(?:[#0\- +]?(?:\d+)?(?:\.\d+)?[diouxXeEfFgGcrs])(?![A-Za-z0-9_])"
+        # Note: the flag class intentionally excludes a bare space. A literal space flag
+        # (e.g. "% d") is valid C printf syntax, but in translated prose "<number> % <word>"
+        # is extremely common, and short one-letter words that happen to be printf conversion
+        # letters (Portuguese "o" = "the", Italian/Portuguese "e" = "and", ...) would otherwise
+        # be misparsed as "%o"/"%e" placeholders.
+        printf_named_pattern = r"%\(([A-Za-z_][A-Za-z0-9_]*)\)[#0\-+]?(?:\d+)?(?:\.\d+)?[diouxXeEfFgGcrs](?![A-Za-z0-9_])"
+        printf_positional_pattern = r"(?<!%)%(?:[#0\-+]?(?:\d+)?(?:\.\d+)?[diouxXeEfFgGcrs])(?![A-Za-z0-9_])"
         printf_named = tuple(sorted(re.findall(printf_named_pattern, text)))
         printf_positional_count = len(re.findall(printf_positional_pattern, text))
 
@@ -565,6 +570,7 @@ class TranslationGroup():
             values_as_text,
             threshold,
             ignore_patterns=ignore_patterns,
+            default_locale=self.default_locale,
         )
 
     # Backward-compat alias for existing callers while naming migrates.

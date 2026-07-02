@@ -106,6 +106,19 @@ class TestPlaceholderSignatureParsing:
         sig = PlaceholderSignature.from_text("50%% off")
         assert sig.printf_positional_count == 0
 
+    def test_printf_positional_not_triggered_by_percent_space_single_letter_word(self):
+        # Regression: "% o" ("o" = Portuguese "the") was misparsed as the octal placeholder
+        # "%o" because the flag class allowed a bare space (valid C printf syntax, e.g. "% d",
+        # but indistinguishable from ordinary "<number> % <word>" prose).
+        sig = PlaceholderSignature.from_text("Acima de ~75 % o rendimento diminui e pode.")
+        assert sig.printf_positional_count == 0
+
+    def test_printf_positional_not_triggered_by_percent_space_e_word(self):
+        # Same false positive for Italian/Portuguese "e" ("and"), which is also a valid
+        # printf conversion letter.
+        sig = PlaceholderSignature.from_text("Sconto del 20 % e altro ancora")
+        assert sig.printf_positional_count == 0
+
     # -- printf named %(name)s -----------------------------------------------
 
     def test_printf_named_single(self):
@@ -270,6 +283,20 @@ class TestGetInvalidIndexLocales:
         # "100% de" should not count as a %d token
         g = self._make_group("100% done", {"fr": "100% terminé"})
         assert "fr" not in g.get_invalid_index_locales()
+
+    def test_printf_percent_space_word_not_false_positive(self):
+        # Regression from a real export: pt's "~75 % o rendimento..." was flagged as an
+        # invalid index because "% o" was misparsed as the octal placeholder "%o".
+        g = self._make_group(
+            "Above ~75 % gives diminishing returns and may be very slow for long videos.",
+            {
+                "pt": (
+                    "Acima de ~75 % o rendimento diminui e pode tornar-se muito lento "
+                    "em vídeos longos."
+                )
+            },
+        )
+        assert "pt" not in g.get_invalid_index_locales()
 
     def test_printf_no_placeholders_in_default_is_valid(self):
         g = self._make_group("Save 50% today", {"fr": "Économisez 50% aujourd'hui"})

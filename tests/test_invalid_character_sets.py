@@ -593,3 +593,106 @@ class TestInvalidCharacterSet:
         invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
         # de should still be flagged because it has dominant Cyrillic
         assert "de" in invalid
+
+    # --- Underscore / CamelCase identifier suppression ---
+
+    def test_leading_underscore_token_not_flagged(self):
+        # Regression: "_edit" was previously extracted as the shared token "edit" (losing the
+        # underscore), so the boundary check blocked the suppression and "_edit" stayed invalid.
+        has_issue = InvalidCharacterSetAnalyzer.analyze_locale("ja", "例: _edit")
+        assert not has_issue
+
+    def test_snake_case_identifier_not_flagged(self):
+        has_issue = InvalidCharacterSetAnalyzer.analyze_locale(
+            "ja", "ノード {0}: RelatedImageCondition に edit_suffix がありません。"
+        )
+        assert not has_issue
+
+    def test_pascal_case_identifier_not_flagged(self):
+        has_issue = InvalidCharacterSetAnalyzer.analyze_locale(
+            "ja", "ノード {0}: NodeResultCondition に node_name がありません。"
+        )
+        assert not has_issue
+
+    def test_underscore_only_value_not_flagged(self):
+        # "de" differs slightly from the other locales so the group is not uniform (which would
+        # otherwise short-circuit before per-locale analysis runs); this exercises the
+        # identifier-run stripping inside analyze_locale directly.
+        values = {
+            "en": "group1_catA,group1_catB; group2_catA,group2_catB",
+            "de": "group1_catA, group1_catB; group2_catA, group2_catB",
+            "ja": "group1_catA,group1_catB; group2_catA,group2_catB",
+            "zh": "group1_catA,group1_catB; group2_catA,group2_catB",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        assert "ja" not in invalid
+        assert "zh" not in invalid
+
+    def test_camel_case_lora_alone_not_flagged(self):
+        # "LoRA" has a lower-to-upper hump ("oR"), so it now qualifies as CamelCase-ignorable
+        # independent of the shared-token-across-all-locales mechanism.
+        has_issue = InvalidCharacterSetAnalyzer.analyze_locale("ja", "LoRA")
+        assert not has_issue
+
+    def test_plain_capitalized_word_still_counts_toward_ratio(self):
+        # A single capitalized word with no hump (e.g. "Node") is not an identifier and should
+        # still be treated as ordinary untranslated Latin text.
+        has_issue = InvalidCharacterSetAnalyzer.analyze_locale("ja", "Node Node Node Node")
+        assert has_issue
+
+    def test_allcaps_acronym_still_flagged_when_dominant(self):
+        # ALLCAPS acronyms (e.g. "GENERATE") are intentionally NOT treated as ignorable
+        # identifiers by this heuristic; only snake_case and CamelCase/PascalCase are.
+        has_issue = InvalidCharacterSetAnalyzer.analyze_locale("ja", "GENERATE GENERATE GENERATE")
+        assert has_issue
+
+    def test_genuinely_untranslated_sentence_still_flagged(self):
+        # Regression guard: identifier-run suppression must not accidentally suppress a fully
+        # untranslated plain-English sentence with no underscores or CamelCase words.
+        has_issue = InvalidCharacterSetAnalyzer.analyze_locale(
+            "ja", "Cannot cut at or past the end of the video."
+        )
+        assert has_issue
+
+    # --- Default-locale token matching (vs. requiring every locale to match) ---
+
+    def test_word_shared_with_default_locale_suppressed_even_if_one_sibling_locale_differs(self):
+        # Regression: "fr" phrases "Enter" differently for this key ("Entrer"), which broke the
+        # old all-locales-must-match intersection and left "ko"/"zh" flagged even though they
+        # both legitimately kept the literal source word "Enter" alongside real translated text.
+        values = {
+            "en": "Drag to select crop, Enter to confirm, Escape to cancel",
+            "fr": "Faites glisser pour recadrer, Entrer pour confirmer, Echap pour annuler",
+            "ko": "드래그하여 자르기 선택, Enter로 확인, Escape로 취소",
+            "zh": "拖动选择裁剪，Enter 确认，Escape 取消",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values, default_locale="en")
+        assert "ko" not in invalid
+        assert "zh" not in invalid
+
+    def test_default_locale_matching_does_not_mask_a_fully_untranslated_locale(self):
+        # Safety net: a locale whose value is just an unmodified copy of the source text has no
+        # characters of its own expected script, so default-locale token matching must not apply
+        # to it (every word would otherwise match the source and get scrubbed away entirely).
+        # "de" is genuinely translated so the group isn't uniform (which would otherwise
+        # short-circuit before per-locale analysis even runs).
+        values = {
+            "en": "Cannot cut at or past the end of the video.",
+            "de": "Sie können nicht am oder nach dem Ende des Videos schneiden.",
+            "ja": "Cannot cut at or past the end of the video.",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values, default_locale="en")
+        assert "ja" in invalid
+
+    def test_default_locale_matching_is_a_noop_when_default_locale_not_supplied(self):
+        # Backward compatibility: omitting default_locale keeps the original strict
+        # all-locales-must-match behavior.
+        values = {
+            "en": "Drag to select crop, Enter to confirm, Escape to cancel",
+            "fr": "Faites glisser pour recadrer, Entrer pour confirmer, Echap pour annuler",
+            "ko": "드래그하여 자르기 선택, Enter로 확인, Escape로 취소",
+            "zh": "拖动选择裁剪，Enter 确认，Escape 取消",
+        }
+        invalid = InvalidCharacterSetAnalyzer.find_invalid_locales(values)
+        assert "ko" in invalid
+        assert "zh" in invalid
