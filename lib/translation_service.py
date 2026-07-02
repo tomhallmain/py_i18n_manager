@@ -28,6 +28,7 @@ Rules:
 2. Preserve any special characters or formatting
 3. Keep the same tone and style as the original
 4. If the text contains technical terms, translate them appropriately for the target language
+5. Where possible, try to match the length of the source text in the target language, to help keep UI layouts consistent
 
 Return only the JSON object, no additional text."""
 
@@ -47,19 +48,21 @@ Rules:
 2. Preserve any special characters or formatting
 3. Keep the same tone and style as the original
 4. If the text contains technical terms, translate them appropriately for each target language
-5. Return exactly one key per target locale listed above, and no other keys
+5. Where possible, try to match the length of the source text in each target language, to help keep UI layouts consistent
+6. Return exactly one key per target locale listed above, and no other keys
 
 Return only the JSON object, no additional text."""
 
     def __init__(self, default_locale='en', prompt_template: Optional[str] = None,
                  cjk_reject_threshold_percentage: Optional[int] = None, project_path: Optional[str] = None,
-                 llm_model: Optional[str] = None, llm_model_multi_locale: Optional[str] = None):
+                 llm_model: Optional[str] = None, llm_model_multi_locale: Optional[str] = None,
+                 prompt_template_multi_locale: Optional[str] = None):
         """Initialize the translation service.
 
         Args:
             default_locale (str, optional): Default source locale for translations. Defaults to 'en'.
-            prompt_template (str, optional): Custom prompt template for LLM translations.
-                                            If None, uses the default template.
+            prompt_template (str, optional): Custom prompt template for one-locale-at-a-time LLM
+                                            translations. If None, uses the default template.
             cjk_reject_threshold_percentage (int, optional): CJK rejection threshold percentage for
                                                             non-CJK locales.
             project_path (str, optional): Project path for project-specific LLM settings.
@@ -67,9 +70,15 @@ Return only the JSON object, no additional text."""
                                         resolved from settings.
             llm_model_multi_locale (str, optional): Ollama model for per-key/all-locales requests.
                                                      If None, resolved from settings.
+            prompt_template_multi_locale (str, optional): Custom prompt template for
+                                            LLMTranslationMode.PER_KEY_ALL_LOCALES requests. Must
+                                            keep the ``{target_locales}`` variable - the response
+                                            is parsed as one JSON key per locale listed there. If
+                                            None, uses the default template.
         """
         self.default_locale = default_locale
         self.prompt_template = prompt_template
+        self.prompt_template_multi_locale = prompt_template_multi_locale
         self.project_path = project_path
         self.settings_manager = SettingsManager()
         if cjk_reject_threshold_percentage is None:
@@ -87,12 +96,20 @@ Return only the JSON object, no additional text."""
         self._executor = ThreadPoolExecutor(max_workers=4)
 
     def set_prompt_template(self, template: Optional[str]):
-        """Update the prompt template used for LLM translations.
+        """Update the prompt template used for one-locale-at-a-time LLM translations.
 
         Args:
             template (str, optional): The new prompt template, or None to use default
         """
         self.prompt_template = template
+
+    def set_prompt_template_multi_locale(self, template: Optional[str]):
+        """Update the prompt template used for LLMTranslationMode.PER_KEY_ALL_LOCALES requests.
+
+        Args:
+            template (str, optional): The new prompt template, or None to use default
+        """
+        self.prompt_template_multi_locale = template
 
     def set_cjk_reject_threshold_percentage(self, threshold_percentage: int):
         """Update CJK rejection threshold percentage used for non-CJK locales."""
@@ -304,9 +321,12 @@ Return only the JSON object, no additional text."""
     def _create_multi_locale_translation_prompt(self, text, source_locale, target_locales: List[str], context=None):
         """Create a prompt requesting translations for several target locales in one JSON object.
 
-        Uses ``DEFAULT_MULTI_LOCALE_PROMPT_TEMPLATE`` (not user-configurable, unlike the
-        single-locale template, since its output shape - one JSON key per locale - is required
-        by :meth:`translate_with_llm_multi_locale`).
+        Uses the configured prompt_template_multi_locale if available, otherwise
+        DEFAULT_MULTI_LOCALE_PROMPT_TEMPLATE. Whichever template is used, its output shape - one
+        JSON key per locale - must stay intact for :meth:`translate_with_llm_multi_locale` to
+        parse the response; the {target_locales} variable (the locales to use as JSON keys) is
+        what keeps a custom template correct here, so removing it will produce technically valid
+        but useless prompts (the LLM settings dialog warns if it's missing from a saved template).
 
         Args:
             text (str): The text to translate
@@ -317,13 +337,25 @@ Return only the JSON object, no additional text."""
         Returns:
             str: The formatted prompt
         """
+        template = self.prompt_template_multi_locale or self.DEFAULT_MULTI_LOCALE_PROMPT_TEMPLATE
         context_str = f"Context: {context}" if context else ""
-        return self.DEFAULT_MULTI_LOCALE_PROMPT_TEMPLATE.format(
-            source_locale=source_locale,
-            target_locales=", ".join(target_locales),
-            source_text=text,
-            context=context_str,
-        )
+        locales_str = ", ".join(target_locales)
+
+        try:
+            return template.format(
+                source_locale=source_locale,
+                target_locales=locales_str,
+                source_text=text,
+                context=context_str,
+            )
+        except KeyError as e:
+            logger.warning(f"Invalid variable in multi-locale prompt template: {e}. Using default template.")
+            return self.DEFAULT_MULTI_LOCALE_PROMPT_TEMPLATE.format(
+                source_locale=source_locale,
+                target_locales=locales_str,
+                source_text=text,
+                context=context_str,
+            )
 
     def _get_cjk_reject_threshold_for_locale(self, target_locale: str) -> Optional[int]:
         """Return CJK reject threshold for non-CJK locales, None for CJK locales."""

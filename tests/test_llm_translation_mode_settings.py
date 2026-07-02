@@ -189,3 +189,85 @@ class TestLLMTranslationModeAndModelSettings:
         real_user_config = Path(__file__).parent.parent / "configs" / "user_config.json"
         if real_user_config.exists():
             assert marker not in real_user_config.read_text(encoding="utf-8")
+
+
+class TestLLMPromptTemplateMultiLocaleSettings:
+    """The PER_KEY_ALL_LOCALES prompt template - separate storage from the single-locale one,
+    same global/project-override pattern."""
+
+    def setup_method(self):
+        self._env_ctx = isolated_settings_and_cache_env(prefix=".tmp_llm_prompt_multi_locale_")
+        self._env_ctx.__enter__()
+        self.settings_manager = SettingsManager()
+        self.project_path = "C:/tmp/llm-prompt-multi-locale-test-project"
+
+    def teardown_method(self):
+        self._env_ctx.__exit__(None, None, None)
+
+    def test_default_is_distinct_from_single_locale_default(self):
+        default_multi = self.settings_manager.get_llm_prompt_template_multi_locale()
+        default_single = self.settings_manager.get_llm_prompt_template()
+        assert default_multi != default_single
+        assert default_multi == SettingsManager.get_default_llm_prompt_template_multi_locale()
+
+    def test_default_multi_locale_template_requires_target_locales_variable(self):
+        # Regression: this variable is what makes the per-key batch response parseable as one
+        # JSON key per locale - it must survive in the shipped default.
+        assert "{target_locales}" in SettingsManager.get_default_llm_prompt_template_multi_locale()
+        assert "{source_text}" in SettingsManager.get_default_llm_prompt_template_multi_locale()
+
+    def test_global_round_trip(self):
+        custom = "Translate {source_text} into {target_locales} from {source_locale}. {context}"
+        assert self.settings_manager.save_llm_prompt_template_multi_locale(custom)
+        assert self.settings_manager.get_llm_prompt_template_multi_locale() == custom
+
+    def test_project_override_takes_precedence_and_clears_back_to_global(self):
+        global_template = "GLOBAL {source_text} {target_locales} {source_locale} {context}"
+        project_template = "PROJECT {source_text} {target_locales} {source_locale} {context}"
+        self.settings_manager.save_llm_prompt_template_multi_locale(global_template)
+        self.settings_manager.save_llm_prompt_template_multi_locale(project_template, self.project_path)
+
+        assert self.settings_manager.get_llm_prompt_template_multi_locale() == global_template
+        assert (
+            self.settings_manager.get_llm_prompt_template_multi_locale(self.project_path)
+            == project_template
+        )
+        assert self.settings_manager.has_project_llm_prompt_template_multi_locale(self.project_path)
+
+        assert self.settings_manager.clear_project_llm_prompt_template_multi_locale(self.project_path)
+        assert not self.settings_manager.has_project_llm_prompt_template_multi_locale(self.project_path)
+        assert (
+            self.settings_manager.get_llm_prompt_template_multi_locale(self.project_path)
+            == global_template
+        )
+
+    def test_independent_from_single_locale_template_storage(self):
+        """Saving one template must not affect the other."""
+        self.settings_manager.save_llm_prompt_template("SINGLE {source_text} {target_locale}")
+        self.settings_manager.save_llm_prompt_template_multi_locale(
+            "MULTI {source_text} {target_locales}"
+        )
+        assert self.settings_manager.get_llm_prompt_template() == "SINGLE {source_text} {target_locale}"
+        assert (
+            self.settings_manager.get_llm_prompt_template_multi_locale()
+            == "MULTI {source_text} {target_locales}"
+        )
+
+
+class TestLLMPromptVariablesPerMode:
+    def test_single_locale_variables_use_singular_target_locale(self):
+        names = {v["name"] for v in SettingsManager.get_llm_prompt_variables(multi_locale=False)}
+        assert "{target_locale}" in names
+        assert "{target_locales}" not in names
+
+    def test_multi_locale_variables_use_plural_target_locales(self):
+        names = {v["name"] for v in SettingsManager.get_llm_prompt_variables(multi_locale=True)}
+        assert "{target_locales}" in names
+        assert "{target_locale}" not in names
+
+    def test_both_variants_include_shared_variables(self):
+        for multi_locale in (False, True):
+            names = {v["name"] for v in SettingsManager.get_llm_prompt_variables(multi_locale=multi_locale)}
+            assert "{source_locale}" in names
+            assert "{source_text}" in names
+            assert "{context}" in names

@@ -235,7 +235,7 @@ class LLM:
         logger.debug(f"LLM.generate_response called with query length: {len(query)}")
         query = self._sanitize_query(query)
         timeout = self._get_timeout(timeout)
-        logger.info(f"Asking LLM {self.model_name}:\n{query}")
+        logger.debug(f"Asking LLM {self.model_name}:\n{query}")
         data = {
             "model": self.model_name,
             "prompt": query,
@@ -361,7 +361,7 @@ class LLM:
         self._thread = threading.Thread(target=run_generation)
         self._thread.daemon = True  # Make it a daemon thread so it won't prevent program exit
         self._thread.start()
-        logger.info("LLM generation thread started")
+        logger.debug("LLM generation thread started")
 
         # Wait for completion or cancellation
         try:

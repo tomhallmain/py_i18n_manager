@@ -722,14 +722,65 @@ class SettingsManager:
 
     def has_project_llm_prompt_template(self, project_path: str) -> bool:
         """Check if a project has a custom LLM prompt template override.
-        
+
         Args:
             project_path (str): Path to the project
-            
+
         Returns:
             bool: True if project has a custom template, False otherwise
         """
         return self.get_project_setting(project_path, 'llm_prompt_template') is not None
+
+    def get_llm_prompt_template_multi_locale(self, project_path: Optional[str] = None) -> str:
+        """Get the LLM prompt template used by LLMTranslationMode.PER_KEY_ALL_LOCALES, with
+        project override if available.
+
+        Args:
+            project_path (str, optional): Path to the project for project-specific override
+
+        Returns:
+            str: The prompt template (project-specific if set, otherwise global default)
+        """
+        if project_path:
+            project_template = self.get_project_setting(project_path, 'llm_prompt_template_multi_locale')
+            if project_template:
+                return project_template
+
+        from utils.config import config_manager
+        return config_manager.get(
+            'translation.llm_prompt_template_multi_locale',
+            self.get_default_llm_prompt_template_multi_locale(),
+        )
+
+    def save_llm_prompt_template_multi_locale(self, template: str, project_path: Optional[str] = None) -> bool:
+        """Save the LLM prompt template used by LLMTranslationMode.PER_KEY_ALL_LOCALES.
+
+        Args:
+            template (str): The prompt template to save
+            project_path (str, optional): If provided, saves as project-specific override
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if project_path:
+            return self.save_project_setting(project_path, 'llm_prompt_template_multi_locale', template)
+        from utils.config import config_manager
+        return config_manager.set('translation.llm_prompt_template_multi_locale', template)
+
+    def clear_project_llm_prompt_template_multi_locale(self, project_path: str) -> bool:
+        """Clear the project-specific multi-locale LLM prompt template override."""
+        return self._clear_project_setting_key(project_path, 'llm_prompt_template_multi_locale')
+
+    def has_project_llm_prompt_template_multi_locale(self, project_path: str) -> bool:
+        """Check if a project has a custom multi-locale LLM prompt template override.
+
+        Args:
+            project_path (str): Path to the project
+
+        Returns:
+            bool: True if project has a custom template, False otherwise
+        """
+        return self.get_project_setting(project_path, 'llm_prompt_template_multi_locale') is not None
 
     def get_llm_cjk_reject_threshold_percentage(self, project_path: Optional[str] = None) -> int:
         """Get the CJK rejection threshold percentage for LLM responses.
@@ -906,19 +957,62 @@ Rules:
 2. Preserve any special characters or formatting
 3. Keep the same tone and style as the original
 4. If the text contains technical terms, translate them appropriately for the target language
+5. Where possible, try to match the length of the source text in the target language, to help keep UI layouts consistent
 
 Return only the JSON object, no additional text."""
-    
+
     @staticmethod
-    def get_llm_prompt_variables() -> list[dict[str, str]]:
+    def get_default_llm_prompt_template_multi_locale() -> str:
+        """Get the hardcoded default LLM prompt template for LLMTranslationMode.PER_KEY_ALL_LOCALES.
+
+        Must keep requesting one JSON object keyed by ``{target_locales}`` - that shape is what
+        :meth:`~lib.translation_service.TranslationService.translate_with_llm_multi_locale`
+        parses the response with.
+
+        Returns:
+            str: The default multi-locale prompt template
+        """
+        return """Translate the following text from {source_locale} into every one of the target locales listed below.
+Return the response as a single JSON object whose keys are exactly the target locale codes listed below and whose values are the translated text for that locale.
+
+Source text: {source_text}
+
+Target locales (use exactly these as the JSON keys): {target_locales}
+
+{context}
+
+Rules:
+1. Maintain any placeholders like {{0}}, {{1}}, %s, %d, etc.
+2. Preserve any special characters or formatting
+3. Keep the same tone and style as the original
+4. If the text contains technical terms, translate them appropriately for each target language
+5. Where possible, try to match the length of the source text in each target language, to help keep UI layouts consistent
+6. Return exactly one key per target locale listed above, and no other keys
+
+Return only the JSON object, no additional text."""
+
+    @staticmethod
+    def get_llm_prompt_variables(multi_locale: bool = False) -> list[dict[str, str]]:
         """Get the list of available variables for LLM prompt templates.
-        
+
+        Args:
+            multi_locale (bool): If True, return variables for the LLMTranslationMode.
+                                  PER_KEY_ALL_LOCALES template (``{target_locales}``, plural)
+                                  instead of the one-locale-at-a-time template (``{target_locale}``).
+
         Returns:
             list[dict]: List of variable definitions with 'name' and 'description'
         """
+        if multi_locale:
+            return [
+                {"name": "{source_locale}", "description": "Source language code (e.g., 'en')"},
+                {"name": "{target_locales}", "description": "Comma-separated target locale codes (e.g., 'es, fr, de') - also the required JSON keys in the response"},
+                {"name": "{source_text}", "description": "The text to be translated"},
+                {"name": "{context}", "description": "Optional context about the translation (key info when different from text)"},
+            ]
         return [
             {"name": "{source_locale}", "description": "Source language code (e.g., 'en')"},
             {"name": "{target_locale}", "description": "Target language code (e.g., 'es', 'fr')"},
             {"name": "{source_text}", "description": "The text to be translated"},
             {"name": "{context}", "description": "Optional context about the translation (key info when different from text)"},
-        ] 
+        ]

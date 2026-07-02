@@ -117,3 +117,54 @@ class TestTranslateWithLlmMultiLocale:
         self.service.set_llm_model_multi_locale("gpt-oss:120b-cloud")
         assert self.service.llm_multi.model_name == "gpt-oss:120b-cloud"
         assert self.service.llm.model_name == original_single
+
+    def test_custom_multi_locale_prompt_template_is_used(self):
+        captured = {}
+
+        def fake_generate_json_dict(**kwargs):
+            captured["query"] = kwargs.get("query")
+            return {"es": "Hola"}
+
+        self.service.set_prompt_template_multi_locale(
+            "CUSTOM PROMPT: {source_text} -> {target_locales} (from {source_locale}) {context}"
+        )
+        self.service.llm_multi.generate_json_dict = fake_generate_json_dict
+        self.service.translate_with_llm_multi_locale("Hello", ["es"])
+
+        assert captured["query"].startswith("CUSTOM PROMPT: Hello -> es (from en)")
+
+    def test_custom_template_missing_a_referenced_variable_falls_back_to_default(self):
+        captured = {}
+
+        def fake_generate_json_dict(**kwargs):
+            captured["query"] = kwargs.get("query")
+            return {"es": "Hola"}
+
+        # {locale_typo} isn't a variable this method supplies, so .format() raises KeyError and
+        # the service should fall back to the built-in default template rather than crashing.
+        self.service.set_prompt_template_multi_locale("Broken template with {locale_typo}")
+        self.service.llm_multi.generate_json_dict = fake_generate_json_dict
+        result = self.service.translate_with_llm_multi_locale("Hello", ["es"])
+
+        assert result == {"es": "Hola"}
+        assert "Broken template" not in captured["query"]
+        assert "Translate the following text" in captured["query"]  # from the default template
+
+    def test_set_prompt_template_multi_locale_back_to_none_restores_default(self):
+        from lib.translation_service import TranslationService
+
+        self.service.set_prompt_template_multi_locale("CUSTOM {source_text} {target_locales}")
+        self.service.set_prompt_template_multi_locale(None)
+
+        captured = {}
+
+        def fake_generate_json_dict(**kwargs):
+            captured["query"] = kwargs.get("query")
+            return {"es": "Hola"}
+
+        self.service.llm_multi.generate_json_dict = fake_generate_json_dict
+        self.service.translate_with_llm_multi_locale("Hello", ["es"])
+
+        assert captured["query"] == TranslationService.DEFAULT_MULTI_LOCALE_PROMPT_TEMPLATE.format(
+            source_locale="en", target_locales="es", source_text="Hello", context=""
+        )
