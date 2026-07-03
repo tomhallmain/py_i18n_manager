@@ -95,9 +95,47 @@ class TestLatinHeuristicsRegression:
             locales=["en", "ru"],
             latin_ignore_patterns=(),
         )
-        signals = {f.signal for f in findings if f.locale == "ru"}
+        # Grouped findings use locale="" + notes listing the affected locale(s) (see
+        # _grouped_locale_finding), mirroring IDENTICAL_TO_DEFAULT/IDENTICAL_TO_NONDEFAULT.
+        signals = {f.signal for f in findings if "ru" in f.notes}
         assert QualityHeuristicKind.LATIN_IN_CJK_LOCALE in signals
         assert QualityHeuristicKind.LATIN_MIXED_SCRIPT_IN_NON_LATIN_LOCALE in signals
+
+    def test_collect_findings_one_latin_in_cjk_finding_for_many_locales(self):
+        # Same untranslated Latin term left in place across several CJK/Cyrillic locales should
+        # collapse into a single grouped row (locale="", notes=affected locales), the same shape
+        # already used for IDENTICAL_TO_DEFAULT / IDENTICAL_TO_NONDEFAULT.
+        class _FakeKey:
+            def __init__(self, msgid: str, context: str = ""):
+                self.msgid = msgid
+                self.context = context
+
+        class _FakeGroup:
+            def __init__(self):
+                self.key = _FakeKey("shared.term", "")
+                self._values = {
+                    "en": "Enable LoRA",
+                    "ja": "LoRA を有効にする Extra",
+                    "ko": "LoRA 활성화 Extra",
+                    "zh": "启用 LoRA Extra",
+                    "ru": "Включить LoRA Extra",
+                }
+
+            def get_translation(self, locale: str):
+                return self._values.get(locale, "")
+
+        findings = collect_findings_for_group(
+            _FakeGroup(),
+            default_locale="en",
+            locales=["en", "ja", "ko", "zh", "ru"],
+            latin_ignore_patterns=(),
+        )
+        latin_findings = [
+            f for f in findings if f.signal == QualityHeuristicKind.LATIN_IN_CJK_LOCALE
+        ]
+        assert len(latin_findings) == 1
+        assert latin_findings[0].locale == ""
+        assert set(latin_findings[0].notes.split(", ")) == {"ja", "ko", "zh", "ru"}
 
     def test_accented_portuguese_letters_are_treated_as_latin(self):
         assert _is_latin_char("é")
@@ -128,7 +166,7 @@ class TestLatinHeuristicsRegression:
             locales=["en", "de"],
             latin_ignore_patterns=(),
         )
-        signals = {f.signal for f in findings if f.locale == "de"}
+        signals = {f.signal for f in findings if "de" in f.notes}
         assert QualityHeuristicKind.STOP_CHARACTER_INCONSISTENCY in signals
 
     def test_collect_findings_no_inconsistency_when_stops_match(self):
@@ -179,7 +217,7 @@ class TestLatinHeuristicsRegression:
             locales=["en", "de"],
             latin_ignore_patterns=(),
         )
-        signals = {f.signal for f in findings if f.locale == "de"}
+        signals = {f.signal for f in findings if "de" in f.notes}
         assert QualityHeuristicKind.STOP_CHARACTER_INCONSISTENCY in signals
 
     def test_collect_findings_identical_to_nondefault_when_locales_match(self):

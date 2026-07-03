@@ -72,6 +72,31 @@ def _debug_heuristic_probe(mid: str, loc: str, tstrip: str, latin_ignore_pattern
     )
 
 
+def _grouped_locale_finding(
+    key_msgid: str,
+    key_context: str,
+    signal: QualityHeuristicKind,
+    matching_locales: List[str],
+) -> Optional[QualityReviewFinding]:
+    """One group-level finding covering every locale that independently triggered ``signal``.
+
+    Mirrors the IDENTICAL_TO_DEFAULT / IDENTICAL_TO_NONDEFAULT shape (``locale=""``, locales
+    listed in ``notes``) so a heuristic that legitimately fires the same way across many locales
+    of one group (e.g. every CJK locale still containing an untranslated Latin term) produces one
+    row instead of one row per locale. The UI already resolves ``locale=""`` + ``notes`` findings
+    by falling back to the first listed locale (see ``_build_heuristic_rows``).
+    """
+    if not matching_locales:
+        return None
+    return QualityReviewFinding(
+        key_msgid=key_msgid,
+        key_context=key_context,
+        locale="",
+        signal=signal,
+        notes=", ".join(sorted(matching_locales)),
+    )
+
+
 def collect_findings_for_group(
     group: TranslationGroup,
     default_locale: str,
@@ -85,6 +110,10 @@ def collect_findings_for_group(
     mid = group.key.msgid
     base = (group.get_translation(default_locale) or "").strip()
 
+    latin_in_cjk_locales: List[str] = []
+    latin_mixed_script_locales: List[str] = []
+    stop_char_inconsistency_locales: List[str] = []
+
     for loc in locales:
         if loc == default_locale:
             continue
@@ -97,35 +126,21 @@ def collect_findings_for_group(
         #     _debug_heuristic_probe(mid, loc, tstrip, latin_ignore_patterns)
         if Utils.is_non_latin_script_locale(loc):
             if _has_significant_latin_run(tstrip, latin_ignore_patterns):
-                h = QualityHeuristicKind.LATIN_IN_CJK_LOCALE
-                findings.append(
-                    QualityReviewFinding(
-                        key_msgid=mid,
-                        key_context=ctx,
-                        locale=loc,
-                        signal=h,
-                    )
-                )
+                latin_in_cjk_locales.append(loc)
             if _has_mixed_script_latin_leakage(tstrip, latin_ignore_patterns):
-                h = QualityHeuristicKind.LATIN_MIXED_SCRIPT_IN_NON_LATIN_LOCALE
-                findings.append(
-                    QualityReviewFinding(
-                        key_msgid=mid,
-                        key_context=ctx,
-                        locale=loc,
-                        signal=h,
-                    )
-                )
+                latin_mixed_script_locales.append(loc)
 
         if base and translation_has_stop_inconsistency_vs_source(base, tstrip, loc):
-            findings.append(
-                QualityReviewFinding(
-                    key_msgid=mid,
-                    key_context=ctx,
-                    locale=loc,
-                    signal=QualityHeuristicKind.STOP_CHARACTER_INCONSISTENCY,
-                )
-            )
+            stop_char_inconsistency_locales.append(loc)
+
+    for signal, matching_locales in (
+        (QualityHeuristicKind.LATIN_IN_CJK_LOCALE, latin_in_cjk_locales),
+        (QualityHeuristicKind.LATIN_MIXED_SCRIPT_IN_NON_LATIN_LOCALE, latin_mixed_script_locales),
+        (QualityHeuristicKind.STOP_CHARACTER_INCONSISTENCY, stop_char_inconsistency_locales),
+    ):
+        grouped = _grouped_locale_finding(mid, ctx, signal, matching_locales)
+        if grouped is not None:
+            findings.append(grouped)
 
     default_match = _finding_identical_to_default_for_group(
         group,

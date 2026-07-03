@@ -122,7 +122,7 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         super().__init__(
             parent=parent,
             title=_("Translation Quality Review"),
-            geometry="920x620",
+            geometry="760x620",
             offset_x=40,
             offset_y=40,
         )
@@ -173,8 +173,8 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             QLabel(
                 _(
                     "Built-in checks: non-Latin-script locales with Latin words/runs and a separate mixed-script Latin-leakage signal; translations identical "
-                    "to the default locale or to other non-default locales (one row per key, with affected locales in Notes); advisory check for trailing "
-                    "sentence-stop mismatches vs. the default (extra, missing, or wrong stop for the locale). "
+                    "to the default locale or to other non-default locales; advisory check for trailing sentence-stop mismatches vs. the default "
+                    "(extra, missing, or wrong stop for the locale). Each finding is one row per key, with all affected locales listed in Locales. "
                     "Respects project exclusions and ignore patterns. (English-ratio heuristic reserved.)"
                 )
             )
@@ -212,12 +212,11 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         layout.addWidget(filter_box)
 
         self._heuristic_table = create_frozen_translation_table()
-        self._heuristic_table.setColumnCount(7)
+        self._heuristic_table.setColumnCount(6)
         self._heuristic_table.setHorizontalHeaderLabels(
             [
                 _("Key"),
-                _("Locale"),
-                _("Notes"),
+                _("Locales"),
                 _("Default locale value"),
                 _("Locale value"),
                 _("Signal"),
@@ -225,21 +224,22 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             ]
         )
         hdr = self._heuristic_table.horizontalHeader()
-        # Avoid Stretch on column 0: it would consume ~all width after tiny Locale/Signal cells,
+        # Avoid Stretch on column 0: it would consume ~all width after tiny Signal cells,
         # hiding Detail. Key is Interactive (user-resizable); Detail stretches for readability.
+        # All findings are group-scoped (see _grouped_locale_finding), so there is no separate
+        # single-locale column — affected locales are always listed in "Locales".
         hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
         hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
-        hdr.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
-        hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
-        hdr.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
+        hdr.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionsClickable(True)
         hdr.setSortIndicatorShown(True)
-        self._heuristic_table.setColumnWidth(0, 240)
-        self._heuristic_table.setColumnWidth(2, 160)
-        self._heuristic_table.setColumnWidth(3, 200)
-        self._heuristic_table.setColumnWidth(4, 200)
+        self._heuristic_table.setColumnWidth(0, 190)
+        self._heuristic_table.setColumnWidth(1, 130)
+        self._heuristic_table.setColumnWidth(2, 170)
+        self._heuristic_table.setColumnWidth(3, 170)
         self._heuristic_table.setSortingEnabled(True)
         self._heuristic_table.cellDoubleClicked.connect(self._on_heuristic_cell_double_clicked)
         self._heuristic_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -753,14 +753,17 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
 
     def _heuristic_row_key_and_locale(self, row: int) -> tuple[Optional[TranslationKey], Optional[str]]:
         key_item = self._heuristic_table.item(row, 0)
-        loc_item = self._heuristic_table.item(row, 1)
+        locales_item = self._heuristic_table.item(row, 1)
         if not key_item:
             return None, None
         key = key_item.data(Qt.ItemDataRole.UserRole)
         if key is None:
             return None, None
-        locale = loc_item.text().strip() if loc_item else ""
-        return key, locale or None
+        # "Locales" may list several affected locales (see _grouped_locale_finding); navigate to
+        # the first one, same as the "Locale value" column's own fallback resolution.
+        locales_text = locales_item.text().strip() if locales_item else ""
+        first_locale = locales_text.replace(";", ",").split(",", 1)[0].strip()
+        return key, first_locale or None
 
     def _on_heuristic_cell_double_clicked(self, row: int, _col: int) -> None:
         key, locale = self._heuristic_row_key_and_locale(row)
@@ -845,6 +848,10 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
                     "key_msgid": f.key_msgid,
                     "locale": f.locale,
                     "notes": notes,
+                    # Displayed "Locales" column: a single-locale finding (if any heuristic ever
+                    # sets f.locale again) falls back to that; group-scoped findings (all
+                    # built-ins today) use the comma-separated notes list.
+                    "locales": (f.locale or notes),
                     "default_text": default_text,
                     "locale_text": locale_text,
                     "signal_name": kind.get_display_name(),
@@ -864,20 +871,19 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             k_item.setData(Qt.ItemDataRole.UserRole, r["key_obj"])
             k_item.setToolTip(r["key_msgid"])
             self._heuristic_table.setItem(i, 0, k_item)
-            self._heuristic_table.setItem(i, 1, QTableWidgetItem(r["locale"]))
-            notes_item = QTableWidgetItem(r["notes"])
-            notes_item.setToolTip(r["notes"])
-            self._heuristic_table.setItem(i, 2, notes_item)
+            locales_item = QTableWidgetItem(r["locales"])
+            locales_item.setToolTip(r["locales"])
+            self._heuristic_table.setItem(i, 1, locales_item)
             def_item = QTableWidgetItem(r["default_text"])
             def_item.setToolTip(r["default_text"])
-            self._heuristic_table.setItem(i, 3, def_item)
+            self._heuristic_table.setItem(i, 2, def_item)
             loc_item = QTableWidgetItem(r["locale_text"])
             loc_item.setToolTip(r["locale_text"])
-            self._heuristic_table.setItem(i, 4, loc_item)
-            self._heuristic_table.setItem(i, 5, QTableWidgetItem(r["signal_name"]))
+            self._heuristic_table.setItem(i, 3, loc_item)
+            self._heuristic_table.setItem(i, 4, QTableWidgetItem(r["signal_name"]))
             det_item = QTableWidgetItem(r["detail"])
             det_item.setToolTip(r["detail"])
-            self._heuristic_table.setItem(i, 6, det_item)
+            self._heuristic_table.setItem(i, 5, det_item)
         self._heuristic_table.setSortingEnabled(True)
         if sort_col >= 0:
             self._heuristic_table.sortItems(sort_col, sort_order)
@@ -1003,8 +1009,7 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             return
         headers = [
             "Key",
-            "Locale",
-            "Notes",
+            "Locales",
             "Default locale value",
             "Locale value",
             "Signal",
