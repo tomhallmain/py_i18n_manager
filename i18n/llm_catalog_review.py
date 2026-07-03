@@ -80,7 +80,7 @@ def _llm_generate(
     user_prompt: str,
     *,
     system_prompt: Optional[str] = None,
-    timeout: int = 180,
+    timeout: int = 2000,
 ) -> str:
     """Sync LLM call; disables CJK rejection because prompts/responses may be multilingual."""
     result = llm.generate_response(
@@ -158,7 +158,7 @@ def merge_rolling_summary_with_llm(
         ]
     )
     try:
-        out = _llm_generate(llm, user, system_prompt=system, timeout=120)
+        out = _llm_generate(llm, user, system_prompt=system, timeout=2000)
         if not out:
             if on_progress:
                 on_progress(_("Rolling merge returned empty; using local merge fallback."))
@@ -287,7 +287,7 @@ def run_catalog_llm_review(
 
         user = build_batch_review_user_prompt(rolling, batch_text, i, n, response_lang)
         try:
-            findings = _llm_generate(llm, user, system_prompt=system_batch, timeout=180)
+            findings = _llm_generate(llm, user, system_prompt=system_batch, timeout=2000)
         except Exception as e:
             logger.error("Batch LLM failed: %s", e, exc_info=True)
             return CatalogLlmReviewResult(
@@ -330,7 +330,7 @@ def run_catalog_llm_review(
 
     final_user = build_final_summary_user_prompt(rolling, response_lang, n)
     try:
-        final_report = _llm_generate(llm, final_user, system_prompt=system_final, timeout=240)
+        final_report = _llm_generate(llm, final_user, system_prompt=system_final, timeout=2000)
     except Exception as e:
         logger.error("Final summary LLM failed: %s", e, exc_info=True)
         return CatalogLlmReviewResult(
