@@ -244,58 +244,136 @@ class AllTranslationsWindow(BaseTranslationWindow):
         if not self.all_translations or not self.all_locales:
             return
 
-        search_text = self.search_box.text().lower()
-        filter_value = TranslationFilter.from_translated_value(self.status_filter.currentText())
+        search_text = self.search_box.text().lower().strip()
+        # Empty search is identical to Clear — do not run the search hide/show path.
+        if not search_text:
+            self.clear_search()
+            return
+
+        filter_value = TranslationFilter.from_translated_value(
+            self.status_filter.currentText()
+        )
         status_filter = filter_value.to_status()
+        row_count = self.table.rowCount()
 
-        # First, apply status filter and collect row data with priorities
+        # Collect matches with priorities (non-empty search only; empty uses Clear).
         visible_rows = []
-        for row in range(self.table.rowCount()):
-            show_row = True
-            priority = 3  # Default priority (no match)
+        for row in range(row_count):
+            key_item = self.table.item(row, 0)
+            if key_item is None:
+                continue
+            msgid_lower = key_item.text().lower()
 
-            msgid = self.table.item(row, 0).text()
-            msgid_lower = msgid.lower()
+            if msgid_lower.startswith(search_text):
+                priority = 0  # Highest — starts with search text
+            elif any(word.startswith(search_text) for word in msgid_lower.split()):
+                priority = 1  # Medium — word starts with search text
+            elif search_text in msgid_lower:
+                priority = 2  # Low — contains search text
+            else:
+                continue
 
-            # Determine search match priority
-            if search_text:
-                if msgid_lower.startswith(search_text):
-                    priority = 0  # Highest priority - starts with search text
-                elif any(word.startswith(search_text) for word in msgid_lower.split()):
-                    priority = 1  # Medium priority - word starts with search text
-                elif search_text in msgid_lower:
-                    priority = 2  # Low priority - contains search text
-                else:
-                    show_row = False
+            if filter_value != TranslationFilter.ALL:
+                has_status = any(
+                    status_filter in self.status_cache.get((row, col), set())
+                    for col in range(1, self.table.columnCount())
+                )
+                if not has_status:
+                    continue
 
-            # Apply status filter
-            if show_row and filter_value != TranslationFilter.ALL:
-                has_status = False
+            visible_rows.append((priority, row))
+
+        visible_rows.sort()
+        visible_row_set = {row for _, row in visible_rows}
+
+        def _apply_search_results() -> None:
+            self._apply_row_visibility(visible_row_set)
+            header = self.table.verticalHeader()
+            for display_index, (_priority, original_row) in enumerate(visible_rows):
+                visual = header.visualIndex(original_row)
+                if visual != display_index:
+                    header.moveSection(visual, display_index)
+
+        self._with_table_updates_blocked(_apply_search_results)
+
+    def clear_search(self):
+        """Clear the search box and restore full-catalog visibility.
+
+        This is the empty-search path. It rebuilds row layout from the current
+        cell items (preserving unsaved edits) instead of unhiding / reordering
+        in place — mass ``setRowHidden`` / ``moveSection`` on a full catalog hangs.
+        """
+        self.search_box.blockSignals(True)
+        try:
+            self.search_box.clear()
+        finally:
+            self.search_box.blockSignals(False)
+        self._apply_status_filter_only()
+
+    def _apply_status_filter_only(self):
+        """Restore all rows (logical order), then apply the status filter only."""
+        if not self.all_translations or not self.all_locales:
+            return
+
+        filter_value = TranslationFilter.from_translated_value(
+            self.status_filter.currentText()
+        )
+
+        def _reset() -> None:
+            self._rebuild_rows_preserving_items()
+            if filter_value == TranslationFilter.ALL:
+                return
+            status_filter = filter_value.to_status()
+            visible_row_set: set[int] = set()
+            for row in range(self.table.rowCount()):
                 for col in range(1, self.table.columnCount()):
                     if status_filter in self.status_cache.get((row, col), set()):
-                        has_status = True
+                        visible_row_set.add(row)
                         break
-                if not has_status:
-                    show_row = False
+            self._apply_row_visibility(visible_row_set)
 
-            if show_row:
-                visible_rows.append((priority, row))
+        self._with_table_updates_blocked(_reset)
 
-        # Sort rows by priority
-        visible_rows.sort()  # Sort by priority (first element of tuple)
+    def _rebuild_rows_preserving_items(self) -> None:
+        """Recreate rows in logical order, all visible, keeping current cell items."""
+        table = self.table
+        row_count = table.rowCount()
+        col_count = table.columnCount()
+        if row_count == 0:
+            return
 
-        # Reorder and show/hide rows
-        for display_index, (priority, original_row) in enumerate(visible_rows):
-            self.table.setRowHidden(original_row, False)
-            self.table.verticalHeader().moveSection(
-                self.table.verticalHeader().visualIndex(original_row),
-                display_index
-            )
+        rows = [
+            [table.takeItem(row, col) for col in range(col_count)]
+            for row in range(row_count)
+        ]
+        # Dropping and restoring row count resets hidden state and header mapping.
+        table.setRowCount(0)
+        table.setRowCount(row_count)
+        for row, items in enumerate(rows):
+            for col, item in enumerate(items):
+                if item is not None:
+                    table.setItem(row, col, item)
 
-        # Hide all rows that didn't match
+    def _apply_row_visibility(self, visible_row_set: set[int]) -> None:
+        """Show exactly the rows in ``visible_row_set``; hide the rest."""
         for row in range(self.table.rowCount()):
-            if row not in [r for _, r in visible_rows]:
-                self.table.setRowHidden(row, True)
+            hide = row not in visible_row_set
+            if self.table.isRowHidden(row) != hide:
+                self.table.setRowHidden(row, hide)
+
+    def _with_table_updates_blocked(self, action) -> None:
+        """Run ``action`` with main + frozen table repaints suspended."""
+        table = self.table
+        frozen = getattr(table, "_frozen_table", None)
+        table.setUpdatesEnabled(False)
+        if frozen is not None:
+            frozen.setUpdatesEnabled(False)
+        try:
+            action()
+        finally:
+            if frozen is not None:
+                frozen.setUpdatesEnabled(True)
+            table.setUpdatesEnabled(True)
 
     def show_context_menu(self, position):
         """Show context menu for copy/delete actions."""
@@ -471,9 +549,13 @@ class AllTranslationsWindow(BaseTranslationWindow):
                     item.setText(txt)
 
     def clear_search(self):
-        """Clear the search box and reset the filter to show all items."""
-        self.search_box.clear()
-        self.filter_table()
+        """Clear the search box and reset visibility (status filter still applies)."""
+        self.search_box.blockSignals(True)
+        try:
+            self.search_box.clear()
+        finally:
+            self.search_box.blockSignals(False)
+        self._apply_status_filter_only()
 
     def open_quality_exclusions(self):
         dialog = QualityReviewExclusionsDialog(
@@ -518,7 +600,7 @@ class AllTranslationsWindow(BaseTranslationWindow):
         finally:
             self.search_box.blockSignals(False)
             self.status_filter.blockSignals(False)
-        self.filter_table()
+        self._apply_status_filter_only()
 
         row = self._row_for_translation_key(key)
         if row < 0:
