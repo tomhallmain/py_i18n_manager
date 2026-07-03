@@ -228,11 +228,15 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         # hiding Detail. Key is Interactive (user-resizable); Detail stretches for readability.
         # All findings are group-scoped (see _grouped_locale_finding), so there is no separate
         # single-locale column — affected locales are always listed in "Locales".
+        # Signal is fixed-width Interactive rather than ResizeToContents: ResizeToContents
+        # recomputes from whatever rows are currently in the model, so filtering to a narrower
+        # set of signal names changed this column's width on every re-render and reflowed the
+        # Stretch "Detail" column after it (looked like columns "shifting" when filtering).
         hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
         hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
-        hdr.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
         hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionsClickable(True)
         hdr.setSortIndicatorShown(True)
@@ -240,6 +244,7 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         self._heuristic_table.setColumnWidth(1, 130)
         self._heuristic_table.setColumnWidth(2, 170)
         self._heuristic_table.setColumnWidth(3, 170)
+        self._heuristic_table.setColumnWidth(4, 210)
         self._heuristic_table.setSortingEnabled(True)
         self._heuristic_table.cellDoubleClicked.connect(self._on_heuristic_cell_double_clicked)
         self._heuristic_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
