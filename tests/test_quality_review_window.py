@@ -8,6 +8,8 @@ set of signal names visibly reflowed every column after it.
 """
 
 import os
+import time
+from unittest.mock import patch
 
 import pytest
 
@@ -200,3 +202,162 @@ class TestTranslationQualityReviewWindow:
         qf = self._findings_from_groups([latin_group], ["en", "ja"])
         assert qf.findings
         assert all(f.locale == "" for f in qf.findings)
+
+
+@pytest.mark.skipif(not _HAS_PYQT6, reason="PyQt6 not installed in this environment")
+class TestCatalogLlmWorkerModelSelection:
+    """The catalog-wide "LLM review" tab should use the same per-key/all-locales model
+    configured in LLM Settings (a cloud model by default), not lib.llm.LLM's own hardcoded
+    single-locale default (deepseek-r1:14b, a local model)."""
+
+    @classmethod
+    def setup_class(cls):
+        cls._app = QApplication.instance() or QApplication([])
+
+    def _make_worker(self, settings_manager):
+        from ui.translation_quality_review_window import _CatalogLlmWorker
+
+        return _CatalogLlmWorker(
+            translations={},
+            locales=["en", "de"],
+            default_locale="en",
+            settings_manager=settings_manager,
+            project_path="C:/tmp/some-project",
+        )
+
+    def test_uses_multi_locale_model_from_settings_manager(self):
+        class _FakeSettingsManager:
+            def get_llm_model_multi_locale(self, project_path):
+                assert project_path == "C:/tmp/some-project"
+                return "glm-4.7:cloud"
+
+        worker = self._make_worker(_FakeSettingsManager())
+        with patch(
+            "i18n.llm_catalog_review.run_catalog_llm_review"
+        ) as mock_run:
+            from i18n.llm_catalog_review import CatalogLlmReviewResult
+
+            mock_run.return_value = CatalogLlmReviewResult(
+                final_report="ok", rolling_summary="", error_message=None
+            )
+            worker.run()
+
+        assert mock_run.called
+        llm_arg = mock_run.call_args[0][0]
+        assert llm_arg.model_name == "glm-4.7:cloud"
+
+    def test_falls_back_to_default_multi_locale_model_when_no_settings_manager(self):
+        from utils.settings_manager import SettingsManager
+
+        worker = self._make_worker(settings_manager=None)
+        with patch(
+            "i18n.llm_catalog_review.run_catalog_llm_review"
+        ) as mock_run:
+            from i18n.llm_catalog_review import CatalogLlmReviewResult
+
+            mock_run.return_value = CatalogLlmReviewResult(
+                final_report="ok", rolling_summary="", error_message=None
+            )
+            worker.run()
+
+        llm_arg = mock_run.call_args[0][0]
+        assert llm_arg.model_name == SettingsManager.DEFAULT_LLM_MODEL_MULTI_LOCALE
+
+
+@pytest.mark.skipif(not _HAS_PYQT6, reason="PyQt6 not installed in this environment")
+class TestLlmCatalogReviewThreading:
+    """Regression tests for two bugs in the LLM review tab's threading:
+
+    1. The Cancel button never became enabled, because _update_settings_dependent_controls()
+       (which computes its enabled state from self._llm_thread.isRunning()) was called *before*
+       thread.start() in _on_run_llm_analysis, when isRunning() was still False.
+    2. closeEvent() blocked the whole app for up to 30s via self._llm_thread.wait(30000) --
+       the in-flight LLM HTTP call can't be interrupted mid-request, so this froze the UI on
+       close instead of letting the background thread finish/cancel on its own.
+
+    Starting the real worker thread here is safe/fast: there's no Ollama server listening on
+    localhost in the test environment, so the request fails immediately with a connection error
+    (no multi-minute timeout involved), and QThread.isRunning() is documented to become true
+    synchronously as part of start(), before the underlying OS thread necessarily runs any code.
+    """
+
+    @classmethod
+    def setup_class(cls):
+        cls._app = QApplication.instance() or QApplication([])
+
+    def setup_method(self):
+        self._env_ctx = isolated_settings_and_cache_env(prefix=".tmp_llm_catalog_threading_")
+        self._env_ctx.__enter__()
+
+        from ui.translation_quality_review_window import TranslationQualityReviewWindow
+
+        self.window = TranslationQualityReviewWindow(
+            parent=None,
+            project_path="C:/tmp/some-project",
+            settings_manager=None,
+            i18n_manager=None,
+        )
+
+        from i18n.translation_group import TranslationGroup
+
+        group = TranslationGroup("hello", is_in_base=True)
+        group.default_locale = "en"
+        group.add_translation("en", "Hello")
+        group.add_translation("de", "Hallo")
+
+        class _FakeI18nManagerLocal:
+            translations = {group.key: group}
+            locales = ["en", "de"]
+            default_locale = "en"
+
+        self.window._i18n_manager = _FakeI18nManagerLocal()
+
+    def teardown_method(self):
+        # Let the background thread actually finish before tearing down, so we don't leak a
+        # running QThread across tests.
+        if self.window._llm_thread is not None:
+            self.window._llm_thread.wait(5000)
+        self.window.deleteLater()
+        self._env_ctx.__exit__(None, None, None)
+
+    def test_cancel_button_enabled_immediately_after_starting_llm_analysis(self):
+        assert not self.window._cancel_llm_btn.isEnabled()
+        self.window._on_run_llm_analysis()
+        try:
+            assert self.window._llm_thread is not None
+            assert self.window._llm_thread.isRunning()
+            assert self.window._cancel_llm_btn.isEnabled()
+        finally:
+            if self.window._llm_worker is not None:
+                self.window._llm_worker.cancel()
+
+    def test_close_event_does_not_block_while_llm_thread_running(self):
+        from PyQt6.QtGui import QCloseEvent
+
+        self.window._on_run_llm_analysis()
+        assert self.window._llm_thread is not None
+        assert self.window._llm_thread.isRunning()
+
+        start = time.monotonic()
+        self.window.closeEvent(QCloseEvent())
+        elapsed = time.monotonic() - start
+
+        # The old behavior called self._llm_thread.wait(30000), blocking for up to 30s.
+        assert elapsed < 5.0
+
+    def test_close_event_disconnects_window_touching_signals(self):
+        from PyQt6.QtGui import QCloseEvent
+
+        self.window._on_run_llm_analysis()
+        worker = self.window._llm_worker
+        assert worker is not None
+
+        self.window.closeEvent(QCloseEvent())
+
+        # Already disconnected by closeEvent(); disconnecting again must raise, proving the
+        # window's slots are no longer attached (so a late 'finished'/'progress' emission after
+        # the window is gone can't try to touch a closed widget).
+        with pytest.raises((TypeError, RuntimeError)):
+            worker.finished.disconnect(self.window._on_llm_finished)
+        with pytest.raises((TypeError, RuntimeError)):
+            worker.progress.disconnect(self.window._on_llm_progress)

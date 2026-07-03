@@ -45,8 +45,10 @@ class SettingsManager:
         r"(?i)\.(?:json|yml|yaml|xml|csv|tsv|txt|log|md|pdf|png|jpe?g|gif|webp|svg|mp3|mp4|wav|zip|tar|gz|7z|exe|msi|dmg|apk|ipa|js|ts|jsx|tsx|py|rb|java|kt|go|rs|c|cpp|h|hpp|ini|cfg|conf|toml|lock|sql)\b",
     ]
 
-    # Conservative default for local / low-context models: catalog slice only (system + reply live outside).
-    DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS = 2400
+    # Catalog review defaults to a large-context cloud model (DEFAULT_LLM_MODEL_MULTI_LOCALE),
+    # so this can afford to be generous; catalog slice only (system + reply live outside this
+    # budget). Lower per-project if pointed at a smaller-context / local model.
+    DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS = 16000
     
     def __init__(self):
         override_path = os.environ.get("PY_I18N_MANAGER_SETTINGS_PATH", "").strip()
@@ -611,13 +613,14 @@ class SettingsManager:
         )
 
     def get_quality_review_llm_max_catalog_tokens(self, project_path: str) -> int:
-        """Max estimated tokens per catalog batch for LLM review (conservative for local / small context)."""
+        """Max estimated tokens per catalog batch for LLM review (generous default for the
+        large-context cloud model catalog review uses; lower per-project for small-context models)."""
         v = self.get_project_setting(project_path, "quality_review_llm_max_catalog_tokens")
         if v is None:
             return self.DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS
         try:
             n = int(v)
-            return max(128, min(n, 32000))
+            return max(128, min(n, 100000))
         except (TypeError, ValueError):
             return self.DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS
 
@@ -627,7 +630,7 @@ class SettingsManager:
             n = int(max_tokens)
         except (TypeError, ValueError):
             n = self.DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS
-        n = max(128, min(n, 32000))
+        n = max(128, min(n, 100000))
         return self.save_project_setting(project_path, "quality_review_llm_max_catalog_tokens", n)
 
     def get_intro_details(self) -> dict[str, str]:

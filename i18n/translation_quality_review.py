@@ -558,10 +558,13 @@ def run_custom_rules(
 
 # --- LLM catalog prompts & batching -------------------------------------------
 
-# Default token budget for the catalog TSV slice only (per batch). Kept moderate so the full
-# request (system prompt + user wrapper + this slice + model output) fits typical local LLMs
-# with 4k–8k context; lower this in settings for stricter hardware.
-DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS = 2400
+# Default token budget for the catalog TSV slice only (per batch). The per-key/all-locales LLM
+# model (see SettingsManager.DEFAULT_LLM_MODEL_MULTI_LOCALE) is the one used for catalog review,
+# and defaults to a large-context cloud model rather than a small local one, so this can afford to
+# be generous -- a small budget here just means many more batches (and LLM round trips) than
+# necessary. Lower this per-project in settings if you point catalog review at a smaller-context
+# model.
+DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS = 16000
 
 
 def estimate_llm_tokens(text: str) -> int:
@@ -592,28 +595,52 @@ def estimate_llm_tokens(text: str) -> int:
 
 
 LLM_CATALOG_REVIEW_SYSTEM_PROMPT = (
-    "You are an expert software localization reviewer. You receive translation data as TSV: "
-    "each line is MSGID<TAB>LOCALE<TAB>TEXT. A header line gives default_locale=...\n"
+    "You are an expert software localization reviewer. Translation data is grouped into blocks "
+    "separated by a blank line: every line in a block, including the first, is "
+    "LOCALE<TAB>TEXT; the first line's locale is the default (source) locale, which also "
+    "identifies the entry -- there is no separate key/id column. "
+    "A header line may show default_locale=...\n"
     "Flag suspicious items only when justified: copy of default in non-default locales, "
     "glaring untranslated English in clearly localized contexts, broken placeholders, "
-    "or inconsistent terminology. Be concise; reference msgid and locale. "
-    "Do not invent keys that are not in the batch."
+    "or inconsistent terminology. Be concise; reference the source text (or a short excerpt of "
+    "it) and locale. Do not invent entries that are not in the batch."
 )
 
 
 def build_llm_catalog_user_prompt(batch_text: str, batch_index: int, batch_total: int) -> str:
     return (
         f"Review batch {batch_index + 1} of {batch_total}.\n"
-        "Each data line is: MSGID\\tLOCALE\\tTEXT\n\n"
+        "Blocks are separated by a blank line. Every line in a block is LOCALE\\tTEXT, "
+        "including the first (the default locale).\n\n"
         f"{batch_text}"
     )
 
 
-def format_catalog_tsv_line(msgid: str, locale: str, text: str, max_text_len: int = 480) -> str:
+def _clean_catalog_text(text: str, max_text_len: int = 480) -> str:
     escaped = (text or "").replace("\n", " ").replace("\t", " ")
     if len(escaped) > max_text_len:
         escaped = escaped[: max_text_len - 3] + "..."
-    return f"{msgid}\t{locale}\t{escaped}"
+    return escaped
+
+
+def format_catalog_group_block(
+    default_locale: str,
+    default_text: str,
+    locale_texts: Sequence[tuple[str, str]],
+    max_text_len: int = 480,
+) -> str:
+    """Format one translation group as a block: the default locale on the first line, followed
+    by one ``LOCALE<TAB>TEXT`` line per other locale -- every line, including the first, uses
+    the same ``LOCALE<TAB>TEXT`` shape, so there is nothing special-cased for the LLM to parse.
+
+    Gettext keys are typically the default-locale text itself, so this deliberately omits a
+    separate key/msgid column -- repeating a (sometimes long) key on every single locale line
+    wastes tokens for no benefit once the default text is already present once per group.
+    """
+    lines = [f"{default_locale}\t{_clean_catalog_text(default_text, max_text_len)}"]
+    for locale, text in locale_texts:
+        lines.append(f"{locale}\t{_clean_catalog_text(text, max_text_len)}")
+    return "\n".join(lines)
 
 
 def iter_llm_catalog_batches(
@@ -624,10 +651,15 @@ def iter_llm_catalog_batches(
 ) -> List[str]:
     """Split the catalog into chunks for sequential LLM calls.
 
-    Batching uses :func:`estimate_llm_tokens` on each line (plus the ``default_locale=`` header
-    repeated per batch) so long strings and CJK-heavy rows consume more of the budget than short
-    Latin rows. ``max_catalog_tokens`` caps the estimated tokens for the header + data lines in
-    each batch only; keep room in the real prompt for system text, instructions, and output.
+    Each translation group becomes one block via :func:`format_catalog_group_block` (default
+    text once, then one line per other locale), with blocks separated by a blank line. Blocks
+    are kept atomic within a batch -- never split across batches -- so a locale line is never
+    separated from the default text it belongs to.
+
+    Batching uses :func:`estimate_llm_tokens` on each block (plus the ``default_locale=`` header
+    repeated per batch) so long/CJK-heavy groups consume more of the budget than short ones.
+    ``max_catalog_tokens`` caps the estimated tokens for the header + blocks in each batch only;
+    keep room in the real prompt for system text, instructions, and output.
 
     Args:
         max_catalog_tokens: Token budget per batch for catalog content. If ``None``, uses
@@ -643,40 +675,42 @@ def iter_llm_catalog_batches(
     header_tokens = estimate_llm_tokens(header)
 
     batches: List[str] = []
-    lines: List[str] = []
+    blocks: List[str] = []
     current_tokens = 0
 
     for group in translations.values():
-        mid = group.key.msgid
-        for loc in locales:
-            raw = group.get_translation(loc) or ""
-            line = format_catalog_tsv_line(mid, loc, raw) + "\n"
-            line_tokens = estimate_llm_tokens(line)
+        default_text = group.get_translation(default_locale) or ""
+        locale_texts = [
+            (loc, group.get_translation(loc) or "") for loc in locales if loc != default_locale
+        ]
+        block = format_catalog_group_block(default_locale, default_text, locale_texts) + "\n\n"
+        block_tokens = estimate_llm_tokens(block)
 
-            # Oversized row: flush pending lines, then emit this line alone (still truncated by format_catalog_tsv_line).
-            if line_tokens >= budget:
-                if lines:
-                    batches.append(header + "".join(lines))
-                    lines = []
-                batches.append(header + line)
-                current_tokens = 0
-                continue
+        # Oversized block: flush pending blocks, then emit this one alone (individual lines are
+        # still truncated by format_catalog_group_block).
+        if block_tokens >= budget:
+            if blocks:
+                batches.append(header + "".join(blocks))
+                blocks = []
+            batches.append(header + block)
+            current_tokens = 0
+            continue
 
-            if not lines:
-                lines = [line]
-                current_tokens = header_tokens + line_tokens
-                continue
+        if not blocks:
+            blocks = [block]
+            current_tokens = header_tokens + block_tokens
+            continue
 
-            if current_tokens + line_tokens > budget:
-                batches.append(header + "".join(lines))
-                lines = [line]
-                current_tokens = header_tokens + line_tokens
-            else:
-                lines.append(line)
-                current_tokens += line_tokens
+        if current_tokens + block_tokens > budget:
+            batches.append(header + "".join(blocks))
+            blocks = [block]
+            current_tokens = header_tokens + block_tokens
+        else:
+            blocks.append(block)
+            current_tokens += block_tokens
 
-    if lines:
-        batches.append(header + "".join(lines))
+    if blocks:
+        batches.append(header + "".join(blocks))
     return batches
 
 

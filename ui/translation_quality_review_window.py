@@ -83,8 +83,13 @@ class _CatalogLlmWorker(QObject):
     def run(self) -> None:
         from i18n.llm_catalog_review import run_catalog_llm_review
         from lib.llm import LLM
+        from utils.settings_manager import SettingsManager
 
-        llm = LLM()
+        if self._settings_manager:
+            model_name = self._settings_manager.get_llm_model_multi_locale(self._project_path)
+        else:
+            model_name = SettingsManager.DEFAULT_LLM_MODEL_MULTI_LOCALE
+        llm = LLM(model_name=model_name, state_key=model_name)
         try:
             result = run_catalog_llm_review(
                 llm,
@@ -350,10 +355,11 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
 
         llm_intro = QLabel(
             _(
-                "Optional catalog-wide LLM review sends token-batched TSV slices to your local "
-                "Ollama model, updates a rolling summary between batches, then requests a "
-                "final report. Requires loaded translations (e.g. Check Status). Cancel stops "
-                "between batches; the current request may still finish."
+                "Optional catalog-wide LLM review sends token-batched TSV slices to your "
+                "configured Ollama model (the same per-key/all-locales model set in LLM Settings, "
+                "typically a cloud model rather than a local one), updates a rolling summary "
+                "between batches, then requests a final report. Requires loaded translations "
+                "(e.g. Check Status). Cancel stops between batches; the current request may still finish."
             )
         )
         llm_intro.setWordWrap(True)
@@ -368,7 +374,10 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         llm_row = QHBoxLayout()
         self._run_llm_btn = QPushButton(_("Run LLM analysis"))
         self._run_llm_btn.setToolTip(
-            _("Uses lib.llm.LLM against localhost:11434 (Ollama). May take several minutes.")
+            _(
+                "Uses lib.llm.LLM via Ollama (localhost:11434), with the per-key/all-locales "
+                "model from LLM Settings. May take several minutes."
+            )
         )
         self._run_llm_btn.clicked.connect(self._on_run_llm_analysis)
         llm_row.addWidget(self._run_llm_btn)
@@ -654,6 +663,13 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
     def _on_cancel_llm_analysis(self) -> None:
         if self._llm_worker:
             self._llm_worker.cancel()
+            self._cancel_llm_btn.setEnabled(False)
+            self._llm_output.append(
+                _(
+                    "Cancellation requested — will stop after the current batch/request "
+                    "completes (the LLM call in progress cannot be interrupted mid-flight)."
+                )
+            )
 
     def _on_run_llm_analysis(self) -> None:
         if not self._i18n_manager or not self._i18n_manager.translations:
@@ -690,8 +706,10 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         worker.progress.connect(self._on_llm_progress)
 
         self._run_llm_btn.setText(_("Running…"))
-        self._update_settings_dependent_controls()
         thread.start()
+        # Must run after thread.start(): _update_settings_dependent_controls() enables Cancel
+        # based on self._llm_thread.isRunning(), which is only true once the thread has started.
+        self._update_settings_dependent_controls()
 
     def _on_run_heuristic_analysis(self) -> None:
         if not self.project_path or not self._i18n_manager:
@@ -752,10 +770,23 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
 
     def closeEvent(self, event) -> None:
         self._disconnect_heuristic_worker()
-        if self._llm_worker:
+        if self._llm_worker and self._llm_thread and self._llm_thread.isRunning():
             self._llm_worker.cancel()
-        if self._llm_thread and self._llm_thread.isRunning():
-            self._llm_thread.wait(30000)
+            # Detach rather than block: the current in-flight LLM request can't be interrupted
+            # mid-call (LLM.generate_response is a blocking urlopen with up to a several-minute
+            # timeout), so waiting here would freeze the whole app on close. Disconnect the
+            # signals that touch this widget so a 'finished'/'progress' emission arriving after
+            # the window is gone doesn't try to update a closed window; the worker/thread still
+            # clean themselves up via their own finished -> quit/deleteLater connections once
+            # the in-flight request settles or the next batch checks the cancel flag.
+            try:
+                self._llm_worker.finished.disconnect(self._on_llm_finished)
+            except (TypeError, RuntimeError):
+                pass
+            try:
+                self._llm_worker.progress.disconnect(self._on_llm_progress)
+            except (TypeError, RuntimeError):
+                pass
         super().closeEvent(event)
 
     def _heuristic_row_key_and_locale(self, row: int) -> tuple[Optional[TranslationKey], Optional[str]]:

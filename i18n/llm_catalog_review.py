@@ -141,7 +141,7 @@ def merge_rolling_summary_with_llm(
         "Produce UPDATED_STATE: a concise bullet list (max ~800 words) that (1) keeps recurring "
         "issues, terminology gaps, and locale patterns from PRIOR_STATE if still relevant, "
         "(2) adds important new points from NEW_FINDINGS, (3) drops noise. "
-        "Stay within the facts given; do not invent msgids. "
+        "Stay within the facts given; do not invent entries. "
         "Use the same language as specified in the user message."
     )
     user = "\n".join(
@@ -152,8 +152,8 @@ def merge_rolling_summary_with_llm(
             _delimiter_block("NEW_FINDINGS", batch_findings or _("(no findings)")),
             _(
                 "Output ONLY the bullet list for UPDATED_STATE, with a short "
-                "\"CarryForward:\" line at the end listing msgid/locale pairs to watch in later batches "
-                "(or \"none\")."
+                "\"CarryForward:\" line at the end listing source-text/locale pairs to watch in "
+                "later batches (or \"none\")."
             ),
         ]
     )
@@ -193,7 +193,8 @@ def build_batch_review_user_prompt(
             _("New data for this batch only:"),
             base,
             _(
-                "Rules: (1) Comment only on rows in this batch. (2) Reference msgid and locale. "
+                "Rules: (1) Comment only on entries in this batch. (2) Reference the source "
+                "text (or a short excerpt of it) and locale. "
                 "(3) Flag likely copy-paste of default locale, broken placeholders, or obvious "
                 "untranslated fragments when the locale suggests translation. "
                 "(4) Note cross-batch themes only if they match ROLLING_NOTES or clearly repeat here."
@@ -218,7 +219,7 @@ def build_final_summary_user_prompt(
             _(
                 "Produce: (1) Executive summary, (2) Top issues by severity, "
                 "(3) Locale-specific gaps if any, (4) Suggested next checks. "
-                "Be concise; do not invent msgids not implied by the notes."
+                "Be concise; do not invent entries not implied by the notes."
             ),
         ]
     )
@@ -253,14 +254,17 @@ def run_catalog_llm_review(
         )
 
     system_batch = _(
-        "You are an expert software localization reviewer. Data lines are MSGID, LOCALE, TEXT "
-        "separated by tabs. A header line may show default_locale=. "
+        "You are an expert software localization reviewer. Translation data is grouped into "
+        "blocks separated by a blank line: every line in a block, including the first, is "
+        "LOCALE, TEXT (tab-separated); the first line's locale is the default (source) locale, "
+        "which also identifies the entry -- there is no separate key/id column. "
+        "A header line may show default_locale=. "
         "You are given ROLLING_NOTES from earlier batches to track trends—do not contradict them "
         "without evidence in the current batch."
     )
     system_final = _(
         "You write clear localization audit reports for developers. Only use information in "
-        "ACCUMULATED_NOTES; do not fabricate msgids."
+        "ACCUMULATED_NOTES; do not fabricate entries."
     )
 
     rolling = ""

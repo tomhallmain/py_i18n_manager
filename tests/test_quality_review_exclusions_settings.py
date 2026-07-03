@@ -158,3 +158,53 @@ class TestQualityReviewQuoteStyleOverrideSettings:
                 f,
             )
         assert self.mgr.get_quality_review_quote_style_overrides(self.project_path) == {}
+
+
+class TestQualityReviewLlmMaxCatalogTokens:
+    """Catalog review defaults to a large-context cloud model (DEFAULT_LLM_MODEL_MULTI_LOCALE),
+    so the default catalog-slice token budget should be generous (16000), not the old
+    conservative-for-local-models value (2400)."""
+
+    def setup_method(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.project_path = "C:/tmp/project-a"
+        self.mgr = SettingsManager()
+        self.mgr.settings_file = Path(self._tmp.name) / "settings.json"
+        self.mgr.settings_file.parent.mkdir(parents=True, exist_ok=True)
+
+    def teardown_method(self):
+        self._tmp.cleanup()
+
+    def test_default_is_16000(self):
+        assert self.mgr.get_quality_review_llm_max_catalog_tokens(self.project_path) == 16000
+        assert SettingsManager.DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS == 16000
+
+    def test_translation_quality_review_module_constant_matches(self):
+        from i18n.translation_quality_review import DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS
+
+        assert DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS == 16000
+
+    def test_save_and_reload(self):
+        ok = self.mgr.save_quality_review_llm_max_catalog_tokens(self.project_path, 40000)
+        assert ok
+        assert self.mgr.get_quality_review_llm_max_catalog_tokens(self.project_path) == 40000
+
+    def test_clamped_to_new_higher_ceiling(self):
+        self.mgr.save_quality_review_llm_max_catalog_tokens(self.project_path, 500000)
+        assert self.mgr.get_quality_review_llm_max_catalog_tokens(self.project_path) == 100000
+
+    def test_clamped_to_floor(self):
+        self.mgr.save_quality_review_llm_max_catalog_tokens(self.project_path, 1)
+        assert self.mgr.get_quality_review_llm_max_catalog_tokens(self.project_path) == 128
+
+    def test_invalid_saved_value_falls_back_to_default(self):
+        with open(self.mgr.settings_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "project_settings": {
+                        self.project_path: {"quality_review_llm_max_catalog_tokens": "not-a-number"}
+                    }
+                },
+                f,
+            )
+        assert self.mgr.get_quality_review_llm_max_catalog_tokens(self.project_path) == 16000
