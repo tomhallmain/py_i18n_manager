@@ -103,3 +103,58 @@ class TestQualityReviewExclusionsSettings:
         assert "quality_review_script_ignore_patterns_initialized" in cfg
         assert "quality_review_latin_ignore_patterns" not in cfg
         assert "quality_review_latin_ignore_patterns_initialized" not in cfg
+
+
+class TestQualityReviewQuoteStyleOverrideSettings:
+    def setup_method(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.project_path = "C:/tmp/project-a"
+        self.mgr = SettingsManager()
+        self.mgr.settings_file = Path(self._tmp.name) / "settings.json"
+        self.mgr.settings_file.parent.mkdir(parents=True, exist_ok=True)
+
+    def teardown_method(self):
+        self._tmp.cleanup()
+
+    def test_defaults_to_empty_dict(self):
+        assert self.mgr.get_quality_review_quote_style_overrides(self.project_path) == {}
+
+    def test_save_and_reload(self):
+        ok = self.mgr.save_quality_review_quote_style_overrides(
+            self.project_path, {"de": "straight", "fr": "curly"}
+        )
+        assert ok
+        loaded = self.mgr.get_quality_review_quote_style_overrides(self.project_path)
+        assert loaded == {"de": "straight", "fr": "curly"}
+
+    def test_save_strips_and_drops_blank_entries(self):
+        ok = self.mgr.save_quality_review_quote_style_overrides(
+            self.project_path,
+            {" de ": " straight ", "": "curly", "es": "", "fr": "guillemets"},
+        )
+        assert ok
+        loaded = self.mgr.get_quality_review_quote_style_overrides(self.project_path)
+        assert loaded == {"de": "straight", "fr": "guillemets"}
+
+    def test_clear_removes_overrides(self):
+        self.mgr.save_quality_review_quote_style_overrides(self.project_path, {"de": "straight"})
+        ok = self.mgr.clear_quality_review_quote_style_overrides(self.project_path)
+        assert ok
+        assert self.mgr.get_quality_review_quote_style_overrides(self.project_path) == {}
+
+    def test_independent_per_project(self):
+        other_path = "C:/tmp/project-b"
+        self.mgr.save_quality_review_quote_style_overrides(self.project_path, {"de": "straight"})
+        assert self.mgr.get_quality_review_quote_style_overrides(other_path) == {}
+
+    def test_non_dict_stored_value_is_treated_as_empty(self):
+        with open(self.mgr.settings_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "project_settings": {
+                        self.project_path: {"quality_review_quote_style_overrides": ["bad"]}
+                    }
+                },
+                f,
+            )
+        assert self.mgr.get_quality_review_quote_style_overrides(self.project_path) == {}

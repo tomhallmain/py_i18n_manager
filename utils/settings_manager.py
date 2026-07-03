@@ -577,6 +577,39 @@ class SettingsManager:
             project_path, "quality_review_script_ignore_patterns_initialized", True
         )
 
+    def get_quality_review_quote_style_overrides(self, project_path: str) -> dict[str, str]:
+        """Per-locale "expected quote style" overrides (locale -> QuoteStyle.value) for the
+        quote-style quality check. Locales not present here fall back to the built-in
+        per-language default (see i18n.quote_styles.DEFAULT_VALID_QUOTE_STYLE_BY_LANGUAGE), and
+        then to the locale's own dominant style in the catalog if neither is known."""
+        raw = self.get_project_setting(project_path, "quality_review_quote_style_overrides", {})
+        if not isinstance(raw, dict):
+            return {}
+        return {
+            str(k).strip(): str(v).strip()
+            for k, v in raw.items()
+            if isinstance(k, str) and str(k).strip() and isinstance(v, str) and str(v).strip()
+        }
+
+    def save_quality_review_quote_style_overrides(
+        self, project_path: str, overrides: dict[str, str]
+    ) -> bool:
+        """Persist per-locale expected-quote-style overrides for this project."""
+        cleaned = {
+            str(k).strip(): str(v).strip()
+            for k, v in overrides.items()
+            if isinstance(k, str) and str(k).strip() and isinstance(v, str) and str(v).strip()
+        }
+        return self.save_project_setting(
+            project_path, "quality_review_quote_style_overrides", cleaned
+        )
+
+    def clear_quality_review_quote_style_overrides(self, project_path: str) -> bool:
+        """Remove all per-locale expected-quote-style overrides for this project."""
+        return self._clear_project_setting_key(
+            project_path, "quality_review_quote_style_overrides"
+        )
+
     def get_quality_review_llm_max_catalog_tokens(self, project_path: str) -> int:
         """Max estimated tokens per catalog batch for LLM review (conservative for local / small context)."""
         v = self.get_project_setting(project_path, "quality_review_llm_max_catalog_tokens")

@@ -81,6 +81,14 @@ class I18NManagerBase(ABC):
             )
         return True
 
+    def get_quality_review_quote_style_overrides(self) -> dict:
+        """Per-locale expected-quote-style overrides for this project (see SettingsManager)."""
+        if self.settings_manager:
+            return self.settings_manager.get_quality_review_quote_style_overrides(
+                self._directory
+            )
+        return {}
+
     def _total_locales_for_statistics(self, results: TranslationManagerResults) -> int:
         """How many locales to report on ``results`` (bundle managers use ``self.locales``)."""
         if self.locales:
@@ -107,6 +115,7 @@ class I18NManagerBase(ABC):
                 self.get_quality_review_excluded_msgids(),
                 self.get_quality_review_script_ignore_patterns(),
                 use_builtin_exclusions=self.get_quality_review_use_builtin_exclusions(),
+                quote_style_overrides=self.get_quality_review_quote_style_overrides(),
             )
         else:
             results.invalid_groups = self.get_invalid_translations()

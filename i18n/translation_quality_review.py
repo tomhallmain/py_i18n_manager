@@ -15,6 +15,12 @@ import re
 import unicodedata
 from typing import AbstractSet, Dict, List, Optional, Sequence, TYPE_CHECKING
 
+from i18n.quote_styles import (
+    QuoteStyle,
+    compute_dominant_quote_style_by_locale,
+    default_valid_quote_style,
+    detect_quote_style,
+)
 from i18n.stop_character_utils import translation_has_stop_inconsistency_vs_source
 from utils.globals import QualityHeuristicKind
 from utils.logging_setup import get_logger
@@ -434,6 +440,71 @@ def _findings_high_english_ratio_stub(
     return []
 
 
+def _effective_valid_quote_style(
+    locale: str,
+    overrides: Dict[str, str],
+    dominant_by_locale: Dict[str, QuoteStyle],
+) -> Optional[QuoteStyle]:
+    """Resolve the quote style a locale is expected to use: project override, then the
+    built-in per-language default, then (if neither is known) the locale's own dominant style
+    as a fallback -- with no known "correct" answer, only internal consistency can be checked.
+    """
+    override = QuoteStyle.from_value(overrides.get(locale))
+    if override is not None:
+        return override
+    built_in = default_valid_quote_style(locale)
+    if built_in is not None:
+        return built_in
+    return dominant_by_locale.get(locale)
+
+
+def collect_quote_style_findings(
+    translations: Dict[TranslationKey, TranslationGroup],
+    locales: Sequence[str],
+    default_locale: str,
+    quote_style_overrides: Optional[Dict[str, str]] = None,
+    excluded_msgids: AbstractSet[str] = frozenset(),
+) -> List[QualityReviewFinding]:
+    """Flag translations whose quote characters don't match the locale's expected style.
+
+    For each non-default locale, "expected style" is resolved by :func:`_effective_valid_quote_style`
+    (project override > built-in per-language default > the locale's own catalog-wide dominant
+    style as a last resort). A translation is flagged whenever its detected quote style differs
+    from that expected style -- this covers both a locale-wide mismatch (the dominant style
+    itself disagrees with the expected one, so every instance of it is flagged) and one-off
+    outliers (a value using neither the dominant nor the expected style).
+    """
+    overrides = quote_style_overrides or {}
+    dominant_by_locale = compute_dominant_quote_style_by_locale(translations, locales, default_locale)
+
+    findings: List[QualityReviewFinding] = []
+    for group in translations.values():
+        if group.key.msgid in excluded_msgids:
+            continue
+        ctx = group.key.context or ""
+        mid = group.key.msgid
+        mismatched_locales: List[str] = []
+        for loc in locales:
+            if loc == default_locale:
+                continue
+            text = group.get_translation(loc)
+            if not text or not str(text).strip():
+                continue
+            detected = detect_quote_style(str(text))
+            if detected is None:
+                continue
+            expected = _effective_valid_quote_style(loc, overrides, dominant_by_locale)
+            if expected is None or detected == expected:
+                continue
+            mismatched_locales.append(loc)
+        grouped = _grouped_locale_finding(
+            mid, ctx, QualityHeuristicKind.QUOTE_STYLE_MISMATCH, mismatched_locales
+        )
+        if grouped is not None:
+            findings.append(grouped)
+    return findings
+
+
 def collect_project_quality_findings(
     translations: Dict[TranslationKey, TranslationGroup],
     locales: Sequence[str],
@@ -441,6 +512,7 @@ def collect_project_quality_findings(
     excluded_msgids: AbstractSet[str] = frozenset(),
     latin_ignore_patterns: Sequence[str] = (),
     use_builtin_exclusions: bool = True,
+    quote_style_overrides: Optional[Dict[str, str]] = None,
 ) -> TranslationQualityFindings:
     """Scan the full in-memory catalog for built-in advisory signals."""
     loc_list = list(locales)
@@ -456,6 +528,15 @@ def collect_project_quality_findings(
                 use_builtin_exclusions=use_builtin_exclusions,
             )
         )
+    rows.extend(
+        collect_quote_style_findings(
+            translations,
+            loc_list,
+            default_locale,
+            quote_style_overrides=quote_style_overrides,
+            excluded_msgids=excluded,
+        )
+    )
     return TranslationQualityFindings(findings=rows)
 
 

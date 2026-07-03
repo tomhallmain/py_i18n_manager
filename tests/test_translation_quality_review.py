@@ -1,7 +1,10 @@
 import unicodedata as u
 
+from i18n.translation_group import TranslationGroup
 from i18n.translation_quality_review import (
     collect_findings_for_group,
+    collect_project_quality_findings,
+    collect_quote_style_findings,
     _is_allowed_identical_copy,
     _is_latin_char,
     _has_mixed_script_latin_leakage,
@@ -760,3 +763,166 @@ class TestUseBuiltinExclusionsToggle:
         assert "pt" in notes
         assert "de" in notes
         assert "fr" in notes
+
+
+class TestCollectQuoteStyleFindings:
+    """Tests for i18n.translation_quality_review.collect_quote_style_findings.
+
+    "de" has a built-in valid style (LOW_HIGH_9_9, i.e. „…“) per
+    i18n.quote_styles.DEFAULT_VALID_QUOTE_STYLE_BY_LANGUAGE; "it" is deliberately not curated,
+    so its expected style falls back to whatever is dominant in the catalog.
+    """
+
+    def _group(self, msgid: str, values: dict) -> TranslationGroup:
+        g = TranslationGroup(msgid, is_in_base=True)
+        g.default_locale = "en"
+        for locale, text in values.items():
+            g.add_translation(locale, text)
+        return g
+
+    def test_no_findings_when_locale_matches_its_valid_style(self):
+        groups = {}
+        for i in range(3):
+            g = self._group(f"key.{i}", {"en": "hi", "de": f"Er sagte „Hallo {i}“."})
+            groups[g.key] = g
+
+        findings = collect_quote_style_findings(groups, ["en", "de"], "en")
+        assert findings == []
+
+    def test_rule_3_dominant_disagrees_with_valid_flags_every_dominant_instance(self):
+        # "de"'s built-in valid style is LOW_HIGH_9_9, but every translation actually uses
+        # STRAIGHT quotes -- since the dominant style disagrees with the expected one, every
+        # instance of the dominant style is a finding.
+        groups = {}
+        for i in range(3):
+            g = self._group(f"key.{i}", {"en": "hi", "de": f'Er sagte "Hallo {i}".'})
+            groups[g.key] = g
+
+        findings = collect_quote_style_findings(groups, ["en", "de"], "en")
+        quote_findings = [
+            f for f in findings if f.signal == QualityHeuristicKind.QUOTE_STYLE_MISMATCH
+        ]
+        assert len(quote_findings) == 3
+        for f in quote_findings:
+            assert f.locale == ""
+            assert f.notes == "de"
+
+    def test_matches_valid_style_is_not_flagged_even_when_dominant_disagrees(self):
+        # Same scenario as above, but one entry correctly uses the expected LOW_HIGH_9_9 style --
+        # that one must not be flagged even though the corpus-wide dominant style is STRAIGHT.
+        groups = {}
+        for i in range(3):
+            g = self._group(f"key.{i}", {"en": "hi", "de": f'Er sagte "Hallo {i}".'})
+            groups[g.key] = g
+        correct = self._group("key.correct", {"en": "hi", "de": "Er sagte „Hallo“."})
+        groups[correct.key] = correct
+
+        findings = collect_quote_style_findings(groups, ["en", "de"], "en")
+        flagged_msgids = {f.key_msgid for f in findings}
+        assert "key.correct" not in flagged_msgids
+        assert "key.0" in flagged_msgids
+
+    def test_rule_4_outlier_neither_dominant_nor_valid_is_flagged(self):
+        # Dominant for "de" is STRAIGHT (majority); valid (built-in) is LOW_HIGH_9_9. A value
+        # using guillemets matches neither and must be flagged as an outlier.
+        groups = {}
+        for i in range(3):
+            g = self._group(f"key.{i}", {"en": "hi", "de": f'Er sagte "Hallo {i}".'})
+            groups[g.key] = g
+        outlier = self._group("key.outlier", {"en": "hi", "de": "Er sagte «Hallo»."})
+        groups[outlier.key] = outlier
+
+        findings = collect_quote_style_findings(groups, ["en", "de"], "en")
+        flagged_msgids = {f.key_msgid for f in findings}
+        assert "key.outlier" in flagged_msgids
+
+    def test_uncurated_locale_falls_back_to_dominant_only(self):
+        # "it" has no built-in valid style. Matching the dominant style should not be flagged;
+        # an outlier that doesn't match the dominant style should be flagged.
+        groups = {}
+        for i in range(3):
+            g = self._group(f"key.{i}", {"en": "hi", "it": f'Ha detto "Ciao {i}".'})
+            groups[g.key] = g
+        outlier = self._group("key.outlier", {"en": "hi", "it": "Ha detto «Ciao»."})
+        groups[outlier.key] = outlier
+
+        findings = collect_quote_style_findings(groups, ["en", "it"], "en")
+        flagged_msgids = {f.key_msgid for f in findings}
+        assert flagged_msgids == {"key.outlier"}
+
+    def test_locale_with_no_detected_quote_style_anywhere_produces_no_findings(self):
+        groups = {}
+        for i in range(3):
+            g = self._group(f"key.{i}", {"en": "hi", "pt": f"Ola, sem aspas aqui {i}."})
+            groups[g.key] = g
+
+        findings = collect_quote_style_findings(groups, ["en", "pt"], "en")
+        assert findings == []
+
+    def test_project_override_takes_precedence_over_builtin_default(self):
+        # "de" built-in default is LOW_HIGH_9_9, but the project explicitly wants STRAIGHT.
+        groups = {}
+        for i in range(3):
+            g = self._group(f"key.{i}", {"en": "hi", "de": f'Er sagte "Hallo {i}".'})
+            groups[g.key] = g
+
+        findings = collect_quote_style_findings(
+            groups, ["en", "de"], "en", quote_style_overrides={"de": "straight"}
+        )
+        assert findings == []
+
+    def test_invalid_override_value_falls_back_to_builtin_default(self):
+        groups = {}
+        for i in range(3):
+            g = self._group(f"key.{i}", {"en": "hi", "de": f'Er sagte "Hallo {i}".'})
+            groups[g.key] = g
+
+        findings = collect_quote_style_findings(
+            groups, ["en", "de"], "en", quote_style_overrides={"de": "not-a-real-style"}
+        )
+        # Falls back to the built-in LOW_HIGH_9_9 default, so STRAIGHT instances are flagged.
+        assert len(findings) == 3
+
+    def test_excluded_msgids_are_skipped(self):
+        g = self._group("key.excluded", {"en": "hi", "de": 'Er sagte "Hallo".'})
+        findings = collect_quote_style_findings(
+            {g.key: g}, ["en", "de"], "en", excluded_msgids={"key.excluded"}
+        )
+        assert findings == []
+
+    def test_multiple_mismatched_locales_in_one_key_are_grouped_into_one_finding(self):
+        # de and pl both have built-in valid styles (LOW_HIGH_9_9 / LOW_HIGH_9_0); a straight-
+        # quoted value in both should collapse into one grouped finding, not two rows.
+        groups = {}
+        for i in range(3):
+            g = self._group(
+                f"key.{i}",
+                {"en": "hi", "de": f'Er sagte "Hallo {i}".', "pl": f'Powiedzial "Czesc {i}".'},
+            )
+            groups[g.key] = g
+
+        findings = collect_quote_style_findings(groups, ["en", "de", "pl"], "en")
+        quote_findings = [
+            f for f in findings if f.signal == QualityHeuristicKind.QUOTE_STYLE_MISMATCH
+        ]
+        assert len(quote_findings) == 3  # one per key, not one per key-locale pair
+        for f in quote_findings:
+            assert set(f.notes.split(", ")) == {"de", "pl"}
+
+    def test_collect_project_quality_findings_respects_quote_style_override(self):
+        g = self._group("key.a", {"en": "hi", "de": 'Er sagte "Hallo".'})
+        qf = collect_project_quality_findings(
+            {g.key: g},
+            ["en", "de"],
+            "en",
+            quote_style_overrides={"de": "straight"},
+        )
+        signals = {f.signal for f in qf.findings}
+        # Matches the (overridden) expected style, so no quote-style finding.
+        assert QualityHeuristicKind.QUOTE_STYLE_MISMATCH not in signals
+
+    def test_collect_project_quality_findings_flags_quote_style_without_override(self):
+        g = self._group("key.a", {"en": "hi", "de": 'Er sagte "Hallo".'})
+        qf = collect_project_quality_findings({g.key: g}, ["en", "de"], "en")
+        signals = {f.signal for f in qf.findings}
+        assert QualityHeuristicKind.QUOTE_STYLE_MISMATCH in signals

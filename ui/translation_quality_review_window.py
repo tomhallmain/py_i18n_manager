@@ -122,7 +122,7 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         super().__init__(
             parent=parent,
             title=_("Translation Quality Review"),
-            geometry="760x620",
+            geometry="1080x620",
             offset_x=40,
             offset_y=40,
         )
@@ -169,16 +169,18 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         page = QWidget()
         layout = QVBoxLayout(page)
 
-        layout.addWidget(
-            QLabel(
-                _(
-                    "Built-in checks: non-Latin-script locales with Latin words/runs and a separate mixed-script Latin-leakage signal; translations identical "
-                    "to the default locale or to other non-default locales; advisory check for trailing sentence-stop mismatches vs. the default "
-                    "(extra, missing, or wrong stop for the locale). Each finding is one row per key, with all affected locales listed in Locales. "
-                    "Respects project exclusions and ignore patterns. (English-ratio heuristic reserved.)"
-                )
+        heuristic_intro = QLabel(
+            _(
+                "Built-in checks: non-Latin-script locales with Latin words/runs and a separate mixed-script Latin-leakage signal; translations identical "
+                "to the default locale or to other non-default locales; advisory check for trailing sentence-stop mismatches vs. the default "
+                "(extra, missing, or wrong stop for the locale); quote-character style mismatches vs. the locale's expected style "
+                "(project setting, else a built-in per-language default, else the locale's own dominant style in the catalog). "
+                "Each finding is one row per key, with all affected locales listed in Locales. "
+                "Respects project exclusions and ignore patterns. (English-ratio heuristic reserved.)"
             )
         )
+        heuristic_intro.setWordWrap(True)
+        layout.addWidget(heuristic_intro)
         filter_box = QGroupBox(_("Filters"))
         filter_layout = QGridLayout(filter_box)
         filter_layout.addWidget(QLabel(_("Key contains:")), 0, 0)
@@ -289,14 +291,14 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         page = QWidget()
         layout = QVBoxLayout(page)
 
-        layout.addWidget(
-            QLabel(
-                _(
-                    "Per-project rules saved in application settings. The rule engine may "
-                    "still be extended; use “Run custom rules” to evaluate when implemented."
-                )
+        rules_intro = QLabel(
+            _(
+                "Per-project rules saved in application settings. The rule engine may "
+                "still be extended; use “Run custom rules” to evaluate when implemented."
             )
         )
+        rules_intro.setWordWrap(True)
+        layout.addWidget(rules_intro)
 
         rules_box = QGroupBox(_("Custom rules"))
         rules_layout = QVBoxLayout(rules_box)
@@ -346,16 +348,16 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         page = QWidget()
         layout = QVBoxLayout(page)
 
-        layout.addWidget(
-            QLabel(
-                _(
-                    "Optional catalog-wide LLM review sends token-batched TSV slices to your local "
-                    "Ollama model, updates a rolling summary between batches, then requests a "
-                    "final report. Requires loaded translations (e.g. Check Status). Cancel stops "
-                    "between batches; the current request may still finish."
-                )
+        llm_intro = QLabel(
+            _(
+                "Optional catalog-wide LLM review sends token-batched TSV slices to your local "
+                "Ollama model, updates a rolling summary between batches, then requests a "
+                "final report. Requires loaded translations (e.g. Check Status). Cancel stops "
+                "between batches; the current request may still finish."
             )
         )
+        llm_intro.setWordWrap(True)
+        layout.addWidget(llm_intro)
         self._llm_output = QTextEdit()
         self._llm_output.setReadOnly(True)
         self._llm_output.setPlaceholderText(

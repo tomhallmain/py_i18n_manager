@@ -255,6 +255,7 @@ class QualityHeuristicKind(str, Enum):
     LATIN_MIXED_SCRIPT_IN_NON_LATIN_LOCALE = "latin_mixed_script_in_non_latin_locale"
     HIGH_ENGLISH_RATIO = "high_english_ratio"
     STOP_CHARACTER_INCONSISTENCY = "stop_character_inconsistency"
+    QUOTE_STYLE_MISMATCH = "quote_style_mismatch"
 
     @classmethod
     def from_signal(cls, signal: str) -> Optional["QualityHeuristicKind"]:
@@ -283,6 +284,11 @@ class QualityHeuristicKind(str, Enum):
             return _(
                 "Trailing sentence stop does not match the default locale (missing, extra, or wrong character for this locale)."
             )
+        if self is QualityHeuristicKind.QUOTE_STYLE_MISMATCH:
+            return _(
+                "Quote characters do not match the expected style for this locale "
+                "(e.g. straight \" \" vs. locale-specific „ “ / « » / 「 」)."
+            )
         raise AssertionError(f"unhandled heuristic: {self!r}")
 
     def get_display_name(self) -> str:
@@ -298,6 +304,8 @@ class QualityHeuristicKind(str, Enum):
             return _("High English ratio")
         if self is QualityHeuristicKind.STOP_CHARACTER_INCONSISTENCY:
             return _("Stop character inconsistency")
+        if self is QualityHeuristicKind.QUOTE_STYLE_MISMATCH:
+            return _("Quote style mismatch")
         raise AssertionError(f"unhandled heuristic: {self!r}")
 
     def get_display_details(self) -> str:
