@@ -9,6 +9,7 @@ set of signal names visibly reflowed every column after it.
 
 import os
 import time
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -264,6 +265,30 @@ class TestCatalogLlmWorkerModelSelection:
         assert llm_arg.model_name == SettingsManager.DEFAULT_LLM_MODEL_MULTI_LOCALE
 
 
+class _InstantFailLlm:
+    """Stand-in for lib.llm.LLM that fails immediately with no real network I/O.
+
+    TestLlmCatalogReviewThreading starts a real _CatalogLlmWorker/QThread on purpose (that's the
+    thing under test), but originally relied on "no Ollama server is listening on localhost, so
+    the connection fails instantly" to keep that real thread short-lived. That assumption doesn't
+    hold in every sandbox -- a firewalled/dropped connection can hang for the full multi-minute
+    LLM timeout instead of failing instantly, which raced QThread.wait(5000) in teardown against
+    isolated_settings_and_cache_env's temp-dir cleanup and could leave a stray
+    tests/.tmp_llm_catalog_threading_*/ directory behind (still being written into by the still-
+    running background thread when shutil.rmtree ran). Using this fake instead of the real LLM
+    class removes the network dependency entirely: the worker thread now fails synchronously,
+    with no I/O and no timing assumptions.
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        pass
+
+    def generate_response(self, *args, **kwargs):
+        from lib.llm import LLMResponseException
+
+        raise LLMResponseException("no server in tests")
+
+
 @pytest.mark.skipif(not _HAS_PYQT6, reason="PyQt6 not installed in this environment")
 class TestLlmCatalogReviewThreading:
     """Regression tests for two bugs in the LLM review tab's threading:
@@ -275,10 +300,10 @@ class TestLlmCatalogReviewThreading:
        the in-flight LLM HTTP call can't be interrupted mid-request, so this froze the UI on
        close instead of letting the background thread finish/cancel on its own.
 
-    Starting the real worker thread here is safe/fast: there's no Ollama server listening on
-    localhost in the test environment, so the request fails immediately with a connection error
-    (no multi-minute timeout involved), and QThread.isRunning() is documented to become true
-    synchronously as part of start(), before the underlying OS thread necessarily runs any code.
+    Starts a real worker thread (see _InstantFailLlm for why lib.llm.LLM itself is patched out):
+    QThread.isRunning() is documented to become true synchronously as part of start(), before the
+    underlying OS thread necessarily runs any code, so this is still exercising real Qt threading
+    behavior, just without a real network call underneath it.
     """
 
     @classmethod
@@ -287,7 +312,22 @@ class TestLlmCatalogReviewThreading:
 
     def setup_method(self):
         self._env_ctx = isolated_settings_and_cache_env(prefix=".tmp_llm_catalog_threading_")
-        self._env_ctx.__enter__()
+        env = self._env_ctx.__enter__()
+
+        # These tests start a real _CatalogLlmWorker/QThread (see class docstring), which -- for
+        # any run with translations loaded -- creates a llm_review_output/<timestamp>/ directory
+        # via i18n.llm_catalog_review.ReviewResponseLog before the (now fake) LLM call fails.
+        # Without this patch that would write real (if empty) directories into the actual repo on
+        # every test run instead of the isolated temp dir.
+        from i18n import llm_catalog_review
+
+        self._review_log_root_patcher = patch.object(
+            llm_catalog_review, "REVIEW_LOG_ROOT", Path(env["root"]) / "llm_review_output"
+        )
+        self._review_log_root_patcher.start()
+
+        self._llm_class_patcher = patch("lib.llm.LLM", _InstantFailLlm)
+        self._llm_class_patcher.start()
 
         from ui.translation_quality_review_window import TranslationQualityReviewWindow
 
@@ -318,6 +358,8 @@ class TestLlmCatalogReviewThreading:
         if self.window._llm_thread is not None:
             self.window._llm_thread.wait(5000)
         self.window.deleteLater()
+        self._llm_class_patcher.stop()
+        self._review_log_root_patcher.stop()
         self._env_ctx.__exit__(None, None, None)
 
     def test_cancel_button_enabled_immediately_after_starting_llm_analysis(self):
@@ -361,3 +403,42 @@ class TestLlmCatalogReviewThreading:
             worker.finished.disconnect(self.window._on_llm_finished)
         with pytest.raises((TypeError, RuntimeError)):
             worker.progress.disconnect(self.window._on_llm_progress)
+
+    def test_on_llm_finished_does_not_drop_thread_reference(self):
+        """Regression test for a crash ("QThread: Destroyed while thread is still running")
+        that aborted the whole process at the end of a real catalog review.
+
+        worker.finished fires the instant worker.run() returns -- *before* the QThread's own
+        event loop has processed quit() and actually unwound, so isRunning() can still be True
+        at that point. self._llm_thread is the only Python reference to an unparented QThread,
+        so nulling it out there raced against Qt's own shutdown: lose the race and PyQt deletes
+        a still-running QThread. Cleanup must instead wait for thread.finished, which Qt only
+        emits once the thread has genuinely stopped (see _cleanup_llm_thread).
+
+        Deliberately uses plain sentinel objects rather than a real QThread: an earlier version
+        of this test started a real background worker/thread and then called _cleanup_llm_thread()
+        on it directly. Nothing pumped the Qt event loop, so the thread's queued quit() was never
+        actually delivered and the thread was still genuinely running -- calling
+        _cleanup_llm_thread() at that point didn't simulate the race, it reproduced the real
+        crash, and aborted the whole pytest process (no traceback, just a dead run). The
+        assertions below only care about *which method touches which attribute*, so plain
+        sentinels are enough and there is no real thread to race against.
+        """
+        from i18n.llm_catalog_review import CatalogLlmReviewResult
+
+        sentinel_thread = object()
+        sentinel_worker = object()
+        self.window._llm_thread = sentinel_thread
+        self.window._llm_worker = sentinel_worker
+
+        result = CatalogLlmReviewResult(final_report="ok", rolling_summary="", error_message=None)
+        self.window._on_llm_finished(result)
+
+        # Simulates the moment worker.finished fires: references must survive this call.
+        assert self.window._llm_thread is sentinel_thread
+        assert self.window._llm_worker is sentinel_worker
+
+        # Simulates thread.finished actually firing: only now is clearing safe.
+        self.window._cleanup_llm_thread()
+        assert self.window._llm_thread is None
+        assert self.window._llm_worker is None

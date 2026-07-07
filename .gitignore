@@ -46,6 +46,10 @@ htmlcov/
 .tox/
 .nox/
 
+# Per-test isolated settings/cache/config dirs (see tests/test_utils.isolated_settings_and_cache_env);
+# normally self-cleaning via TemporaryDirectory, but can survive a hard-killed/interrupted test run.
+tests/.tmp_*
+
 # Misc
 temp*
 *.log
@@ -54,3 +58,6 @@ temp*
 
 configs/*
 !configs/default_config.json
+
+# Raw LLM catalog review prompts/responses (see i18n/llm_catalog_review.ReviewResponseLog)
+llm_review_output/

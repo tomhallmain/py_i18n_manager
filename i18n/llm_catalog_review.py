@@ -9,7 +9,10 @@ for these calls because catalog text is multilingual; optional CJK ratio logging
 
 from __future__ import annotations
 
+import datetime
+import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, TYPE_CHECKING
 
 from utils.logging_setup import get_logger
@@ -34,6 +37,47 @@ _ = I18N._
 MAX_ROLLING_SUMMARY_CHARS = 8000
 # Always attach system prompts for catalog review (no random drop).
 SYSTEM_PROMPT_ALWAYS = 0.0
+
+# lib.llm.LLM only ever logs a response's *length*, never its content (see LLM.generate_response),
+# so a run's intermediate batch findings and rolling merges exist only in memory unless saved here
+# -- if the process dies before the final report is produced (a crash, or the user closing the
+# app), that in-memory history is gone. Each response is written to disk immediately as it comes
+# in, one markdown file per call, so nothing is lost even if a later call in the same run fails.
+REVIEW_LOG_ROOT = Path(__file__).resolve().parent.parent / "llm_review_output"
+
+
+class ReviewResponseLog:
+    """Saves each prompt/response pair from one catalog review run as its own markdown file
+    under :data:`REVIEW_LOG_ROOT`/<run timestamp>/. Best-effort: a logging failure (e.g. a
+    read-only filesystem) is reported via ``on_progress`` and otherwise ignored -- it must never
+    fail the review itself.
+    """
+
+    def __init__(self, on_progress: Optional[Callable[[str], None]] = None) -> None:
+        self._n = 0
+        self.dir: Optional[Path] = None
+        try:
+            run_dir = REVIEW_LOG_ROOT / datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            run_dir.mkdir(parents=True, exist_ok=True)
+            self.dir = run_dir
+        except OSError as e:
+            logger.warning("Could not create LLM review log directory: %s", e, exc_info=True)
+            if on_progress:
+                on_progress(_("Could not create LLM review log directory ({err}).").format(err=e))
+
+    def write(self, label: str, prompt: str, response: str) -> None:
+        if self.dir is None:
+            return
+        self._n += 1
+        slug = re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-") or "response"
+        path = self.dir / f"{self._n:02d}_{slug}.md"
+        try:
+            path.write_text(
+                f"# {label}\n\n## Prompt\n\n```\n{prompt}\n```\n\n## Response\n\n{response}\n",
+                encoding="utf-8",
+            )
+        except OSError as e:
+            logger.warning("Could not write LLM review log file %s: %s", path, e, exc_info=True)
 
 
 def response_language_name_for_prompts() -> str:
@@ -133,6 +177,7 @@ def merge_rolling_summary_with_llm(
     batch_total: int,
     response_language: str,
     on_progress: Optional[Callable[[str], None]] = None,
+    review_log: Optional[ReviewResponseLog] = None,
 ) -> str:
     """Compress previous rolling notes + new batch findings into the next rolling state."""
     system = _(
@@ -159,6 +204,8 @@ def merge_rolling_summary_with_llm(
     )
     try:
         out = _llm_generate(llm, user, system_prompt=system, timeout=2000)
+        if review_log:
+            review_log.write(f"batch-{batch_index + 1:02d}-merge", user, out)
         if not out:
             if on_progress:
                 on_progress(_("Rolling merge returned empty; using local merge fallback."))
@@ -235,11 +282,15 @@ def run_catalog_llm_review(
     *,
     on_progress: Optional[Callable[[str], None]] = None,
     should_cancel: Optional[Callable[[], bool]] = None,
+    log_responses: bool = True,
 ) -> CatalogLlmReviewResult:
     """
     Run batch review, updating rolling summary after each batch, then a final synthesis call.
 
     ``on_progress`` receives human-readable status lines (also translated when called from UI thread).
+    ``log_responses`` saves each raw prompt/response pair to markdown files as they arrive (see
+    :class:`ReviewResponseLog`); disable for non-real runs (e.g. a fake/instant LLM) where there's
+    nothing worth keeping.
     """
     response_lang = response_language_name_for_prompts()
     batches = iter_llm_catalog_batches_for_project(
@@ -252,6 +303,10 @@ def run_catalog_llm_review(
             rolling_summary="",
             error_message=None,
         )
+
+    review_log = ReviewResponseLog(on_progress) if log_responses else None
+    if review_log and review_log.dir and on_progress:
+        on_progress(_("Saving LLM responses to {dir}").format(dir=review_log.dir))
 
     system_batch = _(
         "You are an expert software localization reviewer. Translation data is grouped into "
@@ -299,6 +354,8 @@ def run_catalog_llm_review(
             )
 
         batch_findings_list.append(findings)
+        if review_log:
+            review_log.write(f"batch-{i + 1:02d}-findings", user, findings)
         _maybe_log_script_mismatch(findings, response_lang, on_progress)
 
         if on_progress:
@@ -312,6 +369,7 @@ def run_catalog_llm_review(
             batch_total=n,
             response_language=response_lang,
             on_progress=on_progress,
+            review_log=review_log,
         )
         merge_tx.append(rolling)
 
@@ -331,6 +389,8 @@ def run_catalog_llm_review(
     final_user = build_final_summary_user_prompt(rolling, response_lang, n)
     try:
         final_report = _llm_generate(llm, final_user, system_prompt=system_final, timeout=2000)
+        if review_log:
+            review_log.write("final-report", final_user, final_report)
     except Exception as e:
         logger.error("Final summary LLM failed: %s", e, exc_info=True)
         return CatalogLlmReviewResult(

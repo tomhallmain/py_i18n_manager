@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Optional, Set
 from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QAction, QStandardItem
 from PyQt6.QtWidgets import (
+    QApplication,
     QComboBox,
     QFileDialog,
     QGridLayout,
@@ -45,7 +46,9 @@ from i18n.llm_catalog_review import CatalogLlmReviewResult
 from i18n.translation_group import TranslationKey
 from i18n.translation_manager_results import TranslationAction, TranslationManagerResults
 from ui.base_translation_window import BaseTranslationWindow, create_frozen_translation_table
+from ui.llm_settings_dialog import LLMSettingsDialog
 from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
+from utils.logging_setup import get_logger
 from utils.translations import I18N
 from workers.translation_worker import TranslationWorker
 
@@ -53,6 +56,45 @@ if TYPE_CHECKING:
     from i18n.i18n_manager import I18NManager
 
 _ = I18N._
+
+logger = get_logger("translation_quality_review_window")
+
+
+class _FakeInstantLlm:
+    """Stand-in for :class:`lib.llm.LLM` used by the "Simulate" button (see
+    :meth:`TranslationQualityReviewWindow._on_run_simulated_llm_analysis`).
+
+    Answers every ``generate_response`` call immediately with canned text, so a simulated run
+    drives the exact same worker/QThread lifecycle as a real one -- the same sequence of
+    ``finished``/``progress`` signals, the same number of round trips through
+    :func:`i18n.llm_catalog_review.run_catalog_llm_review` -- with no network I/O and no LLM
+    credits spent. Exists to let that lifecycle (see ``_launch_llm_worker`` /
+    ``_cleanup_llm_thread``) be re-verified quickly and repeatedly after touching it, instead of
+    paying for a real multi-minute catalog review just to reach the same code path.
+    """
+
+    def __init__(self) -> None:
+        self._call_count = 0
+
+    def generate_response(self, query, timeout=None, context=None, system_prompt=None,
+                           system_prompt_drop_rate=None, cjk_reject_threshold_percentage=None):
+        from lib.llm import LLMResult
+
+        self._call_count += 1
+        return LLMResult(
+            response=f"[simulated response #{self._call_count}]",
+            context=None,
+            context_provided=False,
+            created_at="",
+            done=True,
+            done_reason="stop",
+            total_duration=0,
+            load_duration=0,
+            prompt_eval_count=0,
+            prompt_eval_duration=0,
+            eval_count=0,
+            eval_duration=0,
+        )
 
 
 class _CatalogLlmWorker(QObject):
@@ -68,6 +110,7 @@ class _CatalogLlmWorker(QObject):
         default_locale: str,
         settings_manager,
         project_path: str,
+        llm_override: Optional[object] = None,
     ):
         super().__init__()
         self._translations = translations
@@ -75,6 +118,7 @@ class _CatalogLlmWorker(QObject):
         self._default_locale = default_locale
         self._settings_manager = settings_manager
         self._project_path = project_path
+        self._llm_override = llm_override
         self._cancel = False
 
     def cancel(self) -> None:
@@ -82,14 +126,18 @@ class _CatalogLlmWorker(QObject):
 
     def run(self) -> None:
         from i18n.llm_catalog_review import run_catalog_llm_review
-        from lib.llm import LLM
-        from utils.settings_manager import SettingsManager
 
-        if self._settings_manager:
-            model_name = self._settings_manager.get_llm_model_multi_locale(self._project_path)
+        if self._llm_override is not None:
+            llm = self._llm_override
         else:
-            model_name = SettingsManager.DEFAULT_LLM_MODEL_MULTI_LOCALE
-        llm = LLM(model_name=model_name, state_key=model_name)
+            from lib.llm import LLM
+            from utils.settings_manager import SettingsManager
+
+            if self._settings_manager:
+                model_name = self._settings_manager.get_llm_model_multi_locale(self._project_path)
+            else:
+                model_name = SettingsManager.DEFAULT_LLM_MODEL_MULTI_LOCALE
+            llm = LLM(model_name=model_name, state_key=model_name)
         try:
             result = run_catalog_llm_review(
                 llm,
@@ -100,6 +148,7 @@ class _CatalogLlmWorker(QObject):
                 self._project_path,
                 on_progress=lambda m: self.progress.emit(m),
                 should_cancel=lambda: self._cancel,
+                log_responses=self._llm_override is None,
             )
         except Exception as e:
             result = CatalogLlmReviewResult(
@@ -141,6 +190,10 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         self._heuristic_worker: Optional[TranslationWorker] = None
         self._llm_thread: Optional[QThread] = None
         self._llm_worker: Optional[_CatalogLlmWorker] = None
+
+        app = QApplication.instance()
+        if app is not None:
+            app.aboutToQuit.connect(self._on_app_about_to_quit)
 
         self._setup_ui()
         self._refresh_lists_from_settings()
@@ -345,6 +398,12 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         dlg.settings_saved.connect(self._on_exclusions_saved)
         dlg.exec()
 
+    def _open_llm_settings(self) -> None:
+        """Open the LLM settings dialog."""
+        dialog = LLMSettingsDialog(project_path=self.project_path, parent=self)
+        dialog.settings_saved.connect(self.reload_translation_service_settings)
+        dialog.exec()
+
     def _on_exclusions_saved(self) -> None:
         self._refresh_lists_from_settings()
         self._update_settings_dependent_controls()
@@ -386,6 +445,21 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         self._cancel_llm_btn.setToolTip(_("Request stop after the current batch completes."))
         self._cancel_llm_btn.clicked.connect(self._on_cancel_llm_analysis)
         llm_row.addWidget(self._cancel_llm_btn)
+        self._llm_settings_btn = QPushButton(_("LLM Settings"))
+        self._llm_settings_btn.clicked.connect(self._open_llm_settings)
+        self._llm_settings_btn.setToolTip(_("Configure LLM translation prompt template"))
+        llm_row.addWidget(self._llm_settings_btn)
+        self._simulate_llm_btn = QPushButton(_("Simulate (no network)"))
+        self._simulate_llm_btn.setToolTip(
+            _(
+                "Runs the same background worker/thread lifecycle as a real review, but "
+                "answers every model call locally and instantly instead of calling Ollama -- "
+                "no network calls, no LLM credits used. For re-testing the review pipeline "
+                "itself (e.g. after changing its threading code) without paying for a real run."
+            )
+        )
+        self._simulate_llm_btn.clicked.connect(self._on_run_simulated_llm_analysis)
+        llm_row.addWidget(self._simulate_llm_btn)
         llm_row.addStretch()
         layout.addLayout(llm_row)
 
@@ -419,6 +493,7 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         has_catalog = has_mgr and bool(self._i18n_manager.translations)
         llm_running = self._llm_thread is not None and self._llm_thread.isRunning()
         self._run_llm_btn.setEnabled(has_catalog and not llm_running)
+        self._simulate_llm_btn.setEnabled(not llm_running)
         self._cancel_llm_btn.setEnabled(llm_running)
         self._export_filtered_btn.setEnabled(bool(self._heuristic_rows))
 
@@ -630,6 +705,17 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         self._heuristic_worker = None
 
     def _cleanup_llm_thread(self) -> None:
+        """Drop our references once the QThread has actually stopped running.
+
+        Connected to ``thread.finished``, not ``worker.finished``: ``worker.finished`` fires the
+        instant ``worker.run()`` returns, which is *before* the QThread's own event loop has
+        processed ``quit()`` and unwound -- ``isRunning()`` can still be True at that point.
+        ``self._llm_thread`` is an un-parented QThread, so clearing this (its last Python
+        reference) makes PyQt delete the underlying C++ object immediately; deleting a QThread
+        while it isRunning() aborts the whole process ("QThread: Destroyed while thread is still
+        running"). ``thread.finished`` only fires once the thread has truly finished, so clearing
+        here is safe.
+        """
         self._llm_worker = None
         self._llm_thread = None
         self._update_settings_dependent_controls()
@@ -639,6 +725,7 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
 
     def _on_llm_finished(self, result: object) -> None:
         self._run_llm_btn.setText(_("Run LLM analysis"))
+        self._simulate_llm_btn.setText(_("Simulate (no network)"))
         if isinstance(result, CatalogLlmReviewResult):
             cr = result
             if cr.final_report.strip():
@@ -658,7 +745,8 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
                         _("LLM review"),
                         cr.error_message,
                     )
-        self._cleanup_llm_thread()
+        # Reference cleanup happens in _cleanup_llm_thread(), via thread.finished (see there) --
+        # not here, since worker.finished fires too early to safely drop the QThread reference.
 
     def _on_cancel_llm_analysis(self) -> None:
         if self._llm_worker:
@@ -670,6 +758,32 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
                     "completes (the LLM call in progress cannot be interrupted mid-flight)."
                 )
             )
+
+    def _launch_llm_worker(self, worker: "_CatalogLlmWorker") -> None:
+        """Wire up and start a ``_CatalogLlmWorker`` on its own ``QThread``.
+
+        Shared by ``_on_run_llm_analysis`` (real review) and
+        ``_on_run_simulated_llm_analysis`` (fake, instant LLM, see ``_FakeInstantLlm``) so both
+        exercise the exact same thread lifecycle -- see ``_cleanup_llm_thread`` for why cleanup
+        must be gated on ``thread.finished`` rather than ``worker.finished``.
+        """
+        thread = QThread()
+        worker.moveToThread(thread)
+        self._llm_worker = worker
+        self._llm_thread = thread
+
+        thread.started.connect(worker.run)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(self._cleanup_llm_thread)
+        worker.finished.connect(self._on_llm_finished)
+        worker.progress.connect(self._on_llm_progress)
+
+        thread.start()
+        # Must run after thread.start(): _update_settings_dependent_controls() enables Cancel
+        # based on self._llm_thread.isRunning(), which is only true once the thread has started.
+        self._update_settings_dependent_controls()
 
     def _on_run_llm_analysis(self) -> None:
         if not self._i18n_manager or not self._i18n_manager.translations:
@@ -693,23 +807,54 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
             self.settings_manager,
             project_path,
         )
-        thread = QThread()
-        worker.moveToThread(thread)
-        self._llm_worker = worker
-        self._llm_thread = thread
-
-        thread.started.connect(worker.run)
-        worker.finished.connect(thread.quit)
-        worker.finished.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
-        worker.finished.connect(self._on_llm_finished)
-        worker.progress.connect(self._on_llm_progress)
-
         self._run_llm_btn.setText(_("Running…"))
-        thread.start()
-        # Must run after thread.start(): _update_settings_dependent_controls() enables Cancel
-        # based on self._llm_thread.isRunning(), which is only true once the thread has started.
-        self._update_settings_dependent_controls()
+        self._launch_llm_worker(worker)
+
+    @staticmethod
+    def _simulated_catalog():
+        """Small in-memory catalog for ``_on_run_simulated_llm_analysis`` when no real project
+        is loaded, so the simulate button always has something to batch/review."""
+        from i18n.translation_group import TranslationGroup
+
+        groups = {}
+        for i in range(3):
+            g = TranslationGroup(f"simulated.key.{i}", is_in_base=True)
+            g.default_locale = "en"
+            g.add_translation("en", f"Simulated source string {i}")
+            g.add_translation("de", f"Simulierter Zielstring {i}")
+            groups[g.key] = g
+        return groups, ["en", "de"], "en"
+
+    def _on_run_simulated_llm_analysis(self) -> None:
+        """Smoke-test the worker/QThread lifecycle with a fake, instant LLM.
+
+        No network calls, no LLM credits spent -- see ``_FakeInstantLlm``. Uses the loaded
+        project's real catalog (for a realistic batch count) if one is loaded, otherwise a tiny
+        synthetic one, so this always works standalone.
+        """
+        if self._llm_thread and self._llm_thread.isRunning():
+            return
+
+        if self._i18n_manager and self._i18n_manager.translations:
+            translations = self._i18n_manager.translations
+            locales = list(self._i18n_manager.locales)
+            default_locale = self._i18n_manager.default_locale
+        else:
+            translations, locales, default_locale = self._simulated_catalog()
+
+        self._llm_output.clear()
+        self._llm_output.append(_("Starting simulated LLM review (no network, no credits)…"))
+
+        worker = _CatalogLlmWorker(
+            translations,
+            locales,
+            default_locale,
+            self.settings_manager,
+            self.project_path or "",
+            llm_override=_FakeInstantLlm(),
+        )
+        self._simulate_llm_btn.setText(_("Running…"))
+        self._launch_llm_worker(worker)
 
     def _on_run_heuristic_analysis(self) -> None:
         if not self.project_path or not self._i18n_manager:
@@ -767,6 +912,28 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         self._sync_filter_options_from_rows()
         self._apply_heuristic_filters()
         self._update_settings_dependent_controls()
+
+    def _on_app_about_to_quit(self) -> None:
+        """Give the catalog LLM thread a bounded chance to stop before the process tears down.
+
+        closeEvent() deliberately does *not* wait here (see its comment): a normal window close
+        just detaches this window and lets the thread finish/clean up on its own, whenever that
+        turns out to be. At real application exit there is no "later" left for that -- once
+        aboutToQuit returns, Qt starts destroying QThread objects, and destroying one that is
+        still isRunning() (e.g. blocked in the in-flight HTTP call) aborts the whole process
+        with "QThread: Destroyed while thread is still running" rather than raising a catchable
+        Python exception. So this is the one place a bounded wait (with a forced terminate() as
+        a last resort) is worth the brief delay on quit.
+        """
+        if self._llm_worker:
+            self._llm_worker.cancel()
+        thread = self._llm_thread
+        if thread and thread.isRunning():
+            thread.quit()
+            if not thread.wait(5000):
+                logger.warning("LLM review thread did not stop before app exit; terminating it.")
+                thread.terminate()
+                thread.wait()
 
     def closeEvent(self, event) -> None:
         self._disconnect_heuristic_worker()
