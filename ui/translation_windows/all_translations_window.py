@@ -14,6 +14,7 @@ from PyQt6.QtGui import QAction
 from i18n.translation_group import TranslationGroup, TranslationKey
 from ui.app_style import AppStyle
 from ui.translation_windows.base_translation_window import BaseTranslationWindow
+from ui.translation_windows.replace_key_window import ReplaceKeyWindow
 from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 from utils.config import config_manager
 from utils.globals import TranslationStatus, TranslationFilter
@@ -120,11 +121,18 @@ class AllTranslationsWindow(BaseTranslationWindow):
         self.revert_btn.clicked.connect(self.revert_changes)
         self.revert_btn.setToolTip(_("Restore all translations to their last saved state, discarding any unsaved edits"))
 
+        self.replace_key_btn = QPushButton(_("Replace Key"))
+        self.replace_key_btn.clicked.connect(self.open_replace_key_window)
+        self.replace_key_btn.setToolTip(
+            _("Replace the selected translation key with a new one, carrying over its translations")
+        )
+
         button_layout.addWidget(save_btn)
         button_layout.addWidget(close_btn)
         button_layout.addWidget(self.exclusions_btn)
         button_layout.addWidget(self.find_replace_btn)
         button_layout.addWidget(self.revert_btn)
+        button_layout.addWidget(self.replace_key_btn)
         button_layout.addWidget(self.unicode_toggle)
         layout.addLayout(button_layout)
         
@@ -408,6 +416,9 @@ class AllTranslationsWindow(BaseTranslationWindow):
         menu.addAction(copy_default)
 
         menu.addSeparator()
+        replace_action = QAction(_("Replace Key"), self)
+        replace_action.triggered.connect(lambda: self.open_replace_key_window(item.row()))
+        menu.addAction(replace_action)
         delete_action = QAction(_("Delete Translation Key"), self)
         delete_action.triggered.connect(lambda: self.delete_translation_group_for_row(item.row()))
         menu.addAction(delete_action)
@@ -461,6 +472,45 @@ class AllTranslationsWindow(BaseTranslationWindow):
             del self.all_translations[key]
             self.translation_group_deleted.emit(key)
             self.load_data(self.all_translations, self.all_locales)
+
+    def open_replace_key_window(self, row: Optional[int] = None):
+        """Open ReplaceKeyWindow for ``row``, or the currently selected row if not given."""
+        if row is None:
+            row = self.table.currentRow()
+        if row is None or row < 0:
+            QMessageBox.information(self, _("Replace Key"), _("Select a translation key first."))
+            return
+        if not self.all_translations:
+            return
+        key = self.get_key_from_row(row)
+        group = self.all_translations.get(key)
+        if not group:
+            QMessageBox.warning(self, _("Replace Key"), _("Could not find the selected translation key."))
+            return
+
+        dialog = ReplaceKeyWindow(
+            self, self.project_path, key, group, self.all_locales, self.all_translations
+        )
+        dialog.key_replaced.connect(self._on_key_replaced)
+        dialog.show()
+
+    def _on_key_replaced(self, old_key, new_group: TranslationGroup):
+        """Apply a ReplaceKeyWindow result: remove the old key, insert the new one, and persist."""
+        if not self.all_translations:
+            return
+        if old_key in self.all_translations:
+            del self.all_translations[old_key]
+        self.all_translations[new_group.key] = new_group
+        # Only signal a deletion if the key text actually changed -- some managers (Ruby/Java/JS)
+        # prune queued-deleted keys from the on-disk tree before merging, which would be a
+        # pointless prune-then-re-add for the "kept the same key, just tweaked values" case.
+        if old_key != new_group.key:
+            self.translation_group_deleted.emit(old_key)
+        for locale in self.all_locales or []:
+            value = new_group.get_translation_as_text(locale)
+            if value:
+                self.translation_updated.emit(locale, [(new_group.key, value)])
+        self.load_data(self.all_translations, self.all_locales)
 
     def save_changes(self):
         """Save all changes made in the table."""

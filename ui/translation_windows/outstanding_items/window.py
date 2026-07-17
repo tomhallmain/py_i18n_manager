@@ -17,6 +17,7 @@ from ui.translation_windows.base_translation_window import BaseTranslationWindow
 from ui.translation_progress_dialog import ETATracker
 from ui.llm_settings_dialog import LLMSettingsDialog
 from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
+from ui.translation_windows.replace_key_window import ReplaceKeyWindow
 from ui.translation_windows.outstanding_items import context_menus, tsv_export
 from ui.translation_windows.outstanding_items.duplicate_prefill import (
     DuplicatePrefillState,
@@ -190,6 +191,12 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.export_tsv_btn.clicked.connect(self.export_outstanding_to_tsv)
         self.export_tsv_btn.setToolTip(_("Export outstanding keys and invalid locale buckets to TSV"))
 
+        self.replace_key_btn = QPushButton(_("Replace Key"))
+        self.replace_key_btn.clicked.connect(self.open_replace_key_window)
+        self.replace_key_btn.setToolTip(
+            _("Replace the selected translation key with a new one, carrying over its translations")
+        )
+
         self.save_btn = QPushButton(_("Save Changes"))
         self.save_btn.clicked.connect(self.save_changes)
         close_btn = QPushButton(_("Close"))
@@ -205,6 +212,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         button_layout.addWidget(self.llm_settings_btn)
         button_layout.addWidget(self.exclusions_btn)
         button_layout.addWidget(self.export_tsv_btn)
+        button_layout.addWidget(self.replace_key_btn)
         button_layout.addWidget(self.save_btn)
         button_layout.addWidget(close_btn)
         button_layout.addWidget(self.unicode_toggle)
@@ -368,6 +376,61 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                     logger.debug("Outstanding list exhausted after delete; triggering immediate batched update")
                     QTimer.singleShot(0, parent.process_batched_updates)
                 self.close()
+
+    def open_replace_key_window(self, row=None):
+        """Open ReplaceKeyWindow for ``row``, or the currently selected row if not given."""
+        if row is None:
+            row = self.table.currentRow()
+        if row is None or row < 0:
+            QMessageBox.information(self, _("Replace Key"), _("Select a translation key first."))
+            return
+        if not hasattr(self, "translations") or not self.translations:
+            return
+        key = self._get_key_from_row(row)
+        group = self.translations.get(key)
+        if not group:
+            QMessageBox.warning(self, _("Replace Key"), _("Could not find the selected translation key."))
+            return
+
+        dialog = ReplaceKeyWindow(
+            self, self.project_path, key, group, self.locales, self.translations
+        )
+        dialog.key_replaced.connect(self._on_key_replaced)
+        dialog.show()
+
+    def _on_key_replaced(self, old_key, new_group):
+        """Apply a ReplaceKeyWindow result: remove the old key (and any duplicate-group
+        siblings it represents, same as delete_translation_group_for_row), insert the new one,
+        and refresh."""
+        if not hasattr(self, "translations") or not self.translations:
+            return
+
+        keys_to_replace = self._prefill.outstanding_duplicate_groups.pop(old_key, [old_key])
+        for del_key in keys_to_replace:
+            if del_key in self.translations:
+                del self.translations[del_key]
+            # Only signal a deletion if the key text actually changed -- some managers
+            # (Ruby/Java/JS) prune queued-deleted keys from the on-disk tree before merging,
+            # which would be a pointless prune-then-re-add for the "kept the same key, just
+            # tweaked values" case.
+            if del_key != new_group.key:
+                self.translation_group_deleted.emit(del_key)
+
+        self.translations[new_group.key] = new_group
+        for locale in self.locales or []:
+            value = new_group.get_translation_as_text(locale)
+            if value:
+                self.translation_updated.emit(locale, [(new_group.key, value)])
+
+        has_items = self.load_data(self.translations, self.locales, skip_duplicate_prompt=True)
+        if not has_items:
+            # Special case: only a replacement (net-zero item count) remained. Force immediate
+            # persistence, same as delete_translation_group_for_row.
+            parent = self.parent()
+            if parent and hasattr(parent, "process_batched_updates"):
+                logger.debug("Outstanding list exhausted after key replace; triggering immediate batched update")
+                QTimer.singleShot(0, parent.process_batched_updates)
+            self.close()
 
     def _clamp_key_column_width(self, logical_index: int, _old_size: int, new_size: int):
         """Keep the first column (Translation Key) at or above its content-based minimum."""

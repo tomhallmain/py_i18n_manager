@@ -59,6 +59,9 @@ def _show_context_menu_for_item(window, item, global_position):
     menu.addAction(fill_missing_with_default)
 
     menu.addSeparator()
+    replace_key = QAction(_("Replace Key"), window)
+    replace_key.triggered.connect(lambda: window.open_replace_key_window(item.row()))
+    menu.addAction(replace_key)
     delete_key = QAction(_("Delete Translation Key"), window)
     delete_key.triggered.connect(lambda: window.delete_translation_group_for_row(item.row()))
     menu.addAction(delete_key)

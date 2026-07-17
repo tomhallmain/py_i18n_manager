@@ -327,6 +327,138 @@ class TestDeleteTranslationGroup(_OutstandingItemsWindowTestBase):
         mock_close.assert_called_once()
 
 
+class TestReplaceKeyWiring(_OutstandingItemsWindowTestBase):
+    def test_open_with_no_selection_shows_info_message(self):
+        with patch(
+            "ui.translation_windows.outstanding_items.window.ReplaceKeyWindow"
+        ) as mock_dialog_cls, patch.object(QMessageBox, "information") as mock_info:
+            self.window.open_replace_key_window()
+
+        mock_info.assert_called_once()
+        mock_dialog_cls.assert_not_called()
+
+    def test_open_with_selected_row_constructs_dialog_with_current_context(self):
+        group = _make_group("greeting", {"en": "Hello", "es": ""})
+        translations = {group.key: group}
+        self.window.load_data(translations, ["en", "es"])
+        self.window.table.setCurrentCell(0, 0)
+
+        with patch(
+            "ui.translation_windows.outstanding_items.window.ReplaceKeyWindow"
+        ) as mock_dialog_cls:
+            mock_dialog = mock_dialog_cls.return_value
+            self.window.open_replace_key_window()
+
+        mock_dialog_cls.assert_called_once_with(
+            self.window, self.window.project_path, group.key, group, ["en", "es"], translations
+        )
+        mock_dialog.key_replaced.connect.assert_called_once_with(self.window._on_key_replaced)
+        mock_dialog.show.assert_called_once()
+
+    def test_key_replaced_swaps_keys_and_emits_signals(self):
+        from i18n.translation_group import TranslationGroup
+
+        old = _make_group("greeting", {"en": "Hello", "es": ""})
+        translations = {old.key: old}
+        self.window.load_data(translations, ["en", "es"])
+
+        new_group = TranslationGroup("Hello there", is_in_base=True)
+        new_group.add_translation("en", "Hello there")
+        new_group.add_translation("es", "Hola")
+
+        deleted = []
+        updated = []
+        self.window.translation_group_deleted.connect(lambda key: deleted.append(key))
+        self.window.translation_updated.connect(
+            lambda locale, changes: updated.append((locale, changes))
+        )
+
+        self.window._on_key_replaced(old.key, new_group)
+
+        assert old.key not in translations
+        assert translations[new_group.key] is new_group
+        assert deleted == [old.key]
+        assert ("es", [(new_group.key, "Hola")]) in updated
+        assert ("en", [(new_group.key, "Hello there")]) in updated
+        # The new key is now fully translated, so it's no longer outstanding.
+        assert self.window.table.rowCount() == 0
+
+    def test_key_replaced_removes_all_duplicate_group_siblings(self):
+        from i18n.translation_group import TranslationGroup
+
+        rep = _make_group("dup.one", {"en": "Hello", "es": ""})
+        sibling = _make_group("dup.two", {"en": "Hello", "es": ""})
+        translations = {rep.key: rep, sibling.key: sibling}
+        self.window._prefill.outstanding_duplicate_groups[rep.key] = [rep.key, sibling.key]
+
+        new_group = TranslationGroup("Hi", is_in_base=True)
+        new_group.add_translation("en", "Hi")
+        new_group.add_translation("es", "Hola")
+
+        deleted = []
+        self.window.translation_group_deleted.connect(lambda key: deleted.append(key))
+        self.window.translations = translations
+        self.window.locales = ["en", "es"]
+
+        self.window._on_key_replaced(rep.key, new_group)
+
+        assert rep.key not in translations
+        assert sibling.key not in translations
+        assert set(deleted) == {rep.key, sibling.key}
+        assert translations[new_group.key] is new_group
+
+    def test_key_replaced_with_unchanged_key_does_not_emit_delete(self):
+        from i18n.translation_group import TranslationGroup
+
+        old = _make_group("greeting", {"en": "Hello", "es": ""})
+        translations = {old.key: old}
+        self.window.load_data(translations, ["en", "es"])
+
+        # Same msgid/context as old.key -- only the "es" value changes.
+        new_group = TranslationGroup("greeting", is_in_base=True)
+        new_group.add_translation("en", "Hello")
+        new_group.add_translation("es", "Hola")
+
+        deleted = []
+        self.window.translation_group_deleted.connect(lambda key: deleted.append(key))
+
+        self.window._on_key_replaced(old.key, new_group)
+
+        assert deleted == []
+        assert translations[new_group.key] is new_group
+
+    def test_key_replaced_forces_immediate_persist_when_no_items_remain(self):
+        from i18n.translation_group import TranslationGroup
+        from ui.translation_windows.outstanding_items.window import OutstandingItemsWindow
+
+        class _FakeMainWindow(QWidget):
+            def __init__(self):
+                super().__init__()
+                self.batched_calls = 0
+
+            def process_batched_updates(self):
+                self.batched_calls += 1
+
+        parent = _FakeMainWindow()
+        window = OutstandingItemsWindow(parent=parent, project_path=None)
+        try:
+            old = _make_group("greeting", {"en": "Hello", "es": ""})
+            translations = {old.key: old}
+            window.load_data(translations, ["en", "es"])
+
+            new_group = TranslationGroup("Hello there", is_in_base=True)
+            new_group.add_translation("en", "Hello there")
+            new_group.add_translation("es", "Hola")
+
+            with patch.object(window, "close") as mock_close:
+                window._on_key_replaced(old.key, new_group)
+
+            mock_close.assert_called_once()
+        finally:
+            window.deleteLater()
+            parent.deleteLater()
+
+
 class TestFillRowMissingWithDefaultTranslation(_OutstandingItemsWindowTestBase):
     def test_fills_only_empty_cells_with_default_locale_text(self):
         group = _make_group("greeting", {"en": "Hello", "es": "", "fr": "Bonjour"})
