@@ -24,8 +24,9 @@ class SettingsManager:
     # to return one JSON object covering several locales at once, which small/local models handle
     # unreliably, so this mode needs a more capable cloud model. Some Ollama cloud models require
     # a paid subscription (minimax-m2.7:cloud was tried here first and hit a 403 "requires a
-    # subscription" error) - glm-4.7:cloud is used instead as one that's confirmed accessible.
-    DEFAULT_LLM_MODEL_MULTI_LOCALE = "glm-4.7:cloud"
+    # subscription" error). glm-4.7:cloud was used next, but was discontinued by its provider;
+    # gpt-oss:120b:cloud is used instead as one that's confirmed accessible.
+    DEFAULT_LLM_MODEL_MULTI_LOCALE = "gpt-oss:120b:cloud"
     DEFAULT_QUALITY_REVIEW_SCRIPT_IGNORE_PATTERNS = [
         # Keyboard shortcuts / key combos (e.g. Ctrl+S, Cmd+Shift+P).
         r"(?i)\b(?:Ctrl|Cmd|Shift)(?:(?:\+Shift)?\+[A-Za-z])?\b",

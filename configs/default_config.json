@@ -32,7 +32,9 @@
         "show_success_message": true,
         "models_dir": "~/.py_i18n_manager/models/argos",
         "llm_cjk_reject_threshold_percentage": 30,
-        "llm_prompt_template": "Translate the following text from {source_locale} to {target_locale}.\nReturn the response as a JSON object with a single key \"translation\" containing the translated text.\n\nSource text: {source_text}\n\n{context}\n\nRules:\n1. Maintain any placeholders like {{0}}, {{1}}, %s, %d, etc.\n2. Preserve any special characters or formatting\n3. Keep the same tone and style as the original\n4. If the text contains technical terms, translate them appropriately for the target language\n\nReturn only the JSON object, no additional text."
+        "llm_prompt_template": "Translate the following text from {source_locale} to {target_locale}.\nReturn the response as a JSON object with a single key \"translation\" containing the translated text.\n\nSource text: {source_text}\n\n{context}\n\nRules:\n1. Maintain any placeholders like {{0}}, {{1}}, %s, %d, etc.\n2. Preserve any special characters or formatting\n3. Keep the same tone and style as the original\n4. If the text contains technical terms, translate them appropriately for the target language\n\nReturn only the JSON object, no additional text.",
+        "llm_model": "deepseek-r1:14b",
+        "llm_model_multi_locale": "gpt-oss:120b:cloud"
     },
     "files": {
         "settings_dir": ".i18n_manager",
