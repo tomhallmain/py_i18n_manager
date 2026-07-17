@@ -76,6 +76,16 @@ class AllTranslationsWindow(BaseTranslationWindow):
         self.status_filter.currentTextChanged.connect(self.filter_table)
         filter_layout.addWidget(filter_label)
         filter_layout.addWidget(self.status_filter)
+
+        # Context (msgctxt) filter -- populated from whatever distinct context values are
+        # actually present in the loaded catalog (see _populate_context_filter_combo), not a
+        # fixed enum like the status filter: context is project-defined and often unused.
+        context_label = QLabel(_("Context:"))
+        self.context_filter_combo = QComboBox()
+        self.context_filter_combo.addItem(_("All"), None)
+        self.context_filter_combo.currentIndexChanged.connect(self.filter_table)
+        filter_layout.addWidget(context_label)
+        filter_layout.addWidget(self.context_filter_combo)
         controls_layout.addLayout(filter_layout)
         
         layout.addLayout(controls_layout)
@@ -247,6 +257,51 @@ class AllTranslationsWindow(BaseTranslationWindow):
         for col in range(1, self.table.columnCount()):
             self.table.setColumnWidth(col, OTHER_COLUMN_MIN_WIDTH)
 
+        self._populate_context_filter_combo()
+
+    def _populate_context_filter_combo(self) -> None:
+        """Rebuild the context filter from whatever msgctxt values are in the loaded catalog.
+
+        Keeps the current selection if that context value still exists afterward, so a reload
+        (e.g. after Save) doesn't silently reset an active context filter back to "All".
+        """
+        previous_data = (
+            self.context_filter_combo.currentData() if self.context_filter_combo.count() else None
+        )
+
+        self.context_filter_combo.blockSignals(True)
+        self.context_filter_combo.clear()
+        self.context_filter_combo.addItem(_("All"), None)
+
+        contexts = set()
+        has_empty_context = False
+        for key in (self.all_translations or {}):
+            ctx = getattr(key, "context", "") or ""
+            if ctx:
+                contexts.add(ctx)
+            else:
+                has_empty_context = True
+
+        # Only worth offering "no context" as its own option when the catalog is a mix of both --
+        # if every key lacks context, "(No Context)" would just be a second "All".
+        if has_empty_context and contexts:
+            self.context_filter_combo.addItem(_("(No Context)"), "")
+        for ctx in sorted(contexts):
+            self.context_filter_combo.addItem(ctx, ctx)
+
+        restored_index = 0
+        for i in range(self.context_filter_combo.count()):
+            if self.context_filter_combo.itemData(i) == previous_data:
+                restored_index = i
+                break
+        self.context_filter_combo.setCurrentIndex(restored_index)
+        self.context_filter_combo.blockSignals(False)
+
+    def _context_for_row(self, row: int) -> str:
+        item = self.table.item(row, 0)
+        key = item.data(Qt.ItemDataRole.UserRole) if item else None
+        return getattr(key, "context", "") or ""
+
     def filter_table(self):
         """Filter the table based on search text and status filter."""
         if not self.all_translations or not self.all_locales:
@@ -262,6 +317,7 @@ class AllTranslationsWindow(BaseTranslationWindow):
             self.status_filter.currentText()
         )
         status_filter = filter_value.to_status()
+        selected_context = self.context_filter_combo.currentData()
         row_count = self.table.rowCount()
 
         # Collect matches with priorities (non-empty search only; empty uses Clear).
@@ -279,6 +335,9 @@ class AllTranslationsWindow(BaseTranslationWindow):
             elif search_text in msgid_lower:
                 priority = 2  # Low — contains search text
             else:
+                continue
+
+            if selected_context is not None and self._context_for_row(row) != selected_context:
                 continue
 
             if filter_value != TranslationFilter.ALL:
@@ -319,21 +378,27 @@ class AllTranslationsWindow(BaseTranslationWindow):
         self._apply_status_filter_only()
 
     def _apply_status_filter_only(self):
-        """Restore all rows (logical order), then apply the status filter only."""
+        """Restore all rows (logical order), then apply the status and context filters."""
         if not self.all_translations or not self.all_locales:
             return
 
         filter_value = TranslationFilter.from_translated_value(
             self.status_filter.currentText()
         )
+        selected_context = self.context_filter_combo.currentData()
 
         def _reset() -> None:
             self._rebuild_rows_preserving_items()
-            if filter_value == TranslationFilter.ALL:
+            if filter_value == TranslationFilter.ALL and selected_context is None:
                 return
-            status_filter = filter_value.to_status()
+            status_filter = None if filter_value == TranslationFilter.ALL else filter_value.to_status()
             visible_row_set: set[int] = set()
             for row in range(self.table.rowCount()):
+                if selected_context is not None and self._context_for_row(row) != selected_context:
+                    continue
+                if status_filter is None:
+                    visible_row_set.add(row)
+                    continue
                 for col in range(1, self.table.columnCount()):
                     if status_filter in self.status_cache.get((row, col), set()):
                         visible_row_set.add(row)
@@ -634,7 +699,8 @@ class AllTranslationsWindow(BaseTranslationWindow):
     def navigate_to_translation_key(
         self, key: TranslationKey, locale: Optional[str] = None
     ) -> bool:
-        """Make ``key`` visible (reset search/status filters), select the row, and scroll into view.
+        """Make ``key`` visible (reset search/status/context filters), select the row, and
+        scroll into view.
 
         If ``locale`` is a project locale code, scroll focus to that column; otherwise column 0.
         Returns ``False`` if the key is not in the loaded catalog or no matching row exists.
@@ -644,12 +710,15 @@ class AllTranslationsWindow(BaseTranslationWindow):
 
         self.search_box.blockSignals(True)
         self.status_filter.blockSignals(True)
+        self.context_filter_combo.blockSignals(True)
         try:
             self.search_box.clear()
             self.status_filter.setCurrentIndex(0)
+            self.context_filter_combo.setCurrentIndex(0)
         finally:
             self.search_box.blockSignals(False)
             self.status_filter.blockSignals(False)
+            self.context_filter_combo.blockSignals(False)
         self._apply_status_filter_only()
 
         row = self._row_for_translation_key(key)
