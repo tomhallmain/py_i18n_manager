@@ -13,6 +13,7 @@ The heuristic tab reuses :func:`ui.base_translation_window.create_frozen_transla
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any, Optional, Set
 
 from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
@@ -1202,10 +1203,11 @@ class TranslationQualityReviewWindow(BaseTranslationWindow):
         if self._heuristic_table.rowCount() == 0:
             QMessageBox.information(self, _("Export TSV"), _("No filtered rows to export."))
             return
+        default_name = os.path.join(self.project_path or "", "quality_review_findings.tsv")
         path, selected_filter = QFileDialog.getSaveFileName(
             self,
             _("Export filtered findings as TSV"),
-            "quality_review_findings.tsv",
+            default_name,
             _("TSV files (*.tsv);;All files (*.*)"),
         )
         if not selected_filter:
