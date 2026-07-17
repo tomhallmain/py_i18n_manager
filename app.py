@@ -17,7 +17,7 @@ from ui.translation_windows.all_translations_window import AllTranslationsWindow
 from ui.app_style import AppStyle
 from ui.bulk_pot_analysis_window import BulkPotAnalysisWindow
 from ui.cross_project_analysis_window import CrossProjectAnalysisWindow
-from ui.outstanding_items_window import OutstandingItemsWindow
+from ui.translation_windows.outstanding_items.window import OutstandingItemsWindow
 from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 from ui.recent_projects_dialog import RecentProjectsDialog
 from ui.setup_translation_project_window import SetupTranslationProjectWindow

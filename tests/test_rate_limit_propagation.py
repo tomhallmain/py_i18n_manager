@@ -8,8 +8,8 @@ signal instead of continuing to hammer the endpoint with a request that will kee
 same way.
 
 lib.translation_service imports lib.argos_translate, which is a PyQt6 QObject, and
-ui.outstanding_items_window is a PyQt6 module, so this follows the same PyQt6-availability
-gating as tests/test_ui_smoke.py.
+ui.translation_windows.outstanding_items.translation_orchestrator is a PyQt6 module, so this
+follows the same PyQt6-availability gating as tests/test_ui_smoke.py.
 """
 
 import os
@@ -110,7 +110,7 @@ class TestTranslationWorkerStopsOnBatchStoppingErrors:
     @pytest.mark.parametrize("exc_name", ["LLMRateLimitException", "LLMForbiddenException"])
     def test_stops_batch_and_emits_signal_without_processing_remaining_queue(self, exc_name):
         import lib.llm as llm_module
-        from ui.outstanding_items_window import TranslationWorker
+        from ui.translation_windows.outstanding_items.translation_orchestrator import TranslationWorker
         from utils.globals import LLMTranslationMode
 
         exc_type = getattr(llm_module, exc_name)
@@ -157,7 +157,7 @@ class TestTranslationWorkerStopsOnBatchStoppingErrors:
 
     def test_multi_locale_mode_also_stops_on_forbidden(self):
         from lib.llm import LLMForbiddenException
-        from ui.outstanding_items_window import TranslationWorker
+        from ui.translation_windows.outstanding_items.translation_orchestrator import TranslationWorker
         from utils.globals import LLMTranslationMode
 
         calls = []
