@@ -3,8 +3,7 @@
 Characterizes behavior carried over unchanged from the pre-extraction
 ui/outstanding_items_window.py (OutstandingItemsWindow.export_outstanding_to_tsv and its
 _sanitize_export_text/_truncate_export_text/_escape_markdown/_format_locale_list/
-_format_locale_value_pairs helpers) -- see docs/background-llm-outstanding-items-spec.md for
-the extraction this module came out of.
+_format_locale_value_pairs helpers).
 """
 
 import os

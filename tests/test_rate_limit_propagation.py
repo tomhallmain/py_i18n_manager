@@ -124,9 +124,9 @@ class TestTranslationWorkerStopsOnBatchStoppingErrors:
                 return f"[{target_locale}] {text}"
 
         queue = [
-            (0, 1, "key1", "es", "Hello"),
-            (0, 2, "key1", "fr", "Hello"),
-            (0, 3, "key1", "de", "Hello"),
+            ("key1", 1, "es", "Hello"),
+            ("key1", 2, "fr", "Hello"),
+            ("key1", 3, "de", "Hello"),
         ]
         worker = TranslationWorker(
             _FakeTranslationService(), queue, use_llm=True, mode=LLMTranslationMode.PER_LOCALE
@@ -137,7 +137,9 @@ class TestTranslationWorkerStopsOnBatchStoppingErrors:
         error_messages = []
         finished_count = []
 
-        worker.translation_completed.connect(lambda row, col, text: completed_signals.append((row, col, text)))
+        worker.translation_completed.connect(
+            lambda key, col, locale, text: completed_signals.append((key, col, locale, text))
+        )
         worker.batch_stopped_error.connect(lambda msg: stopped_error_messages.append(msg))
         worker.error.connect(lambda msg: error_messages.append(msg))
         worker.finished.connect(lambda: finished_count.append(1))
@@ -146,14 +148,14 @@ class TestTranslationWorkerStopsOnBatchStoppingErrors:
 
         # "es" succeeded before the error hit on "fr"; "de" was never attempted.
         assert calls == ["es", "fr"]
-        assert completed_signals == [(0, 1, "[es] Hello")]
+        assert completed_signals == [("key1", 1, "es", "[es] Hello")]
         assert len(stopped_error_messages) == 1
         assert "fr" in stopped_error_messages[0]
         assert error_messages == []  # no duplicate generic-error popup on top of the dedicated one
         assert finished_count == [1]  # worker still finishes cleanly so the UI can react
         assert worker.completed == 1  # the failed item itself isn't counted as completed
         # "de" is still sitting in the queue, untouched - the batch stopped rather than continuing.
-        assert worker.queue == [(0, 3, "key1", "de", "Hello")]
+        assert worker.queue == [("key1", 3, "de", "Hello")]
 
     def test_multi_locale_mode_also_stops_on_forbidden(self):
         from lib.llm import LLMForbiddenException
@@ -170,8 +172,8 @@ class TestTranslationWorkerStopsOnBatchStoppingErrors:
                 )
 
         queue = [
-            (0, "key1", "Hello", [(1, "es"), (2, "fr")]),
-            (1, "key2", "World", [(1, "es"), (2, "fr")]),
+            ("key1", "Hello", [(1, "es"), (2, "fr")]),
+            ("key2", "World", [(1, "es"), (2, "fr")]),
         ]
         worker = TranslationWorker(
             _FakeTranslationService(),
@@ -190,4 +192,4 @@ class TestTranslationWorkerStopsOnBatchStoppingErrors:
         assert len(stopped_error_messages) == 1
         assert "subscription" in stopped_error_messages[0]
         # key2 is still sitting in the queue, untouched.
-        assert worker.queue == [(1, "key2", "World", [(1, "es"), (2, "fr")])]
+        assert worker.queue == [("key2", "World", [(1, "es"), (2, "fr")])]

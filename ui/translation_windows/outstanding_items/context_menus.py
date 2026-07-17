@@ -71,9 +71,17 @@ def _show_context_menu_for_item(window, item, global_position):
         translate_with_argos.triggered.connect(lambda: window.translate_selected_item(item, use_llm=False))
         menu.addAction(translate_with_argos)
 
-        # Add LLM Translate option
+        # Add LLM Translate option. Disabled while a background "Translate All" batch is
+        # running: both paths would call into the same TranslationService/LLM instance, which
+        # isn't safe for two overlapping requests -- Argos above has no such shared in-flight
+        # state, so it stays enabled.
         translate_with_llm = QAction(_("Translate with LLM"), window)
         translate_with_llm.triggered.connect(lambda: window.translate_selected_item(item, use_llm=True))
+        if getattr(window, "is_translating", False):
+            translate_with_llm.setEnabled(False)
+            translate_with_llm.setToolTip(
+                _("Disabled while a background LLM translation batch is running.")
+            )
         menu.addAction(translate_with_llm)
 
     menu.exec(global_position)

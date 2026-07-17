@@ -1,14 +1,14 @@
 """Tests for ui.translation_windows.outstanding_items.window.OutstandingItemsWindow.
 
 Characterizes behavior carried over unchanged from the pre-extraction
-ui/outstanding_items_window.py (see docs/background-llm-outstanding-items-spec.md for the
-extraction this window was split out of): load_data's missing/invalid detection and
+ui/outstanding_items_window.py: load_data's missing/invalid detection and
 duplicate-combine flow, save_changes' locale-batched persistence, row deletion,
 fill-missing-with-default, and the translate-all button wiring now delegated to
 BackgroundTranslationController.
 """
 
 import os
+import time
 
 import pytest
 
@@ -26,6 +26,9 @@ except Exception:
 from unittest.mock import patch
 
 from test_utils import isolated_settings_and_cache_env
+from utils.translations import I18N
+
+_ = I18N._
 
 
 def _make_group(msgid, values, is_in_base=True):
@@ -35,6 +38,21 @@ def _make_group(msgid, values, is_in_base=True):
     for locale, text in values.items():
         g.add_translation(locale, text)
     return g
+
+
+class _SlowTranslationService:
+    """Blocks the worker thread for `delay` seconds -- used by TestCloseEventWithRunningBatch to
+    guarantee the QThread is still genuinely running when a test's assertions run, without a
+    real network call underneath it."""
+
+    def __init__(self, delay=1.0):
+        self.delay = delay
+        self.calls = []
+
+    def translate(self, text, target_locale, context=None, use_llm=False):
+        self.calls.append((text, target_locale))
+        time.sleep(self.delay)
+        return f"[{target_locale}] {text}"
 
 
 @pytest.mark.skipif(not _HAS_PYQT6, reason="PyQt6 not installed in this environment")
@@ -366,12 +384,24 @@ class TestTranslateAllMissingWiring(_OutstandingItemsWindowTestBase):
         assert self.window.is_translating is True
         assert self.window.translate_all_argos_btn.isEnabled() is False
         assert self.window.translate_all_llm_btn.isEnabled() is False
+        assert self.window.save_btn.isEnabled() is False
+        assert self.window._cancel_batch_btn.isEnabled() is True
         mock_controller.start.assert_called_once()
         args, kwargs = mock_controller.start.call_args
         translation_queue = args[1]
-        assert translation_queue == [(0, 1, missing.key, "es", "Bye")]
+        assert translation_queue == [(missing.key, 1, "es", "Bye")]
         assert kwargs["use_llm"] is False
         assert kwargs["total"] == 1
+        # row_for_key resolves the key back to its current row rather than a row index baked
+        # into the queue itself.
+        assert kwargs["row_for_key"](missing.key) == 0
+        assert kwargs["row_for_key"]("no-such-key") is None
+        # is_stale (per-locale mode here, since use_llm=False): true once the target cell has
+        # text, regardless of who/what put it there or when.
+        es_col = self._col_for_locale("es")
+        assert kwargs["is_stale"](0, es_col) is False
+        self.window.table.item(0, es_col).setText("Adiós")
+        assert kwargs["is_stale"](0, es_col) is True
 
     def test_declined_confirmation_does_not_start_a_batch(self):
         missing = _make_group("farewell", {"en": "Bye", "es": ""})
@@ -388,8 +418,47 @@ class TestTranslateAllMissingWiring(_OutstandingItemsWindowTestBase):
         mock_controller_cls.assert_not_called()
         assert self.window.is_translating is False
         assert self.window.translate_all_argos_btn.isEnabled() is True
+        assert self.window.save_btn.isEnabled() is True
 
     def test_finishing_reenables_buttons_and_cleans_up_the_controller(self):
+        missing = _make_group("farewell", {"en": "Bye", "es": ""})
+        translations = {missing.key: missing}
+        self.window.load_data(translations, ["en", "es"])
+
+        with patch(
+            "ui.translation_windows.outstanding_items.window.BackgroundTranslationController"
+        ), patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            self.window.translate_all_missing(use_llm=False)
+            self.window._on_translation_finished()
+
+        assert self.window.is_translating is False
+        assert self.window.translate_all_argos_btn.isEnabled() is True
+        assert self.window.translate_all_llm_btn.isEnabled() is True
+        assert self.window.save_btn.isEnabled() is True
+        # The controller cleans up its own QThread/worker once genuinely stopped (see
+        # BackgroundTranslationController); the window's job is just to drop its own reference.
+        assert self.window._translation_controller is None
+
+    def test_progress_signal_updates_the_inline_status_label(self):
+        missing = _make_group("farewell", {"en": "Bye", "es": ""})
+        translations = {missing.key: missing}
+        self.window.load_data(translations, ["en", "es"])
+
+        with patch(
+            "ui.translation_windows.outstanding_items.window.BackgroundTranslationController"
+        ), patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            self.window.translate_all_missing(use_llm=False)
+            self.window._on_translation_progress(0, 1, "farewell -> es")
+            mid_text = self.window._batch_status_label.text()
+            self.window._on_translation_progress(1, 1, "")
+            final_text = self.window._batch_status_label.text()
+
+        assert "farewell -> es" in mid_text
+        assert "0 / 1" in mid_text
+        assert "1 / 1" in final_text
+        assert self.window._batch_progress_bar.value() == 100
+
+    def test_cancel_button_confirms_then_delegates_to_the_controller(self):
         missing = _make_group("farewell", {"en": "Bye", "es": ""})
         translations = {missing.key: missing}
         self.window.load_data(translations, ["en", "es"])
@@ -401,15 +470,33 @@ class TestTranslateAllMissingWiring(_OutstandingItemsWindowTestBase):
         ):
             mock_controller = mock_controller_cls.return_value
             self.window.translate_all_missing(use_llm=False)
-            self.window._on_translation_finished()
+            self.window._on_cancel_batch_clicked()
 
-        assert self.window.is_translating is False
-        assert self.window.translate_all_argos_btn.isEnabled() is True
-        assert self.window.translate_all_llm_btn.isEnabled() is True
-        mock_controller.cleanup.assert_called_once()
-        assert self.window._translation_controller is None
+        mock_controller.cancel.assert_called_once()
+        assert self.window._cancel_batch_btn.isEnabled() is False
 
-    def test_cancel_delegates_to_the_controller(self):
+    def test_cancel_button_declined_confirmation_does_not_cancel(self):
+        missing = _make_group("farewell", {"en": "Bye", "es": ""})
+        translations = {missing.key: missing}
+        self.window.load_data(translations, ["en", "es"])
+
+        with patch(
+            "ui.translation_windows.outstanding_items.window.BackgroundTranslationController"
+        ) as mock_controller_cls, patch.object(
+            QMessageBox, "question"
+        ) as mock_question:
+            mock_controller = mock_controller_cls.return_value
+            mock_question.side_effect = [
+                QMessageBox.StandardButton.Yes,  # the initial "Confirm Translation" prompt
+                QMessageBox.StandardButton.No,  # declining the cancel confirmation
+            ]
+            self.window.translate_all_missing(use_llm=False)
+            self.window._on_cancel_batch_clicked()
+
+        mock_controller.cancel.assert_not_called()
+        assert self.window._cancel_batch_btn.isEnabled() is True
+
+    def test_cancel_translation_worker_delegates_to_the_controller(self):
         missing = _make_group("farewell", {"en": "Bye", "es": ""})
         translations = {missing.key: missing}
         self.window.load_data(translations, ["en", "es"])
@@ -424,3 +511,369 @@ class TestTranslateAllMissingWiring(_OutstandingItemsWindowTestBase):
             self.window._cancel_translation_worker()
 
         mock_controller.cancel.assert_called_once()
+
+    def test_batch_stopped_error_shows_inline_and_survives_finish(self):
+        missing = _make_group("farewell", {"en": "Bye", "es": ""})
+        translations = {missing.key: missing}
+        self.window.load_data(translations, ["en", "es"])
+
+        with patch(
+            "ui.translation_windows.outstanding_items.window.BackgroundTranslationController"
+        ), patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            self.window.translate_all_missing(use_llm=False)
+            self.window._on_translation_batch_stopped_error("rate limited")
+            self.window._on_translation_finished()
+
+        assert "rate limited" in self.window._batch_error_label.text()
+
+
+class TestContextMenuLlmGuard(_OutstandingItemsWindowTestBase):
+    """The "Translate with LLM" context menu action must be disabled while a batch is running,
+    since it would otherwise call into the same TranslationService/LLM instance concurrently --
+    Argos has no such shared in-flight state, so it stays enabled either way."""
+
+    def _build_menu(self, item):
+        from PyQt6.QtCore import QPoint
+        from PyQt6.QtWidgets import QMenu
+
+        from ui.translation_windows.outstanding_items import context_menus
+
+        captured = {}
+
+        def fake_exec(menu_self, *args, **kwargs):
+            captured["menu"] = menu_self
+            return None
+
+        with patch.object(QMenu, "exec", fake_exec):
+            context_menus._show_context_menu_for_item(self.window, item, QPoint(0, 0))
+
+        return {action.text(): action for action in captured["menu"].actions()}
+
+    def test_translate_with_llm_enabled_when_not_translating(self):
+        group = _make_group("greeting", {"en": "Hello", "es": ""})
+        translations = {group.key: group}
+        self.window.load_data(translations, ["en", "es"])
+        es_col = self._col_for_locale("es")
+        item = self.window.table.item(0, es_col)
+
+        actions = self._build_menu(item)
+
+        assert actions[_("Translate with LLM")].isEnabled() is True
+        assert actions[_("Translate with Argos Translate")].isEnabled() is True
+
+    def test_translate_with_llm_disabled_while_translating(self):
+        group = _make_group("greeting", {"en": "Hello", "es": ""})
+        translations = {group.key: group}
+        self.window.load_data(translations, ["en", "es"])
+        es_col = self._col_for_locale("es")
+        item = self.window.table.item(0, es_col)
+
+        self.window.is_translating = True
+        actions = self._build_menu(item)
+
+        assert actions[_("Translate with LLM")].isEnabled() is False
+
+
+class TestBackgroundTranslationControllerLifecycle:
+    """BackgroundTranslationController's own thread-lifecycle safety, independent of the window.
+
+    Mirrors translation_quality_review_window.py's test_on_llm_finished_does_not_drop_thread_reference:
+    a real regression this class guards against is "QThread: Destroyed while thread is still
+    running", which aborts the whole process rather than raising a catchable Python exception.
+    The fix is gating reference-drops on thread.finished (fires once the QThread has genuinely
+    stopped) instead of worker.finished (fires the instant run() returns, before the QThread's
+    own event loop has processed quit() and unwound -- isRunning() can still be true then).
+    """
+
+    @classmethod
+    def setup_class(cls):
+        cls._app = QApplication.instance() or QApplication([])
+
+    def test_cleanup_only_drops_references_when_called_directly_not_via_finished_signal(self):
+        """Deliberately uses plain sentinel objects rather than a real QThread/worker -- see
+        translation_quality_review_window.py's own version of this test for why: nothing here
+        pumps the Qt event loop, so a real thread's queued quit() would never actually be
+        delivered, and calling the cleanup method directly on a still-genuinely-running real
+        QThread would reproduce the real crash rather than simulate it. The assertions only care
+        about which method touches which attribute, so sentinels are enough."""
+        from ui.translation_windows.outstanding_items.translation_orchestrator import (
+            BackgroundTranslationController,
+        )
+
+        controller = BackgroundTranslationController()
+        sentinel_thread = object()
+        sentinel_worker = object()
+        controller.thread = sentinel_thread
+        controller.worker = sentinel_worker
+
+        # Simulates the moment worker.finished fires: emitting the controller's own forwarded
+        # `finished` (the only thing worker.finished is connected to besides thread.quit/
+        # worker.deleteLater, neither of which this test exercises) must not touch these.
+        controller.finished.emit()
+
+        assert controller.thread is sentinel_thread
+        assert controller.worker is sentinel_worker
+
+        # Simulates thread.finished actually firing: only now is dropping references safe.
+        controller._cleanup()
+
+        assert controller.thread is None
+        assert controller.worker is None
+
+
+class TestTranslationResultRouting:
+    """BackgroundTranslationController's key-based re-addressing and staleness check.
+
+    Calls ``_on_worker_translation_completed`` directly, as if a worker's ``translation_completed``
+    signal had just been delivered, rather than spinning up a real QThread: the decision logic
+    (resolve the row, check staleness, emit-or-drop) is plain synchronous Python once a result
+    reaches the main thread, so a real thread adds threading-lifecycle risk (see
+    TestBackgroundTranslationControllerLifecycle and the class docstring on
+    BackgroundTranslationController for a crash that real-thread testing here actually hit) without
+    covering anything this simpler approach doesn't. TestCloseEventWithRunningBatch below is where
+    real-thread behavior is deliberately exercised, since closeEvent's not-blocking guarantee can't
+    be verified any other way.
+
+    Staleness is checked live against the table's *current* text at apply-time -- not against a
+    log of past edits -- so a cell (or, in PER_KEY_ALL_LOCALES mode, its whole row) that already
+    has text is left alone regardless of who put it there or when relative to the batch starting
+    (see BackgroundTranslationController.start's docstring)."""
+
+    @classmethod
+    def setup_class(cls):
+        cls._app = QApplication.instance() or QApplication([])
+
+    def setup_method(self):
+        self._env_ctx = isolated_settings_and_cache_env(prefix=".tmp_phase2_addressing_")
+        self._env_ctx.__enter__()
+
+        from ui.translation_windows.outstanding_items.window import OutstandingItemsWindow
+
+        self.window = OutstandingItemsWindow(parent=None, project_path=None)
+
+    def teardown_method(self):
+        self.window.deleteLater()
+        self._env_ctx.__exit__(None, None, None)
+
+    def _col_for_locale(self, locale):
+        for col in range(1, self.window.table.columnCount()):
+            if self.window.table.horizontalHeaderItem(col).text() == locale:
+                return col
+        raise AssertionError(f"locale {locale!r} not found in table header")
+
+    def _cell_is_stale(self, row, col):
+        """Per-locale-mode staleness: only the specific target cell matters."""
+        item = self.window.table.item(row, col)
+        return bool(item and item.text().strip())
+
+    def _make_controller(self, row_for_key, is_stale):
+        from ui.translation_windows.outstanding_items.translation_orchestrator import (
+            BackgroundTranslationController,
+        )
+
+        controller = BackgroundTranslationController(self.window)
+        controller._row_for_key = row_for_key
+        controller._is_stale = is_stale
+        return controller
+
+    def test_a_result_for_an_already_filled_cell_is_dropped(self):
+        group = _make_group("greeting", {"en": "Hello", "es": ""})
+        translations = {group.key: group}
+        self.window.load_data(translations, ["en", "es"])
+        es_col = self._col_for_locale("es")
+        row = self.window._key_to_row[group.key]
+
+        # Simulates the cell having been filled (by the user, by "Fill Missing in Row", or
+        # anything else) by the time the result comes back -- checked live, not via a log of
+        # when/how it happened.
+        self.window.table.item(row, es_col).setText("Hola (manual)")
+
+        controller = self._make_controller(
+            row_for_key=self.window._key_to_row.get, is_stale=self._cell_is_stale
+        )
+        received = []
+        controller.translation_completed.connect(lambda row, col, text: received.append((row, col, text)))
+
+        controller._on_worker_translation_completed(group.key, es_col, "es", "[es] Hello")
+
+        assert received == []
+        assert self.window.table.item(row, es_col).text() == "Hola (manual)"
+
+    def test_a_result_for_a_key_with_no_current_row_is_dropped_without_writing(self):
+        group = _make_group("greeting", {"en": "Hello", "es": ""})
+        translations = {group.key: group}
+        self.window.load_data(translations, ["en", "es"])
+        es_col = self._col_for_locale("es")
+
+        # Simulates the key no longer having a row by the time the result comes back (e.g. it
+        # was deleted mid-batch, or the duplicate-combine representative changed) -- resolver
+        # returns None for every key rather than looking anything up.
+        controller = self._make_controller(row_for_key=lambda key: None, is_stale=self._cell_is_stale)
+        received = []
+        controller.translation_completed.connect(lambda row, col, text: received.append((row, col, text)))
+
+        controller._on_worker_translation_completed(group.key, es_col, "es", "[es] Hello")
+
+        assert received == []
+        # The cell was never written to -- still empty, not "[es] Hello".
+        assert self.window.table.item(0, es_col).text() == ""
+
+    def test_normal_result_is_emitted_for_the_resolved_row(self):
+        group = _make_group("greeting", {"en": "Hello", "es": ""})
+        translations = {group.key: group}
+        self.window.load_data(translations, ["en", "es"])
+        es_col = self._col_for_locale("es")
+        row = self.window._key_to_row[group.key]
+
+        controller = self._make_controller(
+            row_for_key=self.window._key_to_row.get, is_stale=self._cell_is_stale
+        )
+        received = []
+        controller.translation_completed.connect(lambda row, col, text: received.append((row, col, text)))
+
+        controller._on_worker_translation_completed(group.key, es_col, "es", "[es] Hello")
+
+        assert received == [(row, es_col, "[es] Hello")]
+
+    def test_per_key_all_locales_mode_drops_the_whole_row_once_any_locale_is_filled(self):
+        """A PER_KEY_ALL_LOCALES request covers every missing locale in a row at once; if the
+        user (or anything else) fills in *any* one of them before the response comes back, the
+        rest of that same response is stale too -- not just the one locale that got filled."""
+        group = _make_group("greeting", {"en": "Hello", "es": "", "fr": ""})
+        translations = {group.key: group}
+        self.window.load_data(translations, ["en", "es", "fr"])
+        es_col = self._col_for_locale("es")
+        fr_col = self._col_for_locale("fr")
+        row = self.window._key_to_row[group.key]
+
+        # The user fills in "fr" manually while the (single, row-covering) LLM request for both
+        # "es" and "fr" is still in flight.
+        self.window.table.item(row, fr_col).setText("Bonjour (manual)")
+
+        controller = self._make_controller(
+            row_for_key=self.window._key_to_row.get,
+            is_stale=lambda r, _c: self.window._row_has_any_filled_locale(r),
+        )
+        received = []
+        controller.translation_completed.connect(lambda row, col, text: received.append((row, col, text)))
+
+        controller._on_worker_translation_completed(group.key, es_col, "es", "[es] Hello")
+        controller._on_worker_translation_completed(group.key, fr_col, "fr", "[fr] Hola")
+
+        assert received == []
+        assert self.window.table.item(row, es_col).text() == ""
+        assert self.window.table.item(row, fr_col).text() == "Bonjour (manual)"
+
+
+class TestCloseEventWithRunningBatch:
+    """Regression tests for the same class of close-event bugs
+    translation_quality_review_window.py's TestLlmCatalogReviewThreading guards against:
+    closeEvent() must not block waiting for the background thread (the in-flight Argos/LLM call
+    can't be interrupted mid-request), and must disconnect the signals that touch this window so
+    a late 'finished'/'translation_completed' emission after the window is gone doesn't try to
+    update a closed widget.
+
+    Uses a real QThread/TranslationWorker (via _SlowTranslationService, which blocks the worker
+    thread for a bounded, known delay instead of making a real network call) so these are
+    exercising real Qt threading behavior, not just a mocked controller.
+    """
+
+    @classmethod
+    def setup_class(cls):
+        cls._app = QApplication.instance() or QApplication([])
+
+    def setup_method(self):
+        self._env_ctx = isolated_settings_and_cache_env(prefix=".tmp_close_event_batch_")
+        self._env_ctx.__enter__()
+
+        from ui.translation_windows.outstanding_items.window import OutstandingItemsWindow
+
+        self.window = OutstandingItemsWindow(parent=None, project_path=None)
+
+    def teardown_method(self):
+        # Let any still-running background thread actually finish before tearing down, so we
+        # don't leak a running QThread across tests.
+        controller = getattr(self, "_leaked_controller", None)
+        if controller is not None and controller.thread is not None:
+            controller.thread.wait(5000)
+        self.window.deleteLater()
+        self._env_ctx.__exit__(None, None, None)
+
+    def _start_slow_batch(self, delay=1.5):
+        missing = _make_group("farewell", {"en": "Bye", "es": ""})
+        translations = {missing.key: missing}
+        self.window.load_data(translations, ["en", "es"])
+        self.window.translation_service = _SlowTranslationService(delay=delay)
+
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            self.window.translate_all_missing(use_llm=False)
+
+        controller = self.window._translation_controller
+        assert controller is not None
+        assert controller.thread.isRunning()
+        self._leaked_controller = controller  # for teardown, since closeEvent nulls the window's own pointer
+        return controller
+
+    def test_close_event_does_not_block_while_batch_is_running(self):
+        from PyQt6.QtGui import QCloseEvent
+
+        controller = self._start_slow_batch()
+
+        start = time.monotonic()
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            self.window.closeEvent(QCloseEvent())
+        elapsed = time.monotonic() - start
+
+        # The (hypothetical) old behavior of waiting on the thread here would block for
+        # ~1 second (the _SlowTranslationService delay); this must return far sooner.
+        assert elapsed < 0.5
+        assert self.window._translation_controller is None
+        # Detached, not killed: the background thread is still doing its (soon-to-be-ignored)
+        # work independently.
+        assert controller.thread.isRunning()
+
+    def test_close_event_disconnects_controller_signals(self):
+        from PyQt6.QtGui import QCloseEvent
+
+        controller = self._start_slow_batch()
+
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            self.window.closeEvent(QCloseEvent())
+
+        # Already disconnected by closeEvent(); disconnecting again must raise, proving the
+        # window's slots are no longer attached (so a late emission after the window is closed
+        # can't try to touch it).
+        with pytest.raises((TypeError, RuntimeError)):
+            controller.finished.disconnect(self.window._on_translation_finished)
+        with pytest.raises((TypeError, RuntimeError)):
+            controller.translation_completed.disconnect(self.window._on_translation_completed)
+        with pytest.raises((TypeError, RuntimeError)):
+            controller.progress_updated.disconnect(self.window._on_translation_progress)
+
+    def test_close_event_resets_batch_controls_immediately(self):
+        from PyQt6.QtGui import QCloseEvent
+
+        self._start_slow_batch()
+        assert self.window.is_translating is True
+
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            self.window.closeEvent(QCloseEvent())
+
+        # A cached/reopened window (app.py reuses one instance) shouldn't come back with buttons
+        # still disabled from a batch that was abandoned via close.
+        assert self.window.is_translating is False
+        assert self.window.translate_all_argos_btn.isEnabled() is True
+        assert self.window.save_btn.isEnabled() is True
+
+    def test_declining_the_close_confirmation_leaves_the_batch_attached(self):
+        from PyQt6.QtGui import QCloseEvent
+
+        controller = self._start_slow_batch()
+
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.No):
+            event = QCloseEvent()
+            self.window.closeEvent(event)
+
+        assert event.isAccepted() is False
+        assert self.window._translation_controller is controller
+        assert self.window.is_translating is True

@@ -2,8 +2,7 @@
 
 Characterizes behavior carried over unchanged from the pre-extraction
 ui/outstanding_items_window.py (OutstandingItemsWindow._detect_duplicate_values /
-_ask_combine_duplicates / the outstanding_duplicate_groups + pending-prefill bookkeeping) --
-see docs/background-llm-outstanding-items-spec.md for the extraction this module came out of.
+_ask_combine_duplicates / the outstanding_duplicate_groups + pending-prefill bookkeeping).
 """
 
 import os

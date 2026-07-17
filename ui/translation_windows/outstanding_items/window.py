@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton,
-                            QLabel, QTableWidgetItem,
+                            QLabel, QTableWidgetItem, QProgressBar,
                             QMessageBox, QCheckBox, QTextEdit, QStyledItemDelegate)
 from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer
 from PyQt6.QtGui import QShortcut, QKeySequence
@@ -14,7 +14,7 @@ from utils.globals import TranslationStatus
 from utils.logging_setup import get_logger
 from utils.translations import I18N
 from ui.translation_windows.base_translation_window import BaseTranslationWindow
-from ui.translation_progress_dialog import TranslationProgressDialog
+from ui.translation_progress_dialog import ETATracker
 from ui.llm_settings_dialog import LLMSettingsDialog
 from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 from ui.translation_windows.outstanding_items import context_menus, tsv_export
@@ -34,6 +34,19 @@ logger = get_logger(__name__)
 # Minimum column widths: key column fits keys like "en.views.projects.created_at"; others slightly less
 KEY_COLUMN_MIN_WIDTH = 200
 OTHER_COLUMN_MIN_WIDTH = 120
+
+
+def _format_eta_seconds(secs: float) -> str:
+    """Human-readable "~N remaining" text for the inline batch-translate progress strip."""
+    s = int(secs)
+    if s < 60:
+        return _("{s} sec").format(s=s)
+    m, s = divmod(s, 60)
+    if m < 60:
+        return _("{m} min {s} sec").format(m=m, s=f"{s:02d}")
+    h, m = divmod(m, 60)
+    return _("{h} hr {m} min").format(h=h, m=f"{m:02d}")
+
 
 class MultilineItemDelegate(QStyledItemDelegate):
     """A delegate that supports multiline editing in table cells."""
@@ -88,6 +101,10 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         # Minimum width for first column (Translation Key); set in load_data
         self._min_key_column_width = KEY_COLUMN_MIN_WIDTH
         self._current_invalid_groups = {}
+        # key -> current table row; rebuilt on every load_data() call. Lets a background batch
+        # resolve where a result belongs *now* instead of trusting a row index captured when the
+        # queue was built (see translation_orchestrator.BackgroundTranslationController).
+        self._key_to_row = {}
         self._prefill = DuplicatePrefillState()
 
         self.setup_properties()
@@ -97,7 +114,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.setup_translation_service(self.project_path)
         self.is_translating = False
         self._translation_controller = None
-        self._progress_dialog = None
+        self._batch_eta = None
 
     def closeEvent(self, event):
         """Handle cleanup when the window is closed."""
@@ -108,11 +125,41 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             if reply == QMessageBox.StandardButton.No:
                 event.ignore()
                 return
-            # Cancel ongoing translation
-            self._cancel_translation_worker()
+            self._detach_translation_controller()
         if hasattr(self, 'translation_service'):
             del self.translation_service
         super().closeEvent(event)
+
+    def _detach_translation_controller(self):
+        """Cancel the running batch and stop it from reaching back into this window.
+
+        Deliberately does not wait for the thread: the in-flight Argos/LLM call for the current
+        item can't be interrupted mid-request (LLM.cancel_generation only joins its own internal
+        thread with a short timeout, best-effort), so blocking here would freeze the window on
+        close. The controller's worker/thread clean themselves up independently via their own
+        finished -> quit/deleteLater connections (see BackgroundTranslationController.start)
+        once the in-flight item settles or the next queue check sees the cancel flag -- this
+        just disconnects the signals that reach back into this window first, so a
+        'progress_updated'/'translation_completed'/'finished' emission that arrives after this
+        window is gone doesn't try to update a closed widget.
+        """
+        controller = self._translation_controller
+        if not controller:
+            return
+        controller.cancel()
+        for signal, slot in (
+            (controller.progress_updated, self._on_translation_progress),
+            (controller.translation_completed, self._on_translation_completed),
+            (controller.finished, self._on_translation_finished),
+            (controller.error, self._on_translation_error),
+            (controller.batch_stopped_error, self._on_translation_batch_stopped_error),
+        ):
+            try:
+                signal.disconnect(slot)
+            except (TypeError, RuntimeError):
+                pass
+        self._translation_controller = None
+        self._reset_batch_controls()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -143,8 +190,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.export_tsv_btn.clicked.connect(self.export_outstanding_to_tsv)
         self.export_tsv_btn.setToolTip(_("Export outstanding keys and invalid locale buckets to TSV"))
 
-        save_btn = QPushButton(_("Save Changes"))
-        save_btn.clicked.connect(self.save_changes)
+        self.save_btn = QPushButton(_("Save Changes"))
+        self.save_btn.clicked.connect(self.save_changes)
         close_btn = QPushButton(_("Close"))
         close_btn.clicked.connect(self.close)
 
@@ -158,7 +205,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         button_layout.addWidget(self.llm_settings_btn)
         button_layout.addWidget(self.exclusions_btn)
         button_layout.addWidget(self.export_tsv_btn)
-        button_layout.addWidget(save_btn)
+        button_layout.addWidget(self.save_btn)
         button_layout.addWidget(close_btn)
         button_layout.addWidget(self.unicode_toggle)
         layout.addLayout(button_layout)
@@ -168,6 +215,44 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.prefill_notice_label.setStyleSheet("color: #d4a017; font-weight: bold;")
         self.prefill_notice_label.hide()
         layout.addWidget(self.prefill_notice_label)
+
+        # Inline batch-translate progress -- replaces the old application-modal
+        # TranslationProgressDialog so the rest of the window stays usable while a background
+        # "Translate All" batch runs. _batch_mode_label is set once per batch and left alone;
+        # _batch_status_label is overwritten on every progress signal, so the method/model info
+        # would otherwise get stomped within the first fraction of a second of a batch starting.
+        self._batch_mode_label = QLabel("")
+        self._batch_mode_label.setWordWrap(True)
+        self._batch_mode_label.setStyleSheet("font-weight: bold;")
+        self._batch_mode_label.hide()
+        layout.addWidget(self._batch_mode_label)
+
+        batch_progress_row = QHBoxLayout()
+        self._batch_progress_bar = QProgressBar()
+        self._batch_progress_bar.setMinimum(0)
+        self._batch_progress_bar.setMaximum(100)
+        self._batch_progress_bar.hide()
+        batch_progress_row.addWidget(self._batch_progress_bar, 1)
+        self._cancel_batch_btn = QPushButton(_("Cancel"))
+        self._cancel_batch_btn.clicked.connect(self._on_cancel_batch_clicked)
+        self._cancel_batch_btn.hide()
+        batch_progress_row.addWidget(self._cancel_batch_btn)
+        layout.addLayout(batch_progress_row)
+
+        self._batch_status_label = QLabel("")
+        self._batch_status_label.setWordWrap(True)
+        self._batch_status_label.setStyleSheet("color: gray;")
+        self._batch_status_label.hide()
+        layout.addWidget(self._batch_status_label)
+
+        # Stays visible after a batch finishes (until the next one starts) so a rate-limit/
+        # forbidden stop -- the reason a batch might end early -- isn't easy to miss now that
+        # nothing is forcing the user to acknowledge a modal dialog.
+        self._batch_error_label = QLabel("")
+        self._batch_error_label.setWordWrap(True)
+        self._batch_error_label.setStyleSheet("color: #c0392b; font-weight: bold;")
+        self._batch_error_label.hide()
+        layout.addWidget(self._batch_error_label)
 
         # Table for translations
         self.table = self.setup_table()
@@ -326,6 +411,20 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             return msgid_display.split(" (")[0]
         return msgid_display
 
+    def _row_has_any_filled_locale(self, row):
+        """True if any non-key cell in `row` currently has text.
+
+        Used to decide staleness for LLMTranslationMode.PER_KEY_ALL_LOCALES results: one request
+        covers every missing locale in the row at once, so if any of them has been filled by the
+        time a result comes back, the rest of that same response is stale too (see
+        translate_all_missing's is_stale closure and translation_orchestrator.py).
+        """
+        for col in range(1, self.table.columnCount()):
+            item = self.table.item(row, col)
+            if item and item.text().strip():
+                return True
+        return False
+
     def translate_all_missing(self, use_llm=False):
         """Translate all missing items using the specified method.
 
@@ -334,9 +433,12 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         """
         default_locale = config_manager.get('translation.default_locale', 'en')
 
-        # Group missing cells by row (key) so LLM per-key mode can request every locale for a
-        # key in one call. Argos and LLM per-locale mode simply flatten this back to per-cell.
-        row_entries = []  # (row, key, source_text, [(col, locale), ...])
+        # Group missing cells by key so LLM per-key mode can request every locale for a key in
+        # one call. Argos and LLM per-locale mode simply flatten this back to per-cell. Rows are
+        # only used here to discover what's currently missing; results are addressed by key, not
+        # row, so this snapshot doesn't go stale if the table's rows shift mid-batch (see
+        # translation_orchestrator.py).
+        row_entries = []  # (key, source_text, [(col, locale), ...])
         for row in range(self.table.rowCount()):
             key = self._get_key_from_row(row)
 
@@ -362,9 +464,9 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 missing_cols.append((col, locale))
 
             if missing_cols:
-                row_entries.append((row, key, source_text, missing_cols))
+                row_entries.append((key, source_text, missing_cols))
 
-        total_missing = sum(len(cols) for _, _, _, cols in row_entries)
+        total_missing = sum(len(cols) for _, _, cols in row_entries)
         if total_missing == 0:
             QMessageBox.information(self, _("No Items"), _("No missing translations found."))
             return
@@ -382,8 +484,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             ).format(count=len(row_entries), model=self.translation_service.llm_multi.model_name)
         else:
             translation_queue = [
-                (row, col, key, locale, source_text)
-                for row, key, source_text, cols in row_entries
+                (key, col, locale, source_text)
+                for key, source_text, cols in row_entries
                 for col, locale in cols
             ]
             method_name = "LLM" if use_llm else "Argos Translate"
@@ -411,8 +513,8 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self.is_translating = True
         self.translate_all_argos_btn.setEnabled(False)
         self.translate_all_llm_btn.setEnabled(False)
+        self.save_btn.setEnabled(False)
 
-        # Create and show progress dialog
         mode_label = None
         if use_llm and mode == LLMTranslationMode.PER_KEY_ALL_LOCALES:
             mode_label = _("Mode: all locales per key (model: {model})").format(
@@ -423,13 +525,36 @@ class OutstandingItemsWindow(BaseTranslationWindow):
                 model=self.translation_service.llm.model_name
             )
 
-        self._progress_dialog = TranslationProgressDialog(
-            self,
-            title=_("Translation Progress"),
-            use_llm=use_llm,
-            mode_label=mode_label,
+        # Reset and show the inline progress strip for this batch.
+        self._batch_eta = ETATracker()
+        self._batch_error_label.hide()
+        method_text = _("Translation Method: {method}").format(
+            method="LLM" if use_llm else "Argos Translate"
         )
-        self._progress_dialog.cancelled.connect(self._cancel_translation_worker)
+        self._batch_mode_label.setText(
+            f"{method_text}\n{mode_label}" if mode_label else method_text
+        )
+        self._batch_mode_label.show()
+        self._batch_progress_bar.setValue(0)
+        self._batch_progress_bar.show()
+        self._batch_status_label.setText(_("Preparing..."))
+        self._batch_status_label.show()
+        self._cancel_batch_btn.setEnabled(True)
+        self._cancel_batch_btn.setText(_("Cancel"))
+        self._cancel_batch_btn.show()
+
+        # A result is stale (dropped rather than written) if its target already has text by the
+        # time it comes back. Granularity depends on mode: PER_KEY_ALL_LOCALES covers every
+        # missing locale in a row with one request, so any one of them being filled makes the
+        # rest of that same response stale too; every other mode (Argos, or LLM PER_LOCALE)
+        # requests one cell at a time, so only that cell matters.
+        if use_llm and mode == LLMTranslationMode.PER_KEY_ALL_LOCALES:
+            def is_stale(row, _col):
+                return self._row_has_any_filled_locale(row)
+        else:
+            def is_stale(row, col):
+                item = self.table.item(row, col)
+                return bool(item and item.text().strip())
 
         # Create controller, wire signals, and start the background worker/thread
         self._translation_controller = BackgroundTranslationController(self)
@@ -444,14 +569,42 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             use_llm=use_llm,
             mode=mode,
             total=total_missing,
+            row_for_key=self._key_to_row.get,
+            is_stale=is_stale,
         )
-
-        self._progress_dialog.show()
 
     def _on_translation_progress(self, completed, total, current_item):
         """Handle progress updates from the worker."""
-        if self._progress_dialog:
-            self._progress_dialog.update_progress(completed, total, current_item)
+        if total > 0:
+            self._batch_progress_bar.setValue(int((completed / total) * 100))
+
+        self._batch_eta.record(completed)
+        remaining = total - completed
+        eta_secs = self._batch_eta.eta_seconds(remaining)
+
+        count_text = _("{completed} / {total} translations completed").format(
+            completed=completed, total=total
+        )
+        if current_item:
+            detail_text = _("Translating: {item}").format(item=current_item)
+        elif completed >= total:
+            detail_text = _("Finished")
+        elif completed > 0:
+            detail_text = _("Stopped")
+        else:
+            detail_text = _("Preparing...")
+
+        eta_text = ""
+        if remaining > 0:
+            if eta_secs is None:
+                eta_text = _("Estimating time remaining…")
+            else:
+                eta_text = _("~{eta} remaining").format(eta=_format_eta_seconds(eta_secs))
+
+        status_parts = [count_text, detail_text]
+        if eta_text:
+            status_parts.append(eta_text)
+        self._batch_status_label.setText("  •  ".join(status_parts))
 
     def _on_translation_completed(self, row, col, translated_text):
         """Handle a completed translation."""
@@ -460,18 +613,34 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         # Force UI update
         QTimer.singleShot(0, lambda: self.table.viewport().update())
 
-    def _on_translation_finished(self):
-        """Handle when translation process is finished."""
+    def _reset_batch_controls(self):
+        """Re-enable buttons and hide the inline progress strip.
+
+        Shared by the normal finish path and closeEvent's detach path. Does not touch
+        self._translation_controller -- callers decide separately what to do with that
+        reference (drop it immediately, since the controller itself cleans up its QThread/worker
+        independently once genuinely stopped -- see translation_orchestrator.py).
+        """
         self.is_translating = False
         self.translate_all_argos_btn.setEnabled(True)
         self.translate_all_llm_btn.setEnabled(True)
+        self.save_btn.setEnabled(True)
 
-        if self._progress_dialog:
-            self._progress_dialog.on_finished()
+        self._batch_mode_label.hide()
+        self._batch_progress_bar.hide()
+        self._batch_status_label.hide()
+        self._cancel_batch_btn.hide()
+        # _batch_error_label is deliberately left as-is: a stop-early error (see
+        # _on_translation_batch_stopped_error) should stay visible until the next batch starts,
+        # not disappear the moment the worker finishes.
 
-        # Clean up the worker thread
-        if self._translation_controller:
-            self._translation_controller.cleanup()
+    def _on_translation_finished(self):
+        """Handle when translation process is finished."""
+        self._reset_batch_controls()
+        # Dropping this reference here (rather than waiting for the QThread to actually stop) is
+        # safe: the controller is parented to this window, so it stays alive regardless, and it
+        # drops/cleans up its own QThread/worker independently once thread.finished proves they
+        # have genuinely stopped (see BackgroundTranslationController).
         self._translation_controller = None
 
     def _on_translation_error(self, error_msg):
@@ -484,23 +653,38 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         """Handle the batch stopping early because of a provider error that won't resolve by
         continuing (rate limited, or forbidden e.g. the model requires a paid subscription).
 
-        The worker already stopped the queue (see TranslationWorker.run). Rather than popping a
-        separate dialog, annotate the progress dialog - it already shows how many items completed
-        before the stop - with why it stopped, and leave it open for the user to close manually.
+        The worker already stopped the queue (see TranslationWorker.run). Surface it in the
+        inline error strip - which stays visible after the batch finishes (see
+        _on_translation_finished) - rather than popping a separate dialog, since the progress
+        strip above it already shows how many items completed before the stop.
         """
         logger.warning(f"Translation batch stopped early: {message}")
-        if self._progress_dialog:
-            self._progress_dialog.show_stopped_early_error(
-                _(
-                    "Translation stopped early: {message}\n\n"
-                    "Items completed before this happened (shown above) were kept."
-                ).format(message=message)
-            )
+        self._batch_error_label.setText(
+            _(
+                "Translation stopped early: {message}\n\n"
+                "Items completed before this happened (shown above) were kept."
+            ).format(message=message)
+        )
+        self._batch_error_label.show()
 
     def _cancel_translation_worker(self):
         """Cancel the ongoing translation process."""
         if self._translation_controller:
             self._translation_controller.cancel()
+
+    def _on_cancel_batch_clicked(self):
+        """Confirm, then request cancellation of the running batch."""
+        reply = QMessageBox.question(
+            self,
+            _("Cancel Translation"),
+            _("Are you sure you want to cancel the translation process?\n\nCompleted translations will be kept."),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        self._cancel_batch_btn.setEnabled(False)
+        self._cancel_batch_btn.setText(_("Cancelling..."))
+        self._cancel_translation_worker()
 
     def open_llm_settings(self):
         """Open the LLM settings dialog."""
@@ -683,7 +867,7 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             # combine_reply == "no": fall through and open window with all items (no combining)
 
         self._current_invalid_groups = all_invalid_groups
-        self.table.setRowCount(len(all_invalid_groups))
+        self._key_to_row = {}
 
         AppStyle.sync_theme_from_widget(self)
         highlight_colors = AppStyle.get_translation_highlight_colors()
@@ -691,7 +875,10 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         critical_color = highlight_colors["critical"]
         style_color = highlight_colors["style"]
 
+        self.table.setRowCount(len(all_invalid_groups))
+
         for row, (key, (invalid_locales, group)) in enumerate(all_invalid_groups.items()):
+            self._key_to_row[key] = row
             display_text = group.key.msgid
             msgid_item = QTableWidgetItem(display_text)
             msgid_item.setData(Qt.ItemDataRole.UserRole, key)
