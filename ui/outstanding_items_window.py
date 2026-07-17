@@ -17,7 +17,7 @@ from utils.globals import TranslationStatus
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
 from utils.translations import I18N
-from ui.base_translation_window import BaseTranslationWindow
+from ui.translation_windows.base_translation_window import BaseTranslationWindow
 from ui.translation_progress_dialog import TranslationProgressDialog
 from ui.llm_settings_dialog import LLMSettingsDialog
 from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog

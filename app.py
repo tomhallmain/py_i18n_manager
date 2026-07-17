@@ -13,7 +13,7 @@ from i18n.i18n_manager import I18NManager
 from i18n.translation_group import TranslationKey
 from i18n.translation_manager_results import TranslationManagerResults, TranslationAction
 from lib.multi_display import SmartMainWindow
-from ui.all_translations_window import AllTranslationsWindow
+from ui.translation_windows.all_translations_window import AllTranslationsWindow
 from ui.app_style import AppStyle
 from ui.bulk_pot_analysis_window import BulkPotAnalysisWindow
 from ui.cross_project_analysis_window import CrossProjectAnalysisWindow
@@ -22,7 +22,7 @@ from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 from ui.recent_projects_dialog import RecentProjectsDialog
 from ui.setup_translation_project_window import SetupTranslationProjectWindow
 from ui.stats_widget import StatsWidget
-from ui.translation_quality_review_window import TranslationQualityReviewWindow
+from ui.translation_windows.translation_quality_review_window import TranslationQualityReviewWindow
 from utils.globals import ProjectType
 from utils.logging_setup import get_logger
 from utils.project_detector import ProjectDetector

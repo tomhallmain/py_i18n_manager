@@ -13,7 +13,7 @@ from PyQt6.QtGui import QAction
 
 from i18n.translation_group import TranslationGroup, TranslationKey
 from ui.app_style import AppStyle
-from ui.base_translation_window import BaseTranslationWindow
+from ui.translation_windows.base_translation_window import BaseTranslationWindow
 from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 from utils.config import config_manager
 from utils.globals import TranslationStatus, TranslationFilter

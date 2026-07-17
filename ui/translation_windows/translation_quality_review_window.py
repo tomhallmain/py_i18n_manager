@@ -8,7 +8,8 @@ Translation quality review (single entry point for two related feature areas):
 
 3. **LLM-assisted review** — batched catalog review with rolling state in :mod:`i18n.llm_catalog_review`.
 
-The heuristic tab reuses :func:`ui.base_translation_window.create_frozen_translation_table`.
+The heuristic tab reuses
+:func:`ui.translation_windows.base_translation_window.create_frozen_translation_table`.
 """
 
 from __future__ import annotations
@@ -46,7 +47,10 @@ from i18n.invalid_translation_groups import TranslationQualityFindings
 from i18n.llm_catalog_review import CatalogLlmReviewResult
 from i18n.translation_group import TranslationKey
 from i18n.translation_manager_results import TranslationAction, TranslationManagerResults
-from ui.base_translation_window import BaseTranslationWindow, create_frozen_translation_table
+from ui.translation_windows.base_translation_window import (
+    BaseTranslationWindow,
+    create_frozen_translation_table,
+)
 from ui.llm_settings_dialog import LLMSettingsDialog
 from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 from utils.logging_setup import get_logger
@@ -163,7 +167,8 @@ class _CatalogLlmWorker(QObject):
 class TranslationQualityReviewWindow(BaseTranslationWindow):
     """Advisory translation checks, custom rules, and optional LLM catalog review."""
 
-    #: Request main window to open :class:`~ui.all_translations_window.AllTranslationsWindow`
+    #: Request main window to open
+    #: :class:`~ui.translation_windows.all_translations_window.AllTranslationsWindow`
     #: and scroll to this key; second argument is locale code or ``None``.
     navigate_to_all_translations_requested = pyqtSignal(object, object)
 

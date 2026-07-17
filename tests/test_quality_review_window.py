@@ -1,4 +1,4 @@
-"""Tests for ui.translation_quality_review_window.TranslationQualityReviewWindow.
+"""Tests for ui.translation_windows.translation_quality_review_window.TranslationQualityReviewWindow.
 
 Covers the heuristic-findings table shape (columns collapsed onto grouped findings, see
 i18n.translation_quality_review._grouped_locale_finding) and a regression for column widths
@@ -46,7 +46,7 @@ class TestTranslationQualityReviewWindow:
         self._env_ctx = isolated_settings_and_cache_env(prefix=".tmp_quality_review_window_")
         self._env_ctx.__enter__()
 
-        from ui.translation_quality_review_window import TranslationQualityReviewWindow
+        from ui.translation_windows.translation_quality_review_window import TranslationQualityReviewWindow
 
         self.window = TranslationQualityReviewWindow(
             parent=None,
@@ -85,7 +85,8 @@ class TestTranslationQualityReviewWindow:
         assert self.window._heuristic_table.columnCount() == 6
 
     def test_heuristic_table_headers_use_locales_not_locale_and_notes(self):
-        # Headers are gettext-translated (see ui/translation_quality_review_window.py's `_ = I18N._`),
+        # Headers are gettext-translated (see
+        # ui/translation_windows/translation_quality_review_window.py's `_ = I18N._`),
         # so compare against the same translation call rather than hardcoded English literals --
         # the active locale in the test environment may not be English.
         table = self.window._heuristic_table
@@ -216,7 +217,7 @@ class TestCatalogLlmWorkerModelSelection:
         cls._app = QApplication.instance() or QApplication([])
 
     def _make_worker(self, settings_manager):
-        from ui.translation_quality_review_window import _CatalogLlmWorker
+        from ui.translation_windows.translation_quality_review_window import _CatalogLlmWorker
 
         return _CatalogLlmWorker(
             translations={},
@@ -329,7 +330,7 @@ class TestLlmCatalogReviewThreading:
         self._llm_class_patcher = patch("lib.llm.LLM", _InstantFailLlm)
         self._llm_class_patcher.start()
 
-        from ui.translation_quality_review_window import TranslationQualityReviewWindow
+        from ui.translation_windows.translation_quality_review_window import TranslationQualityReviewWindow
 
         self.window = TranslationQualityReviewWindow(
             parent=None,
