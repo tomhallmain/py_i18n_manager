@@ -26,6 +26,7 @@ except Exception:
 from unittest.mock import patch
 
 from test_utils import isolated_settings_and_cache_env
+from utils.globals import LLMTranslationMode
 from utils.translations import I18N
 
 _ = I18N._
@@ -535,6 +536,89 @@ class TestTranslateAllMissingWiring(_OutstandingItemsWindowTestBase):
         self.window.table.item(0, es_col).setText("Adiós")
         assert kwargs["is_stale"](0, es_col) is True
 
+    def test_llm_per_key_all_locales_mode_builds_a_per_cell_is_stale(self):
+        """Regression test: the PER_KEY_ALL_LOCALES batch used to build `is_stale` as a
+        row-level check ("does any locale in this row already have text"), which meant the
+        batch's own just-written first locale made every other locale in the same multi-locale
+        LLM response look stale and get silently dropped (see the doc's "Superseded: row-level
+        granularity" note). `is_stale` must only ever look at the specific (row, col) a result
+        targets, in every mode -- not just the per-locale ones -- so this covers the mode the
+        per-locale test above doesn't."""
+        self.window.settings_manager.save_llm_translation_mode(
+            LLMTranslationMode.PER_KEY_ALL_LOCALES, self.window.project_path
+        )
+        missing = _make_group("greeting", {"en": "Hello", "es": "", "fr": ""})
+        translations = {missing.key: missing}
+        self.window.load_data(translations, ["en", "es", "fr"])
+        es_col = self._col_for_locale("es")
+        fr_col = self._col_for_locale("fr")
+
+        with patch(
+            "ui.translation_windows.outstanding_items.window.BackgroundTranslationController"
+        ) as mock_controller_cls, patch.object(
+            QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes
+        ):
+            mock_controller = mock_controller_cls.return_value
+            self.window.translate_all_missing(use_llm=True)
+
+        mock_controller.start.assert_called_once()
+        _, kwargs = mock_controller.start.call_args
+        assert kwargs["mode"] == LLMTranslationMode.PER_KEY_ALL_LOCALES
+        is_stale = kwargs["is_stale"]
+
+        # Neither cell has text yet -- nothing is stale.
+        assert is_stale(0, es_col) is False
+        assert is_stale(0, fr_col) is False
+
+        # Simulate the batch's own single multi-locale response landing "es" first, exactly as
+        # BackgroundTranslationController._on_worker_translation_completed writes a result before
+        # the next locale from that same response is checked. Only the "es" cell should now read
+        # as stale -- "fr", in the same row, from the same still-in-flight response, must not be.
+        self.window.table.item(0, es_col).setText("Hola")
+        assert is_stale(0, es_col) is True
+        assert is_stale(0, fr_col) is False
+
+    def test_llm_per_key_all_locales_mode_never_queues_a_row_with_nothing_missing(self):
+        """The row-level gate on the cloud LLM's token cost lives at queue-build time, not in
+        is_stale: `translate_all_missing` only turns a row into a queue item -- and so only ever
+        fires an LLM request for it -- if it still has at least one missing locale at the moment
+        "Translate All (LLM)" is clicked. A row that had a missing locale when the table loaded
+        but has since been filled in (manually, or via "Fill Missing in Row") never becomes a
+        queue item, so it never costs a cloud LLM call. This is a different mechanism from
+        is_stale (which only decides whether to keep a *result* after a request was already
+        made) and is unaffected by is_stale's mode -- it applies just as much to PER_LOCALE."""
+        filled_after_load = _make_group("greeting", {"en": "Hello", "es": ""})
+        still_missing = _make_group("farewell", {"en": "Bye", "es": ""})
+        translations = {filled_after_load.key: filled_after_load, still_missing.key: still_missing}
+        self.window.load_data(translations, ["en", "es"])
+        es_col = self._col_for_locale("es")
+
+        # Simulate the user filling in "greeting"'s only missing cell after the table loaded but
+        # before clicking "Translate All (LLM)" -- e.g. typed manually, or "Fill Missing in Row".
+        filled_row = self.window._key_to_row[filled_after_load.key]
+        self.window.table.item(filled_row, es_col).setText("Hola (manual)")
+
+        self.window.settings_manager.save_llm_translation_mode(
+            LLMTranslationMode.PER_KEY_ALL_LOCALES, self.window.project_path
+        )
+
+        with patch(
+            "ui.translation_windows.outstanding_items.window.BackgroundTranslationController"
+        ) as mock_controller_cls, patch.object(
+            QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes
+        ):
+            mock_controller = mock_controller_cls.return_value
+            self.window.translate_all_missing(use_llm=True)
+
+        mock_controller.start.assert_called_once()
+        args, kwargs = mock_controller.start.call_args
+        translation_queue = args[1]
+        queued_keys = [key for key, _source_text, _locale_cols in translation_queue]
+        # Only "farewell" (still missing "es") got a queue entry -- "greeting" (filled in before
+        # the click) never did, so no LLM request is ever made for it.
+        assert queued_keys == [still_missing.key]
+        assert kwargs["total"] == 1
+
     def test_declined_confirmation_does_not_start_a_batch(self):
         missing = _make_group("farewell", {"en": "Bye", "es": ""})
         translations = {missing.key: missing}
@@ -767,9 +851,12 @@ class TestTranslationResultRouting:
     be verified any other way.
 
     Staleness is checked live against the table's *current* text at apply-time -- not against a
-    log of past edits -- so a cell (or, in PER_KEY_ALL_LOCALES mode, its whole row) that already
-    has text is left alone regardless of who put it there or when relative to the batch starting
-    (see BackgroundTranslationController.start's docstring)."""
+    log of past edits -- so a cell that already has text is left alone regardless of who put it
+    there or when relative to the batch starting. This is per-cell in every mode, including
+    PER_KEY_ALL_LOCALES: results for a row-covering request are still applied one locale at a
+    time, so a row-level check would mistake the batch's own just-written earlier locale for a
+    conflicting edit and drop the rest of that same response (see
+    BackgroundTranslationController.start's docstring)."""
 
     @classmethod
     def setup_class(cls):
@@ -867,10 +954,11 @@ class TestTranslationResultRouting:
 
         assert received == [(row, es_col, "[es] Hello")]
 
-    def test_per_key_all_locales_mode_drops_the_whole_row_once_any_locale_is_filled(self):
-        """A PER_KEY_ALL_LOCALES request covers every missing locale in a row at once; if the
-        user (or anything else) fills in *any* one of them before the response comes back, the
-        rest of that same response is stale too -- not just the one locale that got filled."""
+    def test_per_key_all_locales_mode_only_drops_the_specific_filled_locale(self):
+        """A PER_KEY_ALL_LOCALES request covers every missing locale in a row at once, but
+        staleness is still checked per cell: if the user (or anything else, including an earlier
+        result from this same response) fills in *one* locale before another result for that row
+        comes back, only that one locale is dropped -- not the rest of the row."""
         group = _make_group("greeting", {"en": "Hello", "es": "", "fr": ""})
         translations = {group.key: group}
         self.window.load_data(translations, ["en", "es", "fr"])
@@ -884,7 +972,7 @@ class TestTranslationResultRouting:
 
         controller = self._make_controller(
             row_for_key=self.window._key_to_row.get,
-            is_stale=lambda r, _c: self.window._row_has_any_filled_locale(r),
+            is_stale=self._cell_is_stale,
         )
         received = []
         controller.translation_completed.connect(lambda row, col, text: received.append((row, col, text)))
@@ -892,9 +980,110 @@ class TestTranslationResultRouting:
         controller._on_worker_translation_completed(group.key, es_col, "es", "[es] Hello")
         controller._on_worker_translation_completed(group.key, fr_col, "fr", "[fr] Hola")
 
-        assert received == []
-        assert self.window.table.item(row, es_col).text() == ""
+        assert received == [(row, es_col, "[es] Hello")]
         assert self.window.table.item(row, fr_col).text() == "Bonjour (manual)"
+
+    def test_row_fully_filled_probe_answers_true_only_when_every_locale_has_text(self):
+        """`_on_row_fully_filled_probe` is the main-thread side of the live row-level pre-check
+        TranslationWorker consults (via a BlockingQueuedConnection, so this doesn't call the
+        production round-trip -- that would deadlock outside a real QThread, see
+        `_check_row_fully_filled`'s docstring) before firing a PER_KEY_ALL_LOCALES cloud LLM
+        request. It should answer True only once *every* locale that request would have covered
+        already has text -- reusing the same per-cell `is_stale` check as the post-response path,
+        just ANDed across the whole row instead of checked one cell at a time."""
+        group = _make_group("greeting", {"en": "Hello", "es": "", "fr": ""})
+        translations = {group.key: group}
+        self.window.load_data(translations, ["en", "es", "fr"])
+        es_col = self._col_for_locale("es")
+        fr_col = self._col_for_locale("fr")
+        row = self.window._key_to_row[group.key]
+        locale_cols = [(es_col, "es"), (fr_col, "fr")]
+
+        controller = self._make_controller(
+            row_for_key=self.window._key_to_row.get, is_stale=self._cell_is_stale
+        )
+
+        # Nothing filled in yet -- the request is still worth making.
+        result_box = []
+        controller._on_row_fully_filled_probe(group.key, locale_cols, result_box)
+        assert result_box == [False]
+
+        # Only "es" filled in (e.g. the user typed it manually) -- "fr" is still missing, so the
+        # request (which would also ask for "fr") is still worth making.
+        self.window.table.item(row, es_col).setText("Hola (manual)")
+        result_box = []
+        controller._on_row_fully_filled_probe(group.key, locale_cols, result_box)
+        assert result_box == [False]
+
+        # Both filled in now -- nothing left for this request to usefully ask the cloud LLM for.
+        self.window.table.item(row, fr_col).setText("Bonjour (manual)")
+        result_box = []
+        controller._on_row_fully_filled_probe(group.key, locale_cols, result_box)
+        assert result_box == [True]
+
+    def test_row_fully_filled_probe_answers_false_when_key_has_no_current_row(self):
+        """Mirrors `_on_worker_translation_completed`'s handling of a key with no current row
+        (deleted, or no longer the duplicate-combine representative): fail open (don't skip the
+        request) rather than guess, since dropping it here would silently swallow a translation
+        that might still be wanted for whatever row now represents this key."""
+        controller = self._make_controller(row_for_key=lambda key: None, is_stale=self._cell_is_stale)
+
+        result_box = []
+        controller._on_row_fully_filled_probe("no-such-key", [(1, "es")], result_box)
+
+        assert result_box == [False]
+
+    def test_row_precheck_skips_the_request_when_the_row_is_already_fully_filled(self):
+        """End-to-end at the TranslationWorker level (no real QThread -- `run()` is called
+        directly on the test thread, same pattern as
+        TestTranslationWorkerStopsOnBatchStoppingErrors in test_rate_limit_propagation.py): a
+        `row_precheck` that reports "already fully filled" for one key must stop that key's
+        multi-locale request from ever reaching the translation service, while a key it reports
+        False for proceeds normally."""
+        from ui.translation_windows.outstanding_items.translation_orchestrator import TranslationWorker
+        from utils.globals import LLMTranslationMode
+
+        calls = []
+
+        class _FakeTranslationService:
+            def translate_with_llm_multi_locale(self, text, target_locales, context=None):
+                calls.append(tuple(target_locales))
+                return {locale: f"[{locale}] {text}" for locale in target_locales}
+
+        queue = [
+            ("already_filled_key", "Hello", [(1, "es"), (2, "fr")]),
+            ("still_missing_key", "World", [(1, "es"), (2, "fr")]),
+        ]
+        precheck_calls = []
+
+        def row_precheck(key, locale_cols):
+            precheck_calls.append(key)
+            return key == "already_filled_key"
+
+        worker = TranslationWorker(
+            _FakeTranslationService(),
+            queue,
+            use_llm=True,
+            mode=LLMTranslationMode.PER_KEY_ALL_LOCALES,
+            total=4,
+            row_precheck=row_precheck,
+        )
+        completed_signals = []
+        worker.translation_completed.connect(
+            lambda key, col, locale, text: completed_signals.append((key, col, locale, text))
+        )
+
+        worker.run()
+
+        assert precheck_calls == ["already_filled_key", "still_missing_key"]
+        # Only "still_missing_key" ever reached the translation service -- the already-filled
+        # key's request was skipped entirely, spending no cloud LLM call on it.
+        assert calls == [("es", "fr")]
+        assert [key for key, _col, _locale, _text in completed_signals] == [
+            "still_missing_key", "still_missing_key"
+        ]
+        # Both keys still count toward progress even though one was skipped rather than sent.
+        assert worker.completed == 4
 
 
 class TestCloseEventWithRunningBatch:

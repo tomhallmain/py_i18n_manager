@@ -474,20 +474,6 @@ class OutstandingItemsWindow(BaseTranslationWindow):
             return msgid_display.split(" (")[0]
         return msgid_display
 
-    def _row_has_any_filled_locale(self, row):
-        """True if any non-key cell in `row` currently has text.
-
-        Used to decide staleness for LLMTranslationMode.PER_KEY_ALL_LOCALES results: one request
-        covers every missing locale in the row at once, so if any of them has been filled by the
-        time a result comes back, the rest of that same response is stale too (see
-        translate_all_missing's is_stale closure and translation_orchestrator.py).
-        """
-        for col in range(1, self.table.columnCount()):
-            item = self.table.item(row, col)
-            if item and item.text().strip():
-                return True
-        return False
-
     def translate_all_missing(self, use_llm=False):
         """Translate all missing items using the specified method.
 
@@ -526,6 +512,11 @@ class OutstandingItemsWindow(BaseTranslationWindow):
 
                 missing_cols.append((col, locale))
 
+            # A row with nothing missing contributes no entry at all, so it never becomes a queue
+            # item and the LLM (cloud, in PER_KEY_ALL_LOCALES mode) is never asked to translate
+            # it -- distinct from is_stale below, which decides whether to keep a result once a
+            # request has already been made; this is what stops the request from being made in
+            # the first place for a row that needs nothing.
             if missing_cols:
                 row_entries.append((key, source_text, missing_cols))
 
@@ -606,18 +597,16 @@ class OutstandingItemsWindow(BaseTranslationWindow):
         self._cancel_batch_btn.setText(_("Cancel"))
         self._cancel_batch_btn.show()
 
-        # A result is stale (dropped rather than written) if its target already has text by the
-        # time it comes back. Granularity depends on mode: PER_KEY_ALL_LOCALES covers every
-        # missing locale in a row with one request, so any one of them being filled makes the
-        # rest of that same response stale too; every other mode (Argos, or LLM PER_LOCALE)
-        # requests one cell at a time, so only that cell matters.
-        if use_llm and mode == LLMTranslationMode.PER_KEY_ALL_LOCALES:
-            def is_stale(row, _col):
-                return self._row_has_any_filled_locale(row)
-        else:
-            def is_stale(row, col):
-                item = self.table.item(row, col)
-                return bool(item and item.text().strip())
+        # A result is stale (dropped rather than written) if its target cell already has text by
+        # the time it comes back -- checked per cell, not per row. PER_KEY_ALL_LOCALES covers
+        # every missing locale in a row with one request, but results for that request are still
+        # applied one locale at a time, so a row-level check would see the batch's own
+        # just-written earlier locale in the row and mistake it for a conflicting edit, dropping
+        # the rest of that same response. Checking only the specific (row, col) targeted by each
+        # result avoids that false positive in every mode.
+        def is_stale(row, col):
+            item = self.table.item(row, col)
+            return bool(item and item.text().strip())
 
         # Create controller, wire signals, and start the background worker/thread
         self._translation_controller = BackgroundTranslationController(self)
