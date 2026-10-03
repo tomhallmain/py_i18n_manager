@@ -232,10 +232,9 @@ class LLM:
                           system_prompt_drop_rate=DEFAULT_SYSTEM_PROMPT_DROP_RATE,
                           cjk_reject_threshold_percentage=DEFAULT_CJK_REJECT_THRESHOLD_PERCENTAGE):
         """Generate a response from the LLM."""
-        logger.debug(f"LLM.generate_response called with query length: {len(query)}")
+        logger.debug(f"LLM.generate_response called for model {self.model_name} with query length: {len(query)}")
         query = self._sanitize_query(query)
         timeout = self._get_timeout(timeout)
-        logger.debug(f"Asking LLM {self.model_name}:\n{query}")
         data = {
             "model": self.model_name,
             "prompt": query,
