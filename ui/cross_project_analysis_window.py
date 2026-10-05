@@ -12,10 +12,7 @@ from lib.multi_display import SmartDialog
 from i18n.cross_project_analyzer import CrossProjectAnalyzer, CrossProjectAnalysis, MsgIdMatchGroup, TranslationMatch
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
-from utils.translations import I18N
-
-# Set up translation
-_ = I18N._
+from utils.translations import _
 
 logger = get_logger("cross_project_analysis_window")
 

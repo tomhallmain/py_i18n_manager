@@ -12,9 +12,7 @@ from lib.multi_display import SmartDialog
 from utils.globals import LLMTranslationMode
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
-from utils.translations import I18N
-
-_ = I18N._
+from utils.translations import _
 
 logger = get_logger("llm_settings_dialog")
 

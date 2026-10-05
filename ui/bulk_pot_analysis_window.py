@@ -12,10 +12,7 @@ from i18n.bulk_pot_analyzer import BulkPotAnalyzer, ProjectAnalysisResult, GitSt
 from utils.globals import ProjectType
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
-from utils.translations import I18N
-
-# Set up translation
-_ = I18N._
+from utils.translations import _
 
 logger = get_logger("bulk_pot_analysis_window")
 

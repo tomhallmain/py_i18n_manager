@@ -26,9 +26,7 @@ except Exception:
 
 from i18n.translation_manager_results import TranslationAction
 from test_utils import isolated_settings_and_cache_env
-from utils.translations import I18N
-
-_ = I18N._
+from utils.translations import I18N, _
 
 TEST_LOCALE = "fr"
 

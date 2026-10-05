@@ -12,7 +12,7 @@ from utils.globals import config_manager
 from utils.globals import LLMTranslationMode
 from utils.globals import TranslationStatus
 from utils.logging_setup import get_logger
-from utils.translations import I18N
+from utils.translations import _
 from ui.translation_windows.base_translation_window import BaseTranslationWindow
 from ui.translation_progress_dialog import ETATracker
 from ui.llm_settings_dialog import LLMSettingsDialog
@@ -27,8 +27,6 @@ from ui.translation_windows.outstanding_items.duplicate_prefill import (
 from ui.translation_windows.outstanding_items.translation_orchestrator import (
     BackgroundTranslationController,
 )
-
-_ = I18N._
 
 logger = get_logger(__name__)
 

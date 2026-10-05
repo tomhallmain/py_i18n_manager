@@ -9,9 +9,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from utils.translations import I18N
-
-_ = I18N._
+from utils.translations import _
 
 
 class ETATracker:

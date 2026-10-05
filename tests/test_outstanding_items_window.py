@@ -27,9 +27,7 @@ from unittest.mock import patch
 
 from test_utils import isolated_settings_and_cache_env
 from utils.globals import LLMTranslationMode
-from utils.translations import I18N
-
-_ = I18N._
+from utils.translations import _
 
 
 def _make_group(msgid, values, is_in_base=True):

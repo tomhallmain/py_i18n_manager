@@ -4,11 +4,9 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
 from i18n.translation_manager_results import TranslationManagerResults
 from ui.app_style import AppStyle
 from utils.logging_setup import get_logger
-from utils.translations import I18N
+from utils.translations import _
 
 logger = get_logger("stats_widget")
-
-_ = I18N._
 
 class StatsWidget(QWidget):
     def __init__(self, parent=None):

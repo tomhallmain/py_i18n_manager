@@ -11,9 +11,7 @@ from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QMenu
 
 from utils.globals import config_manager
-from utils.translations import I18N
-
-_ = I18N._
+from utils.translations import _
 
 
 def show_context_menu(window, position):

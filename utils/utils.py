@@ -17,6 +17,9 @@ DARK_GREEN = "\033[92m"
 CYAN = "\033[34m"
 logger = get_logger("utils")
 
+# UI language used when none can be detected (see Utils.get_default_user_language).
+DEFAULT_UI_LANGUAGE = "en"
+
 # Defaults for Utils.isdir_with_retry / isfile_with_retry / exists_with_retry.
 DEFAULT_PATH_CHECK_MAX_RETRIES = 3
 DEFAULT_PATH_CHECK_RETRY_DELAY = 1.0
@@ -210,22 +213,38 @@ class Utils:
 
     @staticmethod
     def get_default_user_language():
-        _locale = os.environ['LANG'] if "LANG" in os.environ else None
-        if not _locale or _locale == '':
-            if sys.platform == 'win32':
-                import ctypes
-                import locale
-                windll = ctypes.windll.kernel32
-                windll.GetUserDefaultUILanguage()
-                _locale = locale.windows_locale[windll.GetUserDefaultUILanguage()]
-                if _locale is not None and "_" in _locale:
-                    _locale = _locale[:_locale.index("_")]
-            # TODO support finding default languages on other platforms
-            else:
-                _locale = 'en'
-        elif _locale is not None and "_" in _locale:
-            _locale = _locale[:_locale.index("_")]
-        return _locale
+        """Language code (e.g. ``"de"``) for the user's UI language; never empty.
+
+        Uses ``LANG`` when it names a real language. Otherwise, on Windows, uses the user's
+        UI language (``GetUserDefaultUILanguage``). Falls back to :data:`DEFAULT_UI_LANGUAGE`
+        when neither yields one, including for a Windows language ID that
+        ``locale.windows_locale`` does not know.
+        """
+        language = Utils._language_from_posix_locale(os.environ.get("LANG", ""))
+        if language:
+            return language
+        if sys.platform == 'win32':
+            import ctypes
+            import locale
+            lcid = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+            language = Utils._language_from_posix_locale(locale.windows_locale.get(lcid, ""))
+            if language:
+                return language
+        # TODO support finding default languages on other platforms
+        return DEFAULT_UI_LANGUAGE
+
+    @staticmethod
+    def _language_from_posix_locale(value):
+        """Language part of a POSIX-style locale name, or None if it names no language.
+
+        ``de_DE.UTF-8@euro`` -> ``de``, ``de.UTF-8`` -> ``de``, ``sr_RS@latin`` -> ``sr``.
+        The ``C`` and ``POSIX`` locales (with or without a codeset, e.g. ``C.UTF-8``) and
+        empty values give None.
+        """
+        name = (value or "").strip().split("@", 1)[0].split(".", 1)[0]
+        if name in ("", "C", "POSIX"):
+            return None
+        return name.split("_", 1)[0] or None
 
     @staticmethod
     def play_sound(sound="success"):

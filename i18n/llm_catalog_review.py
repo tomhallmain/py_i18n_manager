@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, TYPE_CHECKING
 
 from utils.logging_setup import get_logger
-from utils.translations import I18N
+from utils.translations import I18N, _
 from utils.utils import Utils
 
 from .translation_group import TranslationGroup, TranslationKey
@@ -30,8 +30,6 @@ if TYPE_CHECKING:
     from utils.settings_manager import SettingsManager
 
 logger = get_logger("llm_catalog_review")
-
-_ = I18N._
 
 # Keep rolling state bounded so prompts stay within context windows.
 MAX_ROLLING_SUMMARY_CHARS = 8000

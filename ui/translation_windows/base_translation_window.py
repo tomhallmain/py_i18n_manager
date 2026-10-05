@@ -12,9 +12,7 @@ from ui.frozen_table_widget import FrozenTableWidget
 from utils.config import config_manager
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
-from utils.translations import I18N
-
-_ = I18N._
+from utils.translations import _
 
 logger = get_logger("base_translation_window")
 

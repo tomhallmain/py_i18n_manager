@@ -18,9 +18,7 @@ from PyQt6.QtWidgets import (
 
 from i18n.translation_group import TranslationGroup, TranslationKey
 from ui.translation_windows.base_translation_window import BaseTranslationWindow
-from utils.translations import I18N
-
-_ = I18N._
+from utils.translations import _
 
 
 def _key_display(key: Any) -> str:

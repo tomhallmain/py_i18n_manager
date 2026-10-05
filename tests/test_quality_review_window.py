@@ -25,9 +25,7 @@ except Exception:
 
 from test_utils import isolated_settings_and_cache_env
 from utils.globals import QualityHeuristicKind
-from utils.translations import I18N
-
-_ = I18N._
+from utils.translations import _
 
 
 class _FakeI18nManager:
@@ -85,8 +83,7 @@ class TestTranslationQualityReviewWindow:
         assert self.window._heuristic_table.columnCount() == 6
 
     def test_heuristic_table_headers_use_locales_not_locale_and_notes(self):
-        # Headers are gettext-translated (see
-        # ui/translation_windows/translation_quality_review_window.py's `_ = I18N._`),
+        # Headers are gettext-translated (via `_` from utils.translations),
         # so compare against the same translation call rather than hardcoded English literals --
         # the active locale in the test environment may not be English.
         table = self.window._heuristic_table

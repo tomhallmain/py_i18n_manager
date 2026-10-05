@@ -18,9 +18,7 @@ from ui.translation_windows.replace_key_window import ReplaceKeyWindow
 from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 from utils.config import config_manager
 from utils.globals import TranslationStatus, TranslationFilter
-from utils.translations import I18N
-
-_ = I18N._
+from utils.translations import _
 
 # Minimum column widths: key column fits keys like "en.views.projects.created_at"; others slightly less
 KEY_COLUMN_MIN_WIDTH = 200

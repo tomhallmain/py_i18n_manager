@@ -4,10 +4,8 @@ from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton,
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from lib.multi_display import SmartDialog
-from utils.translations import I18N
+from utils.translations import _
 from utils.settings_manager import SettingsManager
-
-_ = I18N._
 
 class ProjectListItem(QWidget):
     remove_clicked = pyqtSignal(str)  # Signal to emit when remove is clicked

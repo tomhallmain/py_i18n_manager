@@ -54,13 +54,11 @@ from ui.translation_windows.base_translation_window import (
 from ui.llm_settings_dialog import LLMSettingsDialog
 from ui.quality_review_exclusions_dialog import QualityReviewExclusionsDialog
 from utils.logging_setup import get_logger
-from utils.translations import I18N
+from utils.translations import _
 from workers.translation_worker import TranslationWorker
 
 if TYPE_CHECKING:
     from i18n.i18n_manager import I18NManager
-
-_ = I18N._
 
 logger = get_logger("translation_quality_review_window")
 

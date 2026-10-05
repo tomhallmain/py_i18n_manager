@@ -12,9 +12,7 @@ from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
 from utils.globals import config_manager
 from utils.logging_setup import get_logger
-from utils.translations import I18N
-
-_ = I18N._
+from utils.translations import _
 
 logger = get_logger(__name__)
 

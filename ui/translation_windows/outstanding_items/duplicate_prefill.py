@@ -11,9 +11,7 @@ from __future__ import annotations
 from PyQt6.QtWidgets import QMessageBox
 
 from utils.globals import config_manager
-from utils.translations import I18N
-
-_ = I18N._
+from utils.translations import _
 
 
 def detect_duplicate_values(translations, locales, ignore_patterns=()):

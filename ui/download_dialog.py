@@ -2,9 +2,7 @@ from PyQt6.QtWidgets import QVBoxLayout, QLabel, QProgressBar, QApplication
 from PyQt6.QtCore import Qt, QTimer
 
 from lib.multi_display import SmartDialog
-from utils.translations import I18N
-
-_ = I18N._
+from utils.translations import _
 
 
 class DownloadDialog(SmartDialog):

@@ -53,9 +53,8 @@ class QuoteStyle(str, Enum):
             return default
 
     def get_display_name(self) -> str:
-        from utils.translations import I18N
+        from utils.translations import _
 
-        _ = I18N._
         names: Dict["QuoteStyle", str] = {
             QuoteStyle.STRAIGHT: _('Straight quotes (" ")'),
             QuoteStyle.CURLY: _("Curly quotes (“ ”)"),

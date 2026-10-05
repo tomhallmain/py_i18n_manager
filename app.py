@@ -27,13 +27,10 @@ from utils.globals import ProjectType
 from utils.logging_setup import get_logger
 from utils.project_detector import ProjectDetector
 from utils.settings_manager import SettingsManager
-from utils.translations import I18N
+from utils.translations import _
 from workers.translation_worker import TranslationWorker
 
 logger = get_logger("main_window")
-
-# Set up translation
-_ = I18N._
 
 class MainWindow(SmartMainWindow):
     def __init__(self):

@@ -1,21 +1,22 @@
 import gettext
 import os
 
-from utils.utils import Utils
-
-_locale = os.environ['LANG'] if "LANG" in os.environ else None
-if not _locale or _locale == '':
-    _locale = Utils.get_default_user_language()
-elif _locale is not None and "_" in _locale:
-    _locale = _locale[:_locale.index("_")]
+from utils.utils import DEFAULT_UI_LANGUAGE, Utils
 
 class I18N:
     localedir = os.path.join(os.path.dirname(os.path.abspath(os.path.dirname(__file__))), 'locale')
-    locale = "en"
-    translate = gettext.translation('base', localedir, languages=[_locale])
+    # Placeholders until install_locale() runs with the detected language at the end of this module.
+    locale = DEFAULT_UI_LANGUAGE
+    translate = gettext.NullTranslations()
 
     @staticmethod
     def install_locale(locale, verbose=True):
+        """Make ``locale`` the app's UI language.
+
+        Sets :attr:`locale` (also read for the language of LLM responses), the catalog used by
+        :meth:`_`, and ``_`` in builtins. ``fallback=True``: a language with no catalog under
+        ``locale/`` shows the untranslated msgids instead of raising ``FileNotFoundError``.
+        """
         I18N.locale = locale
         I18N.translate = gettext.translation('base', I18N.localedir, languages=[locale], fallback=True)
         I18N.translate.install()
@@ -29,3 +30,10 @@ class I18N:
             return I18N.translate.gettext(s)
         except KeyError:
             return s
+
+
+I18N.install_locale(Utils.get_default_user_language(), verbose=False)
+
+# Translation function for other modules: ``from utils.translations import _``. It is
+# I18N._, which reads I18N.translate on every call, so it follows later install_locale() calls.
+_ = I18N._

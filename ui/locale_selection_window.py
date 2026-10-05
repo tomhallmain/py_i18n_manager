@@ -30,9 +30,7 @@ from utils.globals import (
     valid_script_codes,
 )
 from utils.settings_manager import SettingsManager
-from utils.translations import I18N
-
-_ = I18N._
+from utils.translations import _
 
 MAX_SUGGESTION_BUTTONS = 18
 

@@ -3,9 +3,7 @@ import os
 from typing import Optional
 
 from utils.config import config_manager
-from utils.translations import I18N
-
-_ = I18N._
+from utils.translations import _
 
 
 class AppInfo(Enum):

@@ -18,9 +18,7 @@ from PyQt6.QtWidgets import (
 
 from lib.multi_display import SmartDialog
 from utils.settings_manager import SettingsManager
-from utils.translations import I18N
-
-_ = I18N._
+from utils.translations import _
 
 
 class QualityReviewExclusionsDialog(SmartDialog):
