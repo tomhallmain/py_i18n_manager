@@ -2,6 +2,7 @@ import re
 from typing import Dict, List, Sequence
 import unicodedata
 
+from .script_utils import is_latin_char
 from .text_scrub import scrub_dynamic_segments
 from utils.utils import Utils
 
@@ -79,15 +80,6 @@ class InvalidCharacterSetAnalyzer:
         "ko": "korean",
     }
 
-    @staticmethod
-    def _is_latin_char(ch: str) -> bool:
-        if not ch or not ch.isalpha():
-            return False
-        try:
-            return "LATIN" in unicodedata.name(ch)
-        except ValueError:
-            return False
-
     @classmethod
     def _non_latin_letter_ratio(cls, text: str) -> float:
         if not text:
@@ -97,7 +89,7 @@ class InvalidCharacterSetAnalyzer:
         for ch in text:
             if not ch.isalpha():
                 continue
-            if cls._is_latin_char(ch):
+            if is_latin_char(ch):
                 latin += 1
             else:
                 non_latin += 1
@@ -117,7 +109,7 @@ class InvalidCharacterSetAnalyzer:
     def _character_script_family(cls, ch: str) -> str | None:
         if not ch or not ch.isalpha():
             return None
-        if cls._is_latin_char(ch):
+        if is_latin_char(ch):
             return "latin"
         if "\uac00" <= ch <= "\ud7af":
             return "korean"

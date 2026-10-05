@@ -1,12 +1,12 @@
 import unicodedata as u
 
+from i18n.script_utils import is_latin_char
 from i18n.translation_group import TranslationGroup
 from i18n.translation_quality_review import (
     collect_findings_for_group,
     collect_project_quality_findings,
     collect_quote_style_findings,
     _is_allowed_identical_copy,
-    _is_latin_char,
     _has_mixed_script_latin_leakage,
     _has_significant_latin_run,
 )
@@ -75,6 +75,21 @@ class TestLatinHeuristicsRegression:
         assert not _has_significant_latin_run(text, ())
         assert not _has_mixed_script_latin_leakage(text, ())
 
+    def test_mixed_script_flags_latin_letter_embedded_in_non_latin_word(self):
+        assert _has_mixed_script_latin_leakage("абвxгде", ())
+
+    def test_mixed_script_flags_latin_letter_at_word_boundary(self):
+        assert _has_mixed_script_latin_leakage("x абв", ())
+
+    def test_mixed_script_flags_single_latin_letter_between_punctuation(self):
+        assert _has_mixed_script_latin_leakage("абв (x) где", ())
+
+    def test_mixed_script_ignores_two_letter_latin_run(self):
+        text = "абв xy где"
+        assert not _has_mixed_script_latin_leakage(text, ())
+        # Runs of 2+ Latin letters belong to the significant-run heuristic instead.
+        assert _has_significant_latin_run(text, ())
+
     def test_collect_findings_emits_both_latin_signals_when_both_match(self):
         class _FakeKey:
             def __init__(self, msgid: str, context: str = ""):
@@ -141,9 +156,9 @@ class TestLatinHeuristicsRegression:
         assert set(latin_findings[0].notes.split(", ")) == {"ja", "ko", "zh", "ru"}
 
     def test_accented_portuguese_letters_are_treated_as_latin(self):
-        assert _is_latin_char("é")
-        assert _is_latin_char("ç")
-        assert _is_latin_char("ã")
+        assert is_latin_char("é")
+        assert is_latin_char("ç")
+        assert is_latin_char("ã")
         assert _has_significant_latin_run("ação", ())
 
     def test_collect_findings_stop_character_inconsistency_extra(self):

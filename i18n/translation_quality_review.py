@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import math
 import re
-import unicodedata
 from typing import AbstractSet, Dict, List, Optional, Sequence, TYPE_CHECKING
 
 from i18n.quote_styles import (
@@ -30,6 +29,7 @@ if TYPE_CHECKING:
     from utils.settings_manager import SettingsManager
 
 from .invalid_translation_groups import QualityReviewFinding, TranslationQualityFindings
+from .script_utils import is_latin_char
 from .text_scrub import scrub_dynamic_segments
 from .translation_group import TranslationGroup, TranslationKey
 from .valid_exclusions_by_language import (
@@ -131,9 +131,10 @@ def collect_findings_for_group(
         # if base_language(loc) == "ru":
         #     _debug_heuristic_probe(mid, loc, tstrip, latin_ignore_patterns)
         if Utils.is_non_latin_script_locale(loc):
-            if _has_significant_latin_run(tstrip, latin_ignore_patterns):
+            scrubbed = _scrub_for_latin_checks(tstrip, latin_ignore_patterns)
+            if _scrubbed_has_significant_latin_run(scrubbed):
                 latin_in_cjk_locales.append(loc)
-            if _has_mixed_script_latin_leakage(tstrip, latin_ignore_patterns):
+            if _scrubbed_has_isolated_latin_letter(scrubbed):
                 latin_mixed_script_locales.append(loc)
 
         if base and translation_has_stop_inconsistency_vs_source(base, tstrip, loc):
@@ -189,15 +190,20 @@ def _finding_identical_to_default_for_group(
     base = (group.get_translation(default_locale) or "").strip()
     if not base:
         return None
+    # Every candidate equals ``base``, so its scrubbed form is computed once (on first need).
+    base_scrubbed: Optional[str] = None
     for loc in locales:
         if loc == default_locale:
             continue
         text = (group.get_translation(loc) or "").strip()
-        if not text:
+        if not text or text != base:
             continue
-        if text == base and not _is_allowed_identical_copy(
+        if base_scrubbed is None:
+            base_scrubbed = _scrub_for_latin_checks(base, latin_ignore_patterns)
+        if not _is_allowed_identical_copy(
             default_locale, loc, text, latin_ignore_patterns,
             use_builtin_exclusions=use_builtin_exclusions,
+            scrubbed=base_scrubbed,
         ):
             matching.append(loc)
     if not matching:
@@ -283,8 +289,13 @@ def _is_allowed_identical_copy(
     text: str,
     latin_ignore_patterns: Sequence[str] = (),
     use_builtin_exclusions: bool = True,
+    scrubbed: Optional[str] = None,
 ) -> bool:
-    """True when copying the default locale text is expected for this locale/value."""
+    """True when copying the default locale text is expected for this locale/value.
+
+    ``scrubbed`` is ``text`` already passed through :func:`_scrub_for_latin_checks` with the
+    same ``latin_ignore_patterns``; computed here when omitted.
+    """
     if use_builtin_exclusions and is_globally_shared_identical_value(text):
         return True
 
@@ -298,22 +309,19 @@ def _is_allowed_identical_copy(
     if normalized in allowed_lang:
         return True
 
-    scrubbed = scrub_dynamic_segments(text or "")
+    if scrubbed is None:
+        scrubbed = _scrub_for_latin_checks(text or "", latin_ignore_patterns)
 
     # Allow if user-configured Latin-ignore patterns account for all Latin characters.
-    scrubbed_without_patterns = _apply_latin_ignore_patterns(scrubbed, latin_ignore_patterns)
-    if not _contains_latin_letter(scrubbed_without_patterns):
+    if not _contains_latin_letter(scrubbed):
         return True
 
+    remaining = scrubbed
     if use_builtin_exclusions:
-        scrubbed_without_patterns = _strip_allowed_shared_terms(
-            scrubbed_without_patterns, GLOBALLY_SHARED_IDENTICAL_VALUES
-        )
-        scrubbed_without_patterns = _strip_allowed_shared_terms(
-            scrubbed_without_patterns, allowed_lang
-        )
-    scrubbed_without_patterns = _strip_ui_label_parentheticals(scrubbed_without_patterns)
-    return not _contains_latin_letter(scrubbed_without_patterns)
+        remaining = _strip_allowed_shared_terms(remaining, GLOBALLY_SHARED_IDENTICAL_VALUES)
+        remaining = _strip_allowed_shared_terms(remaining, allowed_lang)
+    remaining = _strip_ui_label_parentheticals(remaining)
+    return not _contains_latin_letter(remaining)
 
 
 def _apply_latin_ignore_patterns(text: str, patterns: Sequence[str]) -> str:
@@ -330,15 +338,14 @@ def _apply_latin_ignore_patterns(text: str, patterns: Sequence[str]) -> str:
     return scrubbed
 
 
-def _is_latin_char(ch: str) -> bool:
-    if not ch or not ch.isalpha():
-        return False
-    return "LATIN" in unicodedata.name(ch, "")
+def _scrub_for_latin_checks(text: str, latin_ignore_patterns: Sequence[str]) -> str:
+    """Remove placeholder-like segments, markup tags and user Latin-ignore pattern matches."""
+    return _apply_latin_ignore_patterns(scrub_dynamic_segments(text), latin_ignore_patterns)
 
 
 def _contains_latin_letter(text: str) -> bool:
     for ch in text:
-        if _is_latin_char(ch):
+        if is_latin_char(ch):
             return True
     return False
 
@@ -346,7 +353,7 @@ def _contains_latin_letter(text: str) -> bool:
 def _has_latin_sequence(text: str, minimum_length: int) -> bool:
     run = 0
     for ch in text:
-        if _is_latin_char(ch):
+        if is_latin_char(ch):
             run += 1
             if run >= minimum_length:
                 return True
@@ -355,62 +362,37 @@ def _has_latin_sequence(text: str, minimum_length: int) -> bool:
     return False
 
 
-def _is_non_latin_alpha(ch: str) -> bool:
-    return ch.isalpha() and not _is_latin_char(ch)
+def _scrubbed_has_isolated_latin_letter(text: str) -> bool:
+    """True for typo-like leakage: a Latin letter with no Latin letter on either side.
 
-
-def _has_single_latin_char_embedded_in_non_latin_word(text: str) -> bool:
-    """True for typo-like leakage in non-Latin text.
-
-    Matches either:
-    - one Latin char directly between non-Latin letters, or
-    - a single-letter Latin token (e.g. ``c``), including when separated by spaces/punctuation.
+    Covers one Latin char between non-Latin letters (``абвxгде``), at a word boundary
+    (``x абв``), and a one-letter token between spaces or punctuation. Runs of 2+ Latin
+    letters are not matched (see :func:`_scrubbed_has_significant_latin_run`).
     """
-    if len(text) < 1:
-        return False
-
     for i, ch in enumerate(text):
-        if not _is_latin_char(ch):
+        if not is_latin_char(ch):
             continue
         left = text[i - 1] if i > 0 else ""
         right = text[i + 1] if i + 1 < len(text) else ""
-        # Embedded typo: Latin between non-Latin letters.
-        if _is_non_latin_alpha(left) and _is_non_latin_alpha(right):
-            return True
-        # Boundary typo: single Latin char touching non-Latin on either side.
-        if _is_non_latin_alpha(left) or _is_non_latin_alpha(right):
-            # Ensure this Latin char is not part of a longer Latin run.
-            if not _is_latin_char(left) and not _is_latin_char(right):
-                return True
-    # Also catch isolated one-letter Latin tokens surrounded by non-Latin or separators.
-    for i, ch in enumerate(text):
-        if not _is_latin_char(ch):
-            continue
-        left = text[i - 1] if i > 0 else ""
-        right = text[i + 1] if i + 1 < len(text) else ""
-        if not _is_latin_char(left) and not _is_latin_char(right):
+        if not is_latin_char(left) and not is_latin_char(right):
             return True
     return False
 
 
-def _has_significant_latin_run(text: str, latin_ignore_patterns: Sequence[str] = ()) -> bool:
-    # Ignore placeholder-like segments and markup tags.
-    scrubbed = scrub_dynamic_segments(text)
-    scrubbed = _apply_latin_ignore_patterns(scrubbed, latin_ignore_patterns)
+def _scrubbed_has_significant_latin_run(text: str) -> bool:
     # Catch longer Latin runs and short Latin sequences (e.g. "GM", "ee"),
     # including when adjacent to non-Latin letters.
-    # after placeholder/tag/pattern scrubbing.
-    return _has_latin_sequence(scrubbed, 2)
+    return _has_latin_sequence(text, 2)
+
+
+def _has_significant_latin_run(text: str, latin_ignore_patterns: Sequence[str] = ()) -> bool:
+    return _scrubbed_has_significant_latin_run(_scrub_for_latin_checks(text, latin_ignore_patterns))
 
 
 def _has_mixed_script_latin_leakage(
     text: str, latin_ignore_patterns: Sequence[str] = ()
 ) -> bool:
-    scrubbed = scrub_dynamic_segments(text)
-    scrubbed = _apply_latin_ignore_patterns(scrubbed, latin_ignore_patterns)
-    if not _contains_latin_letter(scrubbed):
-        return False
-    return _has_single_latin_char_embedded_in_non_latin_word(scrubbed)
+    return _scrubbed_has_isolated_latin_letter(_scrub_for_latin_checks(text, latin_ignore_patterns))
 
 
 def _findings_high_english_ratio_stub(
