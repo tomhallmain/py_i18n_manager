@@ -339,7 +339,20 @@ def _apply_latin_ignore_patterns(text: str, patterns: Sequence[str]) -> str:
 
 
 def _scrub_for_latin_checks(text: str, latin_ignore_patterns: Sequence[str]) -> str:
-    """Remove placeholder-like segments, markup tags and user Latin-ignore pattern matches."""
+    """Strip the parts of ``text`` whose Latin letters are not translation content.
+
+    Shared input preparation for the Latin heuristics and :func:`_is_allowed_identical_copy`:
+
+    1. :func:`~i18n.text_scrub.scrub_dynamic_segments` removes placeholders and markup
+       (``{name}`` including nested braces, ``%{name}``, printf forms such as ``%s`` /
+       ``%(name)s`` / ``%1$s``, and ``<tag>`` / ``</tag>``), which are Latin by nature.
+    2. Each project Latin-ignore pattern (user regexes, e.g. a product name or ``MFA``) is
+       removed with ``re.sub``. Blank patterns are skipped, and an invalid regex is skipped
+       silently so one bad setting cannot break the review.
+
+    Matches are deleted, not replaced with a separator, so the text on either side becomes
+    adjacent: ``x{name}y`` scrubs to ``xy``, a two-letter run rather than two isolated letters.
+    """
     return _apply_latin_ignore_patterns(scrub_dynamic_segments(text), latin_ignore_patterns)
 
 
@@ -363,11 +376,33 @@ def _has_latin_sequence(text: str, minimum_length: int) -> bool:
 
 
 def _scrubbed_has_isolated_latin_letter(text: str) -> bool:
-    """True for typo-like leakage: a Latin letter with no Latin letter on either side.
+    """True if ``text`` contains a Latin letter with no Latin letter directly on either side.
 
-    Covers one Latin char between non-Latin letters (``абвxгде``), at a word boundary
-    (``x абв``), and a one-letter token between spaces or punctuation. Runs of 2+ Latin
-    letters are not matched (see :func:`_scrubbed_has_significant_latin_run`).
+    Targets single Latin letters leaking into non-Latin text, such as a Latin look-alike in
+    place of a native letter: Latin ``c`` for Cyrillic ``с`` in ``войдите c новым``, Latin
+    ``B`` for Cyrillic ``В`` in ``Bсего``, or Latin ``e`` after Cyrillic ``е`` in ``еe``.
+    Look-alikes render the same as the native letter, so they are not visible by eye.
+
+    Only the immediately adjacent characters are examined. "Not Latin" means anything for
+    which :func:`~i18n.script_utils.is_latin_char` is False: non-Latin letters, digits,
+    whitespace, punctuation, or the start/end of the string. So all of these match:
+
+    - between non-Latin letters: ``абвxгде``
+    - at a word boundary: ``x абв``, ``Bсего``
+    - a standalone one-letter token between spaces or punctuation: ``абв (x) где``
+
+    This deliberately does not require a non-Latin letter next to the Latin one, so a lone
+    Latin letter anywhere in a non-Latin translation is flagged. Runs of two or more adjacent
+    Latin letters (``xy``, ``MFA``) are never matched here; they are
+    :func:`_scrubbed_has_significant_latin_run`'s concern, so the two heuristics split Latin
+    content by run length and never both fire for the same letters.
+
+    ``text`` must already be scrubbed with :func:`_scrub_for_latin_checks`; see there for how
+    placeholder removal can merge letters into a run. The caller applies this only to
+    non-Latin-script locales (:meth:`utils.utils.Utils.is_non_latin_script_locale`), and
+    reports a match as
+    :attr:`~utils.globals.QualityHeuristicKind.LATIN_MIXED_SCRIPT_IN_NON_LATIN_LOCALE`. In
+    Latin-script text it would flag ordinary one-letter words such as ``a``, ``I`` or ``à``.
     """
     for i, ch in enumerate(text):
         if not is_latin_char(ch):
@@ -380,18 +415,41 @@ def _scrubbed_has_isolated_latin_letter(text: str) -> bool:
 
 
 def _scrubbed_has_significant_latin_run(text: str) -> bool:
-    # Catch longer Latin runs and short Latin sequences (e.g. "GM", "ee"),
-    # including when adjacent to non-Latin letters.
+    """True if ``text`` contains two or more adjacent Latin letters.
+
+    Targets untranslated Latin words in a non-Latin translation: whole English words, short
+    sequences such as ``GM`` or ``ee``, and Latin runs touching non-Latin letters. Accented
+    Latin counts (``ação`` is a run). Single Latin letters are left to
+    :func:`_scrubbed_has_isolated_latin_letter`.
+
+    Brand names, acronyms and other Latin terms that legitimately stay untranslated (``MFA``)
+    are matched too unless a project Latin-ignore pattern removes them first. ``text`` must
+    already be scrubbed with :func:`_scrub_for_latin_checks`. The caller reports a match as
+    :attr:`~utils.globals.QualityHeuristicKind.LATIN_IN_CJK_LOCALE`, applied to every
+    non-Latin-script locale (:meth:`utils.utils.Utils.is_non_latin_script_locale`), not only
+    CJK ones.
+    """
     return _has_latin_sequence(text, 2)
 
 
 def _has_significant_latin_run(text: str, latin_ignore_patterns: Sequence[str] = ()) -> bool:
+    """Scrub raw ``text`` (:func:`_scrub_for_latin_checks`), then apply
+    :func:`_scrubbed_has_significant_latin_run`. Callers that also need
+    :func:`_has_mixed_script_latin_leakage` should scrub once and call both ``_scrubbed_*``
+    forms directly, as :func:`collect_findings_for_group` does.
+    """
     return _scrubbed_has_significant_latin_run(_scrub_for_latin_checks(text, latin_ignore_patterns))
 
 
 def _has_mixed_script_latin_leakage(
     text: str, latin_ignore_patterns: Sequence[str] = ()
 ) -> bool:
+    """Scrub raw ``text`` (:func:`_scrub_for_latin_checks`), then apply
+    :func:`_scrubbed_has_isolated_latin_letter`. Reported as
+    :attr:`~utils.globals.QualityHeuristicKind.LATIN_MIXED_SCRIPT_IN_NON_LATIN_LOCALE`.
+    Callers that also need :func:`_has_significant_latin_run` should scrub once and call both
+    ``_scrubbed_*`` forms directly, as :func:`collect_findings_for_group` does.
+    """
     return _scrubbed_has_isolated_latin_letter(_scrub_for_latin_checks(text, latin_ignore_patterns))
 
 

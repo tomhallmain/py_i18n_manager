@@ -780,6 +780,50 @@ class TestUseBuiltinExclusionsToggle:
         assert "fr" in notes
 
 
+class TestIdenticalToDefaultLatinIgnorePatterns:
+    """Group-level IDENTICAL_TO_DEFAULT honours ``latin_ignore_patterns``.
+
+    ``_finding_identical_to_default_for_group`` scrubs the shared default text once and passes
+    it to ``_is_allowed_identical_copy`` via ``scrubbed=``; these tests cover that handoff.
+    Test words are invented so no built-in exclusion short-circuits the pattern check.
+    """
+
+    @staticmethod
+    def _identical_to_default_notes(values, locales, latin_ignore_patterns):
+        class _K:
+            msgid = "brand.product"
+            context = ""
+
+        class _G:
+            key = _K()
+
+            def get_translation(self, loc):
+                return values.get(loc, "")
+
+        findings = collect_findings_for_group(
+            _G(), "en", locales,
+            latin_ignore_patterns=latin_ignore_patterns,
+            use_builtin_exclusions=True,
+        )
+        matches = [f for f in findings if f.signal == QualityHeuristicKind.IDENTICAL_TO_DEFAULT]
+        assert len(matches) <= 1
+        return set(matches[0].notes.split(", ")) if matches else set()
+
+    def test_copy_is_flagged_without_ignore_pattern(self):
+        values = {"en": "Zorbex", "de": "Zorbex", "ru": "Zorbex"}
+        assert self._identical_to_default_notes(values, ["en", "de", "ru"], ()) == {"de", "ru"}
+
+    def test_copy_is_allowed_when_pattern_covers_all_latin_text(self):
+        values = {"en": "Zorbex", "de": "Zorbex", "ru": "Zorbex"}
+        assert self._identical_to_default_notes(values, ["en", "de", "ru"], ("Zorbex",)) == set()
+
+    def test_copy_is_flagged_when_pattern_leaves_latin_text(self):
+        values = {"en": "Zorbex Quux", "de": "Zorbex Quux", "ru": "Zorbex Quux"}
+        assert self._identical_to_default_notes(
+            values, ["en", "de", "ru"], ("Zorbex",)
+        ) == {"de", "ru"}
+
+
 class TestCollectQuoteStyleFindings:
     """Tests for i18n.translation_quality_review.collect_quote_style_findings.
 
