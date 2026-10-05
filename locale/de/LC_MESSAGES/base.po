@@ -2,9 +2,9 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2026-07-23 17:14-0400\n"
-"PO-Revision-Date: 2026-07-23 17:14-0400\n"
-"Last-Translator: Thomas Hall <tomhall.main@gmail.com>\n"
+"POT-Creation-Date: 2026-10-05 11:24-0400\n"
+"PO-Revision-Date: 2026-10-05 11:24-0400\n"
+"Last-Translator: Translator Name <translator@example.com>\n"
 "Language-Team: de Team <<EMAIL>>\n"
 "Language: de\n"
 "MIME-Version: 1.0\n"
@@ -12,90 +12,90 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: app.py:42 app.py:228
+#: app.py:42 app.py:230
 msgid "i18n Translation Manager"
 msgstr "i18n Übersetzungsleiter"
 
-#: app.py:86
+#: app.py:88
 msgid "Current Project:"
 msgstr "Aktuelles Projekt:"
 
-#: app.py:88
+#: app.py:90 app.py:758
 msgid "No project selected"
 msgstr "Kein Projekt ausgewählt"
 
-#: app.py:109
+#: app.py:111
 msgid "Latest file change:"
 msgstr "Neuste Dateiänderung:"
 
-#: app.py:116
+#: app.py:118
 msgid "Last sync:"
 msgstr "Letzte Sync:"
 
-#: app.py:126 ui/recent_projects_dialog.py:82
+#: app.py:128 ui/recent_projects_dialog.py:82
 msgid "Select Project"
 msgstr "Projekt auswählen"
 
-#: app.py:130
+#: app.py:132
 msgid "Modify Project Settings"
 msgstr "Projekteinstellungen ändern"
 
-#: app.py:164
+#: app.py:166
 msgid "Check Status"
 msgstr "Überprüfungsstatus"
 
-#: app.py:165
+#: app.py:167
 msgid "Write Default Locale"
 msgstr "Standard-Sprachumgebung schreiben"
 
-#: app.py:166
+#: app.py:168
 msgid "Show All Translations"
 msgstr "Alle Übersetzungen anzeigen"
 
-#: app.py:167
+#: app.py:169
 msgid "Show Outstanding Items"
 msgstr "Offene Posten anzeigen"
 
-#: app.py:168 ui/translation_windows/translation_quality_review_window.py:184
+#: app.py:170 ui/translation_windows/translation_quality_review_window.py:184
 msgid "Translation Quality Review"
 msgstr "Übersetzungsqualitätsbewertung"
 
-#: app.py:169 ui/quality_review_exclusions_dialog.py:40
+#: app.py:171 ui/quality_review_exclusions_dialog.py:40
 #: ui/setup_translation_project_window.py:153
 #: ui/translation_windows/all_translations_window.py:120
 #: ui/translation_windows/outstanding_items/window.py:184
 msgid "Heuristic Exclusions"
 msgstr "Heuristische Ausnahmen"
 
-#: app.py:170
+#: app.py:172
 msgid "Find Untranslated"
 msgstr "Unübersetztes finden"
 
-#: app.py:190 ui/bulk_pot_analysis_window.py:77
+#: app.py:192 ui/bulk_pot_analysis_window.py:77
 msgid "Bulk Project Status"
 msgstr "Projektstatus in Massen"
 
-#: app.py:191
+#: app.py:193
 msgid "Cross-Project Analysis"
 msgstr "Projektübergreifende Analyse"
 
-#: app.py:192
+#: app.py:194
 msgid "Sync Base Translations"
 msgstr "Übersetzungen synchronisieren"
 
-#: app.py:193
+#: app.py:195
 msgid "Update Translation Files"
 msgstr "Übersetzungsdateien aktualisieren"
 
-#: app.py:194
+#: app.py:196
 msgid "Compile Translations"
 msgstr "Übersetzungen kompilieren"
 
-#: app.py:213 ui/bulk_pot_analysis_window.py:129
+#: app.py:215 ui/bulk_pot_analysis_window.py:129
 msgid "Status"
 msgstr "Status"
 
-#: app.py:353
+#: app.py:357
 msgid ""
 "Translation file compilation is not relevant for {} projects. {} projects "
 "use source translation files directly without a compilation step."
@@ -103,37 +103,39 @@ msgstr ""
 "Kompilierung ist für {}-Projekte nicht relevant. {}-Projekte verwenden "
 "Quelldateien direkt ohne einen Kompilierungsschritt."
 
-#: app.py:386
+#: app.py:390
 msgid "Loading translation project..."
 msgstr "Übersetzungsprojekt wird geladen..."
 
-#: app.py:387
+#: app.py:391
 msgid "Updating translation files..."
 msgstr "Übersetzungsdateien werden aktualisiert..."
 
-#: app.py:388
+#: app.py:392
 msgid "Compiling translation files..."
 msgstr "Übersetzungsdateien werden kompiliert..."
 
-#: app.py:389
+#: app.py:393
 msgid "Syncing base translation files..."
 msgstr "Synchronisierung der Basisübersetzungsdateien..."
 
-#: app.py:390
+#: app.py:394
 msgid "Running quality review..."
 msgstr "Qualitätsprüfung wird durchgeführt..."
 
-#: app.py:392
+#: app.py:396
 msgid "Running translation task..."
 msgstr "Übersetzungsauftrag wird ausgeführt..."
 
-#: app.py:393
+#: app.py:397
 msgid "Please wait"
 msgstr "Bitte warten"
 
-#: app.py:561 app.py:583 app.py:707 app.py:722 app.py:769 app.py:791
-#: app.py:821 app.py:878 ui/bulk_pot_analysis_window.py:235
-#: ui/bulk_pot_analysis_window.py:263 ui/cross_project_analysis_window.py:268
+#: app.py:421 app.py:550 app.py:574 app.py:596 app.py:720 app.py:735
+#: app.py:783 app.py:798 app.py:806 app.py:813 app.py:820 app.py:840
+#: app.py:845 app.py:850 app.py:871 app.py:910
+#: ui/bulk_pot_analysis_window.py:235 ui/bulk_pot_analysis_window.py:263
+#: ui/cross_project_analysis_window.py:268
 #: ui/cross_project_analysis_window.py:560 ui/llm_settings_dialog.py:449
 #: ui/llm_settings_dialog.py:522 ui/locale_selection_window.py:279
 #: ui/locale_selection_window.py:290 ui/locale_selection_window.py:298
@@ -159,50 +161,50 @@ msgstr "Bitte warten"
 msgid "Error"
 msgstr "Fehler"
 
-#: app.py:561 app.py:769
+#: app.py:550 app.py:574 app.py:783
 msgid "No translation data available"
 msgstr "Keine Übersetzungsdaten verfügbar"
 
-#: app.py:583 app.py:791 app.py:821 app.py:878
+#: app.py:421 app.py:596 app.py:820 app.py:850 app.py:910
 msgid "Please select a project first"
 msgstr "Bitte wählen Sie ein Projekt zuerst aus"
 
-#: app.py:707 app.py:722
+#: app.py:720 app.py:735
 msgid "Please check status first to load translation data"
 msgstr ""
 "Bitte überprüfen Sie den Status zuerst, um die Übersetzungsdaten herzuladen"
 
-#: app.py:730 ui/translation_windows/all_translations_window.py:34
+#: app.py:743 ui/translation_windows/all_translations_window.py:34
 msgid "All Translations"
 msgstr "Alle Übersetzungen"
 
-#: app.py:731
+#: app.py:744
 msgid "Could not find that translation key in the current catalog."
 msgstr ""
 "Dieser Übersetzungsschlüssel konnte im aktuellen Katalog nicht gefunden "
 "werden."
 
-#: app.py:795
+#: app.py:824
 msgid "Updating base translation files..."
 msgstr "Basise Übersetzungsdateien aktualisieren..."
 
-#: app.py:799
+#: app.py:828
 msgid "Base translation files updated successfully."
 msgstr "Basiseinweg-Übersetzungsdateien wurden erfolgreich aktualisiert."
 
-#: app.py:808
+#: app.py:837
 msgid "Update failed"
 msgstr "Aktualisierung fehlgeschlagen"
 
-#: app.py:811
+#: app.py:840
 msgid "Failed to update base translation files."
 msgstr "Fehler beim Aktualisieren der Basisübersetzungsdateien."
 
-#: app.py:886 app.py:902
+#: app.py:918 app.py:934
 msgid "No Projects to Analyze"
 msgstr "Keine Projekte zu analysieren"
 
-#: app.py:887
+#: app.py:919
 msgid ""
 "You need at least 2 projects in your recent projects list to perform cross-"
 "project analysis."
@@ -210,7 +212,7 @@ msgstr ""
 "Sie benötigen mindestens 2 Projekte in Ihrer Liste der letzten Projekte, um "
 "eine projektübergreifende Analyse durchzuführen."
 
-#: app.py:903
+#: app.py:935
 msgid ""
 "You need at least 1 project in your recent projects list to perform bulk POT"
 " analysis."
@@ -218,17 +220,17 @@ msgstr ""
 "Sie benötigen mindestens 1 Projekt in Ihrer Liste der letzten Projekte, um "
 "eine Massen-POT-Analyse durchzuführen."
 
-#: app.py:921
+#: app.py:953
 msgid "Compiled Files Need Update"
 msgstr "Zusammengefasste Dateien müssen aktualisiert werden"
 
-#: app.py:922
+#: app.py:954
 msgid "Translation files have been updated for the following locales:"
 msgstr ""
 "Die Übersetzungsdateien wurden für die folgenden Sprachumgebungen "
 "aktualisiert:"
 
-#: app.py:924
+#: app.py:956
 msgid "Remember to run Compile Translations to apply these changes."
 msgstr ""
 "Denken Sie daran, „Übersetzungen kompilieren“ auszuführen, um diese "
@@ -717,7 +719,7 @@ msgstr "Zusammenfassung der Analyse"
 msgid "Translation Matches"
 msgstr "Übersetzung Treffer"
 
-#: ui/cross_project_analysis_window.py:256
+#: app.py:466 ui/cross_project_analysis_window.py:256
 #: ui/cross_project_analysis_window.py:458
 #: ui/cross_project_analysis_window.py:488
 #: ui/cross_project_analysis_window.py:554
@@ -1394,7 +1396,7 @@ msgstr "Wählen Sie einen kürzlich genutzten Projekt aus"
 msgid "Browse..."
 msgstr "Durchsuchen..."
 
-#: ui/recent_projects_dialog.py:163
+#: app.py:319 ui/recent_projects_dialog.py:163
 msgid "Select Project Directory"
 msgstr "Projektverzeichnis auswählen"
 
@@ -2749,3 +2751,69 @@ msgstr "Inkonsistenz bei Stoppzeichen"
 #: utils/globals.py:308
 msgid "Quote style mismatch"
 msgstr "Abweichender Anführungszeichenstil"
+
+#: app.py:255 app.py:305
+msgid "Loading project: {path}"
+msgstr "Projekt wird geladen: {path}"
+
+#: app.py:467
+msgid ""
+"Task completed with warnings or errors:\n"
+"\n"
+"{details}"
+msgstr ""
+"Aufgabe abgeschlossen mit Warnungen oder Fehlern:\n"
+"\n"
+"{details}"
+
+#: app.py:513
+msgid "Project loaded successfully!"
+msgstr "Projekt erfolgreich geladen!"
+
+#: app.py:515
+msgid "Found {translation_count} translations in {locale_count} locales."
+msgstr ""
+"Gefunden {translation_count} Übersetzungen in {locale_count} "
+"Sprachvarianten."
+
+#: app.py:790
+msgid "Writing translation file for default locale ({locale})..."
+msgstr "Schreibe Übersetzungsdatei für die Standardsprache ({locale})..."
+
+#: app.py:794
+msgid "Default locale translation file written successfully!"
+msgstr "Standard‑Lokalisierungsdatei erfolgreich geschrieben!"
+
+#: app.py:799
+msgid "Failed to write translation file for default locale ({locale})"
+msgstr ""
+"Fehler beim Schreiben der Übersetzungsdatei für die Standardsprache "
+"({locale})"
+
+#: app.py:807
+msgid "Default locale ({locale}) not found in project"
+msgstr "Standard‑Sprache ({locale}) nicht im Projekt gefunden"
+
+#: app.py:814
+msgid "Failed to write default locale translation file: {error}"
+msgstr "Fehler beim Schreiben der Standard‑Lokalisierungsdatei: {error}"
+
+#: app.py:854
+msgid "Searching for untranslated strings..."
+msgstr "Suche nach nicht übersetzten Zeichenketten..."
+
+#: app.py:858
+msgid "No untranslated strings found in UI components."
+msgstr "Keine nicht übersetzten Zeichenketten in UI‑Komponenten gefunden."
+
+#: app.py:861
+msgid "Potential untranslated strings found:"
+msgstr "Mögliche nicht übersetzte Zeichenfolgen gefunden:"
+
+#: app.py:863
+msgid "In {file_path}:"
+msgstr "In {file_path}:"
+
+#: app.py:872
+msgid "Error finding untranslated strings: {error}"
+msgstr "Fehler beim Finden von nicht übersetzten Zeichenketten: {error}"

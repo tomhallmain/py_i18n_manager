@@ -63,6 +63,8 @@ class MainWindow(SmartMainWindow):
         self._task_running = False
         self._task_progress_dialog = None
         self._last_latest_translation_file_mtime: Optional[datetime] = None
+        # True while the status log was started by a project load (cleared with the log on project removal).
+        self._status_log_from_project_load = False
 
         # Initialize debounce timer for translation updates
         self.update_timer = QTimer()
@@ -250,7 +252,8 @@ class MainWindow(SmartMainWindow):
 
             # Clear previous status
             self.status_text.clear()
-            self.status_text.append(f"Loading project: {last_project}")
+            self.status_text.append(_("Loading project: {path}").format(path=last_project))
+            self._status_log_from_project_load = True
 
             # Run status check
             self.run_translation_task()
@@ -299,7 +302,8 @@ class MainWindow(SmartMainWindow):
 
         # Clear previous status
         self.status_text.clear()
-        self.status_text.append(f"Loading project: {directory}")
+        self.status_text.append(_("Loading project: {path}").format(path=directory))
+        self._status_log_from_project_load = True
 
         # Update i18n_manager with new directory if it exists
         if self.i18n_manager:
@@ -312,7 +316,7 @@ class MainWindow(SmartMainWindow):
         """Show directory picker for project selection."""
         directory = QFileDialog.getExistingDirectory(
             self,
-            "Select Project Directory",
+            _("Select Project Directory"),
             "",
             QFileDialog.Option.ShowDirsOnly
         )
@@ -414,7 +418,7 @@ class MainWindow(SmartMainWindow):
         """
         if not self.current_project:
             logger.warning("No project selected, cannot run translation task")
-            QMessageBox.warning(self, "Error", "Please select a project first")
+            QMessageBox.warning(self, _("Error"), _("Please select a project first"))
             return
 
         if self._task_running:
@@ -456,9 +460,14 @@ class MainWindow(SmartMainWindow):
             self.pending_updates.clear()
 
             if not results.action_successful:
-                error_msg = "Task completed with warnings or errors:\n\n" + results.error_message
-                logger.warning(f"Translation task completed with errors: {error_msg}")
-                QMessageBox.warning(self, "Warning", error_msg)
+                logger.warning(f"Translation task completed with errors: {results.error_message}")
+                QMessageBox.warning(
+                    self,
+                    _("Warning"),
+                    _("Task completed with warnings or errors:\n\n{details}").format(
+                        details=results.error_message
+                    ),
+                )
 
                 # TODO maybe implement this with other condition: if not self.needs_project_setup()            
                 # # If this was a status check and it failed, remove the project from recent projects
@@ -500,9 +509,13 @@ class MainWindow(SmartMainWindow):
             self.locales_label.setText("")
 
         # Add a success message if this was an automatic check
-        if self.status_text.toPlainText().startswith("Loading project:"):
-            self.status_text.append("\nProject loaded successfully!")
-            self.status_text.append(f"Found {len(translations)} translations in {len(locales)} locales.")
+        if self._status_log_from_project_load:
+            self.status_text.append("\n" + _("Project loaded successfully!"))
+            self.status_text.append(
+                _("Found {translation_count} translations in {locale_count} locales.").format(
+                    translation_count=len(translations), locale_count=len(locales)
+                )
+            )
 
     def update_status(self, text):
         self.status_text.append(text)
@@ -534,7 +547,7 @@ class MainWindow(SmartMainWindow):
     def show_outstanding_items(self):
         """Show the outstanding items window."""
         if not self.i18n_manager or not self.i18n_manager.translations or not self.locales:
-            QMessageBox.warning(self, "Error", "No translation data available")
+            QMessageBox.warning(self, _("Error"), _("No translation data available"))
             return
 
         if not self.outstanding_window:
@@ -742,7 +755,7 @@ class MainWindow(SmartMainWindow):
         # If the removed project was the current project, clear it
         if self.current_project == project_path:
             self.current_project = None
-            self.project_label.setText("No project selected")
+            self.project_label.setText(_("No project selected"))
             self.locales_label.setText("")  # Clear locales label
             self.project_type_label.setText("")  # Clear project type label
             self.update_window_title()  # Reset window title
@@ -753,6 +766,7 @@ class MainWindow(SmartMainWindow):
             self.stats_widget.clear_stats()
             # Clear status text
             self.status_text.clear()
+            self._status_log_from_project_load = False
             self._last_latest_translation_file_mtime = None
             self.update_project_time_display()
 
@@ -773,17 +787,32 @@ class MainWindow(SmartMainWindow):
             # Use project-specific default locale if available, otherwise fall back to global
             default_locale = self.settings_manager.get_project_default_locale(self.current_project)
             if default_locale in self.locales:
-                self.status_text.append(f"\nWriting translation file for default locale ({default_locale})...")
+                self.status_text.append("\n" + _("Writing translation file for default locale ({locale})...").format(
+                    locale=default_locale
+                ))
                 if self.i18n_manager.write_locale_po_file(default_locale):
-                    self.status_text.append("Default locale translation file written successfully!")
+                    self.status_text.append(_("Default locale translation file written successfully!"))
                 else:
-                    QMessageBox.warning(self, "Error", f"Failed to write translation file for default locale ({default_locale})")
+                    QMessageBox.warning(
+                        self,
+                        _("Error"),
+                        _("Failed to write translation file for default locale ({locale})").format(
+                            locale=default_locale
+                        ),
+                    )
             else:
-                QMessageBox.warning(self, "Error", f"Default locale ({default_locale}) not found in project")
+                QMessageBox.warning(
+                    self,
+                    _("Error"),
+                    _("Default locale ({locale}) not found in project").format(locale=default_locale),
+                )
         except Exception as e:
-            error_msg = f"Failed to write default locale translation file: {e}"
-            logger.error(error_msg)
-            QMessageBox.critical(self, "Error", error_msg)
+            logger.error(f"Failed to write default locale translation file: {e}")
+            QMessageBox.critical(
+                self,
+                _("Error"),
+                _("Failed to write default locale translation file: {error}").format(error=e),
+            )
 
     def generate_base_file(self):
         """Refresh the base translation set (POT for Python, i18n-tasks for Ruby, etc.)."""
@@ -808,12 +837,12 @@ class MainWindow(SmartMainWindow):
                     QMessageBox.warning(self, _("Update failed"), detail)
                 else:
                     QMessageBox.warning(
-                        self, "Error", _("Failed to update base translation files.")
+                        self, _("Error"), _("Failed to update base translation files.")
                     )
         except Exception as e:
             error_msg = f"{_('Failed to update base translation files.')}: {e}"
             logger.error(error_msg)
-            QMessageBox.critical(self, "Error", error_msg)
+            QMessageBox.critical(self, _("Error"), error_msg)
 
     def find_untranslated_strings(self):
         """Find and display potential untranslated strings in the project."""
@@ -822,23 +851,26 @@ class MainWindow(SmartMainWindow):
             return
             
         try:
-            self.status_text.append("\nSearching for untranslated strings...")
+            self.status_text.append("\n" + _("Searching for untranslated strings..."))
             results = self.i18n_manager.find_translatable_strings()
-            
+
             if not results:
-                self.status_text.append("No untranslated strings found in UI components.")
+                self.status_text.append(_("No untranslated strings found in UI components."))
                 return
-                
-            self.status_text.append("\nPotential untranslated strings found:")
+
+            self.status_text.append("\n" + _("Potential untranslated strings found:"))
             for file_path, strings in results.items():
-                self.status_text.append(f"\nIn {file_path}:")
+                self.status_text.append("\n" + _("In {file_path}:").format(file_path=file_path))
                 for string in strings:
                     self.status_text.append(f"  • {string}")
-                    
+
         except Exception as e:
-            error_msg = f"Error finding untranslated strings: {e}"
-            logger.error(error_msg)
-            QMessageBox.critical(self, "Error", error_msg)
+            logger.error(f"Error finding untranslated strings: {e}")
+            QMessageBox.critical(
+                self,
+                _("Error"),
+                _("Error finding untranslated strings: {error}").format(error=e),
+            )
 
     def needs_project_setup(self, results: Optional[TranslationManagerResults] = None):
         """Check if the project needs initial setup."""

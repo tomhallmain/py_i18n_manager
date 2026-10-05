@@ -2,8 +2,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
-"POT-Creation-Date: 2026-07-23 17:06-0400\n"
-"PO-Revision-Date: 2026-07-23 17:06-0400\n"
+"POT-Creation-Date: 2026-10-05 11:23-0400\n"
+"PO-Revision-Date: 2026-10-05 11:23-0400\n"
 "Last-Translator: Translator Name <translator@example.com>\n"
 "Language-Team: en Team <<EMAIL>>\n"
 "Language: en\n"
@@ -12,90 +12,90 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: app.py:42 app.py:228
+#: app.py:42 app.py:230
 msgid "i18n Translation Manager"
 msgstr "i18n Translation Manager"
 
-#: app.py:86
+#: app.py:88
 msgid "Current Project:"
 msgstr "Current Project:"
 
-#: app.py:88
+#: app.py:90 app.py:758
 msgid "No project selected"
 msgstr "No project selected"
 
-#: app.py:109
+#: app.py:111
 msgid "Latest file change:"
 msgstr "Latest file change:"
 
-#: app.py:116
+#: app.py:118
 msgid "Last sync:"
 msgstr "Last sync:"
 
-#: app.py:126 ui/recent_projects_dialog.py:82
+#: app.py:128 ui/recent_projects_dialog.py:82
 msgid "Select Project"
 msgstr "Select Project"
 
-#: app.py:130
+#: app.py:132
 msgid "Modify Project Settings"
 msgstr "Modify Project Settings"
 
-#: app.py:164
+#: app.py:166
 msgid "Check Status"
 msgstr "Check Status"
 
-#: app.py:165
+#: app.py:167
 msgid "Write Default Locale"
 msgstr "Write Default Locale"
 
-#: app.py:166
+#: app.py:168
 msgid "Show All Translations"
 msgstr "Show All Translations"
 
-#: app.py:167
+#: app.py:169
 msgid "Show Outstanding Items"
 msgstr "Show Outstanding Items"
 
-#: app.py:168 ui/translation_windows/translation_quality_review_window.py:184
+#: app.py:170 ui/translation_windows/translation_quality_review_window.py:184
 msgid "Translation Quality Review"
 msgstr "Translation Quality Review"
 
-#: app.py:169 ui/quality_review_exclusions_dialog.py:40
+#: app.py:171 ui/quality_review_exclusions_dialog.py:40
 #: ui/setup_translation_project_window.py:153
 #: ui/translation_windows/all_translations_window.py:120
 #: ui/translation_windows/outstanding_items/window.py:184
 msgid "Heuristic Exclusions"
 msgstr "Heuristic Exclusions"
 
-#: app.py:170
+#: app.py:172
 msgid "Find Untranslated"
 msgstr "Find Untranslated"
 
-#: app.py:190 ui/bulk_pot_analysis_window.py:77
+#: app.py:192 ui/bulk_pot_analysis_window.py:77
 msgid "Bulk Project Status"
 msgstr "Bulk Project Status"
 
-#: app.py:191
+#: app.py:193
 msgid "Cross-Project Analysis"
 msgstr "Cross-Project Analysis"
 
-#: app.py:192
+#: app.py:194
 msgid "Sync Base Translations"
 msgstr "Sync Base Translations"
 
-#: app.py:193
+#: app.py:195
 msgid "Update Translation Files"
 msgstr "Update Translation Files"
 
-#: app.py:194
+#: app.py:196
 msgid "Compile Translations"
 msgstr "Compile Translations"
 
-#: app.py:213 ui/bulk_pot_analysis_window.py:129
+#: app.py:215 ui/bulk_pot_analysis_window.py:129
 msgid "Status"
 msgstr "Status"
 
-#: app.py:353
+#: app.py:357
 msgid ""
 "Translation file compilation is not relevant for {} projects. {} projects "
 "use source translation files directly without a compilation step."
@@ -103,37 +103,39 @@ msgstr ""
 "Translation file compilation is not relevant for {} projects. {} projects "
 "use source translation files directly without a compilation step."
 
-#: app.py:386
+#: app.py:390
 msgid "Loading translation project..."
 msgstr "Loading translation project..."
 
-#: app.py:387
+#: app.py:391
 msgid "Updating translation files..."
 msgstr "Updating translation files..."
 
-#: app.py:388
+#: app.py:392
 msgid "Compiling translation files..."
 msgstr "Compiling translation files..."
 
-#: app.py:389
+#: app.py:393
 msgid "Syncing base translation files..."
 msgstr "Syncing base translation files..."
 
-#: app.py:390
+#: app.py:394
 msgid "Running quality review..."
 msgstr "Running quality review..."
 
-#: app.py:392
+#: app.py:396
 msgid "Running translation task..."
 msgstr "Running translation task..."
 
-#: app.py:393
+#: app.py:397
 msgid "Please wait"
 msgstr "Please wait"
 
-#: app.py:561 app.py:583 app.py:707 app.py:722 app.py:769 app.py:791
-#: app.py:821 app.py:878 ui/bulk_pot_analysis_window.py:235
-#: ui/bulk_pot_analysis_window.py:263 ui/cross_project_analysis_window.py:268
+#: app.py:421 app.py:550 app.py:574 app.py:596 app.py:720 app.py:735
+#: app.py:783 app.py:798 app.py:806 app.py:813 app.py:820 app.py:840
+#: app.py:845 app.py:850 app.py:871 app.py:910
+#: ui/bulk_pot_analysis_window.py:235 ui/bulk_pot_analysis_window.py:263
+#: ui/cross_project_analysis_window.py:268
 #: ui/cross_project_analysis_window.py:560 ui/llm_settings_dialog.py:449
 #: ui/llm_settings_dialog.py:522 ui/locale_selection_window.py:279
 #: ui/locale_selection_window.py:290 ui/locale_selection_window.py:298
@@ -159,47 +161,47 @@ msgstr "Please wait"
 msgid "Error"
 msgstr "Error"
 
-#: app.py:561 app.py:769
+#: app.py:550 app.py:574 app.py:783
 msgid "No translation data available"
 msgstr "No translation data available"
 
-#: app.py:583 app.py:791 app.py:821 app.py:878
+#: app.py:421 app.py:596 app.py:820 app.py:850 app.py:910
 msgid "Please select a project first"
 msgstr "Please select a project first"
 
-#: app.py:707 app.py:722
+#: app.py:720 app.py:735
 msgid "Please check status first to load translation data"
 msgstr "Please check status first to load translation data"
 
-#: app.py:730 ui/translation_windows/all_translations_window.py:34
+#: app.py:743 ui/translation_windows/all_translations_window.py:34
 msgid "All Translations"
 msgstr "All Translations"
 
-#: app.py:731
+#: app.py:744
 msgid "Could not find that translation key in the current catalog."
 msgstr "Could not find that translation key in the current catalog."
 
-#: app.py:795
+#: app.py:824
 msgid "Updating base translation files..."
 msgstr "Updating base translation files..."
 
-#: app.py:799
+#: app.py:828
 msgid "Base translation files updated successfully."
 msgstr "Base translation files updated successfully."
 
-#: app.py:808
+#: app.py:837
 msgid "Update failed"
 msgstr "Update failed"
 
-#: app.py:811
+#: app.py:840
 msgid "Failed to update base translation files."
 msgstr "Failed to update base translation files."
 
-#: app.py:886 app.py:902
+#: app.py:918 app.py:934
 msgid "No Projects to Analyze"
 msgstr "No Projects to Analyze"
 
-#: app.py:887
+#: app.py:919
 msgid ""
 "You need at least 2 projects in your recent projects list to perform cross-"
 "project analysis."
@@ -207,7 +209,7 @@ msgstr ""
 "You need at least 2 projects in your recent projects list to perform cross-"
 "project analysis."
 
-#: app.py:903
+#: app.py:935
 msgid ""
 "You need at least 1 project in your recent projects list to perform bulk POT"
 " analysis."
@@ -215,17 +217,21 @@ msgstr ""
 "You need at least 1 project in your recent projects list to perform bulk POT"
 " analysis."
 
-#: app.py:921
+#: app.py:953
 msgid "Compiled Files Need Update"
 msgstr "Compiled Files Need Update"
 
-#: app.py:922
+#: app.py:954
 msgid "Translation files have been updated for the following locales:"
 msgstr "Translation files have been updated for the following locales:"
 
-#: app.py:924
+#: app.py:956
 msgid "Remember to run Compile Translations to apply these changes."
 msgstr "Remember to run Compile Translations to apply these changes."
+
+#: i18n/llm_catalog_review.py:66
+msgid "Could not create LLM review log directory ({err})."
+msgstr "Could not create LLM review log directory ({err})."
 
 #: i18n/llm_catalog_review.py:153
 msgid ""
@@ -335,6 +341,10 @@ msgstr ""
 msgid "No catalog data to send (empty project or batches)."
 msgstr "No catalog data to send (empty project or batches)."
 
+#: i18n/llm_catalog_review.py:309
+msgid "Saving LLM responses to {dir}"
+msgstr "Saving LLM responses to {dir}"
+
 #: i18n/llm_catalog_review.py:312
 msgid ""
 "You are an expert software localization reviewer. Translation data is "
@@ -435,6 +445,36 @@ msgstr "Low-high quotes („ ”)"
 msgid "Corner brackets (「 」)"
 msgstr "Corner brackets (「 」)"
 
+#: tests/test_all_translations_window.py:192
+#: tests/test_all_translations_window.py:206
+#: ui/cross_project_analysis_window.py:107
+#: ui/translation_windows/all_translations_window.py:85
+#: ui/translation_windows/all_translations_window.py:274
+#: ui/translation_windows/translation_quality_review_window.py:1155
+#: utils/globals.py:193 utils/globals.py:220
+msgid "All"
+msgstr "All"
+
+#: tests/test_all_translations_window.py:193
+#: ui/translation_windows/all_translations_window.py:288
+msgid "(No Context)"
+msgstr "(No Context)"
+
+#: tests/test_outstanding_items_window.py:777
+#: tests/test_outstanding_items_window.py:790
+#: ui/translation_windows/all_translations_window.py:496
+#: ui/translation_windows/outstanding_items/context_menus.py:81
+#: ui/translation_windows/replace_key_window.py:165
+msgid "Translate with LLM"
+msgstr "Translate with LLM"
+
+#: tests/test_outstanding_items_window.py:778
+#: ui/translation_windows/all_translations_window.py:493
+#: ui/translation_windows/outstanding_items/context_menus.py:73
+#: ui/translation_windows/replace_key_window.py:162
+msgid "Translate with Argos Translate"
+msgstr "Translate with Argos Translate"
+
 #: tests/test_quality_review_window.py:97
 #: ui/translation_windows/translation_quality_review_window.py:284
 msgid "Key"
@@ -465,251 +505,6 @@ msgstr "Signal"
 msgid "Detail"
 msgstr "Detail"
 
-#: ui/translation_windows/all_translations_window.py:52
-msgid "Search:"
-msgstr "Search:"
-
-#: ui/translation_windows/all_translations_window.py:54
-msgid "Search translation keys... (Press Enter to search)"
-msgstr "Search translation keys... (Press Enter to search)"
-
-#: ui/translation_windows/all_translations_window.py:60
-msgid "Search"
-msgstr "Search"
-
-#: ui/translation_windows/all_translations_window.py:65
-msgid "Clear"
-msgstr "Clear"
-
-#: ui/translation_windows/all_translations_window.py:73
-msgid "Filter:"
-msgstr "Filter:"
-
-#: ui/translation_windows/all_translations_window.py:110
-#: ui/translation_windows/outstanding_items/window.py:200
-msgid "Save Changes"
-msgstr "Save Changes"
-
-#: ui/bulk_pot_analysis_window.py:105 ui/cross_project_analysis_window.py:158
-#: ui/quality_review_exclusions_dialog.py:130
-#: ui/translation_progress_dialog.py:203
-#: ui/translation_windows/all_translations_window.py:112
-#: ui/translation_windows/all_translations_window.py:952
-#: ui/translation_windows/outstanding_items/window.py:202
-msgid "Close"
-msgstr "Close"
-
-#: ui/translation_windows/all_translations_window.py:116
-#: ui/translation_windows/outstanding_items/window.py:206
-msgid "Show Escaped Unicode"
-msgstr "Show Escaped Unicode"
-
-#: ui/translation_windows/all_translations_window.py:123
-#: ui/translation_windows/outstanding_items/window.py:187
-msgid "Manage msgid exclusions and ignore regex patterns for this project."
-msgstr "Manage msgid exclusions and ignore regex patterns for this project."
-
-#: ui/translation_windows/all_translations_window.py:126
-msgid "Find && Replace"
-msgstr "Find && Replace"
-
-#: ui/translation_windows/all_translations_window.py:128
-msgid "Search and replace text within translation values"
-msgstr "Search and replace text within translation values"
-
-#: ui/translation_windows/all_translations_window.py:130
-#: ui/translation_windows/all_translations_window.py:792
-msgid "Revert Changes"
-msgstr "Revert Changes"
-
-#: ui/translation_windows/all_translations_window.py:132
-msgid ""
-"Restore all translations to their last saved state, discarding any unsaved "
-"edits"
-msgstr ""
-"Restore all translations to their last saved state, discarding any unsaved "
-"edits"
-
-#: ui/translation_windows/all_translations_window.py:472
-#: ui/translation_windows/all_translations_window.py:509
-#: ui/translation_windows/all_translations_window.py:520
-#: ui/translation_windows/outstanding_items/context_menus.py:45
-#: ui/translation_windows/outstanding_items/context_menus.py:104
-#: ui/translation_windows/outstanding_items/context_menus.py:116
-msgid "Copy Text"
-msgstr "Copy Text"
-
-#: ui/translation_windows/all_translations_window.py:477
-#: ui/translation_windows/outstanding_items/context_menus.py:51
-msgid "Copy Default Translation"
-msgstr "Copy Default Translation"
-
-#: ui/translation_windows/all_translations_window.py:487
-#: ui/translation_windows/base_translation_window.py:223
-#: ui/translation_windows/outstanding_items/context_menus.py:65
-msgid "Delete Translation Key"
-msgstr "Delete Translation Key"
-
-#: tests/test_outstanding_items_window.py:778
-#: ui/translation_windows/all_translations_window.py:493
-#: ui/translation_windows/outstanding_items/context_menus.py:73
-#: ui/translation_windows/replace_key_window.py:162
-msgid "Translate with Argos Translate"
-msgstr "Translate with Argos Translate"
-
-#: tests/test_outstanding_items_window.py:777
-#: tests/test_outstanding_items_window.py:790
-#: ui/translation_windows/all_translations_window.py:496
-#: ui/translation_windows/outstanding_items/context_menus.py:81
-#: ui/translation_windows/replace_key_window.py:165
-msgid "Translate with LLM"
-msgstr "Translate with LLM"
-
-#: ui/cross_project_analysis_window.py:548 ui/llm_settings_dialog.py:443
-#: ui/translation_windows/all_translations_window.py:626
-#: ui/translation_windows/all_translations_window.py:637
-msgid "Success"
-msgstr "Success"
-
-#: ui/translation_windows/all_translations_window.py:626
-msgid "Saved key deletions successfully!"
-msgstr "Saved key deletions successfully!"
-
-#: ui/cross_project_analysis_window.py:471
-#: ui/cross_project_analysis_window.py:474
-#: ui/cross_project_analysis_window.py:495
-#: ui/translation_windows/all_translations_window.py:629
-msgid "Info"
-msgstr "Info"
-
-#: ui/translation_windows/all_translations_window.py:629
-msgid "No changes to save."
-msgstr "No changes to save."
-
-#: ui/translation_windows/all_translations_window.py:637
-msgid "Saved {} changes successfully!"
-msgstr "Saved {} changes successfully!"
-
-#: ui/translation_windows/all_translations_window.py:794
-msgid ""
-"You have unsaved changes that will be lost.\n"
-"\n"
-"Restore all translations to their last saved state?"
-msgstr ""
-"You have unsaved changes that will be lost.\n"
-"\n"
-"Restore all translations to their last saved state?"
-
-#: ui/translation_windows/all_translations_window.py:806
-#: ui/translation_windows/all_translations_window.py:885
-msgid "Find & Replace"
-msgstr "Find & Replace"
-
-#: ui/translation_windows/all_translations_window.py:806
-msgid "No translation data loaded."
-msgstr "No translation data loaded."
-
-#: ui/translation_windows/all_translations_window.py:897
-msgid "Text or pattern to find"
-msgstr "Text or pattern to find"
-
-#: ui/translation_windows/all_translations_window.py:899
-msgid "Find:"
-msgstr "Find:"
-
-#: ui/translation_windows/all_translations_window.py:902
-msgid "Replacement text (may be empty)"
-msgstr "Replacement text (may be empty)"
-
-#: ui/translation_windows/all_translations_window.py:903
-msgid "Replace:"
-msgstr "Replace:"
-
-#: ui/translation_windows/all_translations_window.py:908
-msgid "Regex"
-msgstr "Regex"
-
-#: ui/translation_windows/all_translations_window.py:909
-msgid "Treat the find text as a regular expression"
-msgstr "Treat the find text as a regular expression"
-
-#: ui/translation_windows/all_translations_window.py:913
-msgid "Match Case"
-msgstr "Match Case"
-
-#: ui/translation_windows/all_translations_window.py:914
-msgid "Use case-sensitive matching"
-msgstr "Use case-sensitive matching"
-
-#: ui/translation_windows/all_translations_window.py:919
-msgid "Scope:"
-msgstr "Scope:"
-
-#: ui/translation_windows/all_translations_window.py:922
-msgid "Apply to all locale columns, or restrict to a single locale"
-msgstr "Apply to all locale columns, or restrict to a single locale"
-
-#: ui/translation_windows/all_translations_window.py:932
-msgid ""
-"Only visible rows are searched and replaced. Use the Search box and Status "
-"Filter in the main window to narrow the scope before replacing."
-msgstr ""
-"Only visible rows are searched and replaced. Use the Search box and Status "
-"Filter in the main window to narrow the scope before replacing."
-
-#: ui/translation_windows/all_translations_window.py:948
-msgid "Replace All"
-msgstr "Replace All"
-
-#: ui/translation_windows/all_translations_window.py:960
-#: ui/translation_windows/translation_quality_review_window.py:272
-msgid "All locales"
-msgstr "All locales"
-
-#: ui/translation_windows/all_translations_window.py:972
-msgid "Please enter text to find."
-msgstr "Please enter text to find."
-
-#: ui/translation_windows/all_translations_window.py:983
-msgid "Invalid regex: {error}"
-msgstr "Invalid regex: {error}"
-
-#: ui/translation_windows/all_translations_window.py:995
-msgid "No matches found."
-msgstr "No matches found."
-
-#: ui/translation_windows/all_translations_window.py:1003
-msgid "Confirm Replacement"
-msgstr "Confirm Replacement"
-
-#: ui/translation_windows/all_translations_window.py:1005
-msgid ""
-"Found {cell_count} match(es) across {row_count} row(s) ({scope}).\n"
-"\n"
-"Changes are held in memory — use Save Changes to persist.\n"
-"\n"
-"Proceed?"
-msgstr ""
-"Found {cell_count} match(es) across {row_count} row(s) ({scope}).\n"
-"\n"
-"Changes are held in memory — use Save Changes to persist.\n"
-"\n"
-"Proceed?"
-
-#: ui/translation_windows/all_translations_window.py:1021
-msgid "Replaced {count} cell(s). Use Save Changes to persist."
-msgstr "Replaced {count} cell(s). Use Save Changes to persist."
-
-#: ui/translation_windows/base_translation_window.py:224
-msgid ""
-"Delete translation key \"{key_display}\" from all locales?\n"
-"\n"
-"This will remove the key from written translation files on save/update."
-msgstr ""
-"Delete translation key \"{key_display}\" from all locales?\n"
-"\n"
-"This will remove the key from written translation files on save/update."
-
 #: ui/bulk_pot_analysis_window.py:40
 msgid "No projects available for analysis."
 msgstr "No projects available for analysis."
@@ -733,6 +528,15 @@ msgstr "Analyze All Projects"
 #: ui/bulk_pot_analysis_window.py:100
 msgid "Refresh"
 msgstr "Refresh"
+
+#: ui/bulk_pot_analysis_window.py:105 ui/cross_project_analysis_window.py:158
+#: ui/quality_review_exclusions_dialog.py:130
+#: ui/translation_progress_dialog.py:203
+#: ui/translation_windows/all_translations_window.py:112
+#: ui/translation_windows/all_translations_window.py:952
+#: ui/translation_windows/outstanding_items/window.py:202
+msgid "Close"
+msgstr "Close"
 
 #: ui/bulk_pot_analysis_window.py:123
 msgid "Project Analysis Results"
@@ -851,16 +655,6 @@ msgstr "Target Project:"
 msgid "Locales:"
 msgstr "Locales:"
 
-#: tests/test_all_translations_window.py:192
-#: tests/test_all_translations_window.py:206
-#: ui/cross_project_analysis_window.py:107
-#: ui/translation_windows/all_translations_window.py:85
-#: ui/translation_windows/all_translations_window.py:274
-#: ui/translation_windows/translation_quality_review_window.py:1155
-#: utils/globals.py:193 utils/globals.py:220
-msgid "All"
-msgstr "All"
-
 #: ui/cross_project_analysis_window.py:122
 msgid "Source Project:"
 msgstr "Source Project:"
@@ -906,7 +700,7 @@ msgstr "Analysis Summary"
 msgid "Translation Matches"
 msgstr "Translation Matches"
 
-#: ui/cross_project_analysis_window.py:256
+#: app.py:466 ui/cross_project_analysis_window.py:256
 #: ui/cross_project_analysis_window.py:458
 #: ui/cross_project_analysis_window.py:488
 #: ui/cross_project_analysis_window.py:554
@@ -976,6 +770,13 @@ msgid "Please select matches to apply."
 msgstr "Please select matches to apply."
 
 #: ui/cross_project_analysis_window.py:471
+#: ui/cross_project_analysis_window.py:474
+#: ui/cross_project_analysis_window.py:495
+#: ui/translation_windows/all_translations_window.py:629
+msgid "Info"
+msgstr "Info"
+
+#: ui/cross_project_analysis_window.py:471
 msgid "No matches to apply."
 msgstr "No matches to apply."
 
@@ -1036,6 +837,12 @@ msgstr ""
 "Successfully applied translations:\n"
 "\n"
 "{}"
+
+#: ui/cross_project_analysis_window.py:548 ui/llm_settings_dialog.py:443
+#: ui/translation_windows/all_translations_window.py:626
+#: ui/translation_windows/all_translations_window.py:637
+msgid "Success"
+msgstr "Success"
 
 #: ui/cross_project_analysis_window.py:554
 msgid "No translations were applied (all were already filled)."
@@ -1389,231 +1196,6 @@ msgstr "Country code must be exactly two letters when provided."
 msgid "Invalid locale"
 msgstr "Invalid locale"
 
-#: ui/translation_windows/outstanding_items/window.py:92
-msgid "Outstanding Translation Items"
-msgstr "Outstanding Translation Items"
-
-#: ui/translation_windows/outstanding_items/duplicate_prefill.py:188
-msgid ""
-"Pending duplicate-prefill updates: {count}. These may include keys not "
-"currently visible in the table and will be saved."
-msgstr ""
-"Pending duplicate-prefill updates: {count}. These may include keys not "
-"currently visible in the table and will be saved."
-
-#: ui/translation_windows/outstanding_items/window.py:123
-msgid "Translation in Progress"
-msgstr "Translation in Progress"
-
-#: ui/translation_windows/outstanding_items/window.py:124
-msgid "Translation is in progress. Are you sure you want to close?"
-msgstr "Translation is in progress. Are you sure you want to close?"
-
-#: ui/translation_windows/outstanding_items/window.py:172
-msgid "Translate All (Argos)"
-msgstr "Translate All (Argos)"
-
-#: ui/translation_windows/outstanding_items/window.py:174
-msgid "Translate all missing items using Argos Translate (fast, offline)"
-msgstr "Translate all missing items using Argos Translate (fast, offline)"
-
-#: ui/translation_windows/outstanding_items/window.py:176
-msgid "Translate All (LLM)"
-msgstr "Translate All (LLM)"
-
-#: ui/translation_windows/outstanding_items/window.py:178
-msgid "Translate all missing items using LLM (slower, higher quality)"
-msgstr "Translate all missing items using LLM (slower, higher quality)"
-
-#: ui/translation_windows/outstanding_items/window.py:180
-#: ui/translation_windows/translation_quality_review_window.py:454
-msgid "LLM Settings"
-msgstr "LLM Settings"
-
-#: ui/translation_windows/outstanding_items/window.py:182
-#: ui/translation_windows/translation_quality_review_window.py:456
-msgid "Configure LLM translation prompt template"
-msgstr "Configure LLM translation prompt template"
-
-#: ui/translation_windows/outstanding_items/tsv_export.py:174
-#: ui/translation_windows/outstanding_items/window.py:190
-msgid "Export Outstanding TSV"
-msgstr "Export Outstanding TSV"
-
-#: ui/translation_windows/outstanding_items/window.py:192
-msgid "Export outstanding keys and invalid locale buckets to TSV"
-msgstr "Export outstanding keys and invalid locale buckets to TSV"
-
-#: ui/translation_windows/outstanding_items/context_menus.py:55
-msgid "Fill Missing in Row with Default Translation"
-msgstr "Fill Missing in Row with Default Translation"
-
-#: ui/translation_windows/outstanding_items/window.py:326
-msgid "No Default Translation"
-msgstr "No Default Translation"
-
-#: ui/translation_windows/outstanding_items/window.py:327
-msgid "The default locale translation is empty for this row."
-msgstr "The default locale translation is empty for this row."
-
-#: ui/translation_windows/outstanding_items/window.py:343
-msgid "No Missing Values"
-msgstr "No Missing Values"
-
-#: ui/translation_windows/outstanding_items/window.py:344
-msgid "No missing values were found in this row."
-msgstr "No missing values were found in this row."
-
-#: ui/translation_windows/outstanding_items/window.py:525
-msgid "No Items"
-msgstr "No Items"
-
-#: ui/translation_windows/outstanding_items/window.py:525
-msgid "No missing translations found."
-msgstr "No missing translations found."
-
-#: ui/translation_windows/outstanding_items/window.py:534
-msgid "LLM (all locales per key)"
-msgstr "LLM (all locales per key)"
-
-#: ui/translation_windows/outstanding_items/window.py:536
-msgid ""
-"\n"
-"\n"
-"This will make {count} LLM request(s), one per key covering all its missing locales at once, using model \"{model}\"."
-msgstr ""
-"\n"
-"\n"
-"This will make {count} LLM request(s), one per key covering all its missing locales at once, using model \"{model}\"."
-
-#: ui/translation_windows/outstanding_items/window.py:549
-msgid ""
-"\n"
-"\n"
-"This will make one LLM request per missing locale, using model \"{model}\"."
-msgstr ""
-"\n"
-"\n"
-"This will make one LLM request per missing locale, using model \"{model}\"."
-
-#: ui/translation_windows/outstanding_items/window.py:555
-msgid "Confirm Translation"
-msgstr "Confirm Translation"
-
-#: ui/translation_windows/outstanding_items/window.py:556
-msgid ""
-"This will translate {count} missing items using {method}.\n"
-"\n"
-"LLM translations are higher quality but slower.\n"
-"Argos translations are faster but may be less accurate.{confirm_note}\n"
-"\n"
-"Continue?"
-msgstr ""
-"This will translate {count} missing items using {method}.\n"
-"\n"
-"LLM translations are higher quality but slower.\n"
-"Argos translations are faster but may be less accurate.{confirm_note}\n"
-"\n"
-"Continue?"
-
-#: ui/translation_windows/outstanding_items/window.py:574
-msgid "Mode: all locales per key (model: {model})"
-msgstr "Mode: all locales per key (model: {model})"
-
-#: ui/translation_windows/outstanding_items/window.py:578
-msgid "Mode: one locale at a time (model: {model})"
-msgstr "Mode: one locale at a time (model: {model})"
-
-#: ui/outstanding_items_window.py:661
-msgid "Translation Progress"
-msgstr "Translation Progress"
-
-#: ui/translation_windows/outstanding_items/window.py:701
-msgid "Translation Error"
-msgstr "Translation Error"
-
-#: ui/translation_windows/outstanding_items/window.py:702
-msgid ""
-"An error occurred during translation:\n"
-"{error}"
-msgstr ""
-"An error occurred during translation:\n"
-"{error}"
-
-#: ui/translation_windows/outstanding_items/window.py:716
-msgid ""
-"Translation stopped early: {message}\n"
-"\n"
-"Items completed before this happened (shown above) were kept."
-msgstr ""
-"Translation stopped early: {message}\n"
-"\n"
-"Items completed before this happened (shown above) were kept."
-
-#: ui/translation_windows/outstanding_items/duplicate_prefill.py:126
-msgid "Combine Duplicate Translations?"
-msgstr "Combine Duplicate Translations?"
-
-#: ui/translation_windows/outstanding_items/tsv_export.py:74
-msgid "No Data"
-msgstr "No Data"
-
-#: ui/translation_windows/outstanding_items/tsv_export.py:74
-msgid "There are no outstanding rows to export."
-msgstr "There are no outstanding rows to export."
-
-#: ui/translation_windows/outstanding_items/tsv_export.py:176
-msgid "TSV Files (*.tsv);;All Files (*)"
-msgstr "TSV Files (*.tsv);;All Files (*)"
-
-#: ui/translation_windows/outstanding_items/tsv_export.py:223
-msgid "Export Complete"
-msgstr "Export Complete"
-
-#: ui/translation_windows/outstanding_items/tsv_export.py:224
-msgid ""
-"Exported {count} outstanding key(s) to:\n"
-"{path}\n"
-"\n"
-"Markdown companion:\n"
-"{md_path}"
-msgstr ""
-"Exported {count} outstanding key(s) to:\n"
-"{path}\n"
-"\n"
-"Markdown companion:\n"
-"{md_path}"
-
-#: ui/translation_windows/outstanding_items/tsv_export.py:234
-msgid "Export Failed"
-msgstr "Export Failed"
-
-#: ui/translation_windows/outstanding_items/tsv_export.py:235
-msgid ""
-"Could not export TSV file:\n"
-"{error}"
-msgstr ""
-"Could not export TSV file:\n"
-"{error}"
-
-#: ui/translation_windows/outstanding_items/window.py:911
-msgid "All Translations Resolved"
-msgstr "All Translations Resolved"
-
-#: ui/translation_windows/outstanding_items/window.py:1008
-msgid "Save includes hidden duplicate-prefill updates"
-msgstr "Save includes hidden duplicate-prefill updates"
-
-#: ui/translation_windows/outstanding_items/window.py:1010
-msgid ""
-"This save will also persist {count} pre-filled duplicate update(s), including keys that may not be visible in the current table.\n"
-"\n"
-"Continue?"
-msgstr ""
-"This save will also persist {count} pre-filled duplicate update(s), including keys that may not be visible in the current table.\n"
-"\n"
-"Continue?"
-
 #: ui/quality_review_exclusions_dialog.py:60
 msgid ""
 "Configure per-project exclusions used by quality review and invalid "
@@ -1783,7 +1365,7 @@ msgstr "Select a Recent Project"
 msgid "Browse..."
 msgstr "Browse..."
 
-#: ui/recent_projects_dialog.py:163
+#: app.py:319 ui/recent_projects_dialog.py:163
 msgid "Select Project Directory"
 msgstr "Select Project Directory"
 
@@ -2020,6 +1602,306 @@ msgstr "Cancelling..."
 msgid "Cancelling translation process..."
 msgstr "Cancelling translation process..."
 
+#: ui/translation_windows/all_translations_window.py:52
+msgid "Search:"
+msgstr "Search:"
+
+#: ui/translation_windows/all_translations_window.py:54
+msgid "Search translation keys... (Press Enter to search)"
+msgstr "Search translation keys... (Press Enter to search)"
+
+#: ui/translation_windows/all_translations_window.py:60
+msgid "Search"
+msgstr "Search"
+
+#: ui/translation_windows/all_translations_window.py:65
+msgid "Clear"
+msgstr "Clear"
+
+#: ui/translation_windows/all_translations_window.py:73
+msgid "Filter:"
+msgstr "Filter:"
+
+#: ui/translation_windows/all_translations_window.py:83
+#: ui/translation_windows/replace_key_window.py:104
+msgid "Context:"
+msgstr "Context:"
+
+#: ui/translation_windows/all_translations_window.py:110
+#: ui/translation_windows/outstanding_items/window.py:200
+msgid "Save Changes"
+msgstr "Save Changes"
+
+#: ui/translation_windows/all_translations_window.py:116
+#: ui/translation_windows/outstanding_items/window.py:206
+msgid "Show Escaped Unicode"
+msgstr "Show Escaped Unicode"
+
+#: ui/translation_windows/all_translations_window.py:123
+#: ui/translation_windows/outstanding_items/window.py:187
+msgid "Manage msgid exclusions and ignore regex patterns for this project."
+msgstr "Manage msgid exclusions and ignore regex patterns for this project."
+
+#: ui/translation_windows/all_translations_window.py:126
+msgid "Find && Replace"
+msgstr "Find && Replace"
+
+#: ui/translation_windows/all_translations_window.py:128
+msgid "Search and replace text within translation values"
+msgstr "Search and replace text within translation values"
+
+#: ui/translation_windows/all_translations_window.py:130
+#: ui/translation_windows/all_translations_window.py:792
+msgid "Revert Changes"
+msgstr "Revert Changes"
+
+#: ui/translation_windows/all_translations_window.py:132
+msgid ""
+"Restore all translations to their last saved state, discarding any unsaved "
+"edits"
+msgstr ""
+"Restore all translations to their last saved state, discarding any unsaved "
+"edits"
+
+#: ui/translation_windows/all_translations_window.py:134
+#: ui/translation_windows/all_translations_window.py:484
+#: ui/translation_windows/all_translations_window.py:546
+#: ui/translation_windows/all_translations_window.py:553
+#: ui/translation_windows/outstanding_items/context_menus.py:62
+#: ui/translation_windows/outstanding_items/window.py:194
+#: ui/translation_windows/outstanding_items/window.py:385
+#: ui/translation_windows/outstanding_items/window.py:392
+#: ui/translation_windows/replace_key_window.py:116
+#: ui/translation_windows/replace_key_window.py:176
+#: ui/translation_windows/replace_key_window.py:185
+msgid "Replace Key"
+msgstr "Replace Key"
+
+#: ui/translation_windows/all_translations_window.py:137
+#: ui/translation_windows/outstanding_items/window.py:197
+msgid ""
+"Replace the selected translation key with a new one, carrying over its "
+"translations"
+msgstr ""
+"Replace the selected translation key with a new one, carrying over its "
+"translations"
+
+#: ui/translation_windows/all_translations_window.py:472
+#: ui/translation_windows/all_translations_window.py:509
+#: ui/translation_windows/all_translations_window.py:520
+#: ui/translation_windows/outstanding_items/context_menus.py:45
+#: ui/translation_windows/outstanding_items/context_menus.py:104
+#: ui/translation_windows/outstanding_items/context_menus.py:116
+msgid "Copy Text"
+msgstr "Copy Text"
+
+#: ui/translation_windows/all_translations_window.py:477
+#: ui/translation_windows/outstanding_items/context_menus.py:51
+msgid "Copy Default Translation"
+msgstr "Copy Default Translation"
+
+#: ui/translation_windows/all_translations_window.py:487
+#: ui/translation_windows/base_translation_window.py:223
+#: ui/translation_windows/outstanding_items/context_menus.py:65
+msgid "Delete Translation Key"
+msgstr "Delete Translation Key"
+
+#: ui/translation_windows/all_translations_window.py:546
+#: ui/translation_windows/outstanding_items/window.py:385
+msgid "Select a translation key first."
+msgstr "Select a translation key first."
+
+#: ui/translation_windows/all_translations_window.py:553
+#: ui/translation_windows/outstanding_items/window.py:392
+msgid "Could not find the selected translation key."
+msgstr "Could not find the selected translation key."
+
+#: ui/translation_windows/all_translations_window.py:626
+msgid "Saved key deletions successfully!"
+msgstr "Saved key deletions successfully!"
+
+#: ui/translation_windows/all_translations_window.py:629
+msgid "No changes to save."
+msgstr "No changes to save."
+
+#: ui/translation_windows/all_translations_window.py:637
+msgid "Saved {} changes successfully!"
+msgstr "Saved {} changes successfully!"
+
+#: ui/translation_windows/all_translations_window.py:794
+msgid ""
+"You have unsaved changes that will be lost.\n"
+"\n"
+"Restore all translations to their last saved state?"
+msgstr ""
+"You have unsaved changes that will be lost.\n"
+"\n"
+"Restore all translations to their last saved state?"
+
+#: ui/translation_windows/all_translations_window.py:806
+#: ui/translation_windows/all_translations_window.py:885
+msgid "Find & Replace"
+msgstr "Find & Replace"
+
+#: ui/translation_windows/all_translations_window.py:806
+msgid "No translation data loaded."
+msgstr "No translation data loaded."
+
+#: ui/translation_windows/all_translations_window.py:897
+msgid "Text or pattern to find"
+msgstr "Text or pattern to find"
+
+#: ui/translation_windows/all_translations_window.py:899
+msgid "Find:"
+msgstr "Find:"
+
+#: ui/translation_windows/all_translations_window.py:902
+msgid "Replacement text (may be empty)"
+msgstr "Replacement text (may be empty)"
+
+#: ui/translation_windows/all_translations_window.py:903
+msgid "Replace:"
+msgstr "Replace:"
+
+#: ui/translation_windows/all_translations_window.py:908
+msgid "Regex"
+msgstr "Regex"
+
+#: ui/translation_windows/all_translations_window.py:909
+msgid "Treat the find text as a regular expression"
+msgstr "Treat the find text as a regular expression"
+
+#: ui/translation_windows/all_translations_window.py:913
+msgid "Match Case"
+msgstr "Match Case"
+
+#: ui/translation_windows/all_translations_window.py:914
+msgid "Use case-sensitive matching"
+msgstr "Use case-sensitive matching"
+
+#: ui/translation_windows/all_translations_window.py:919
+msgid "Scope:"
+msgstr "Scope:"
+
+#: ui/translation_windows/all_translations_window.py:922
+msgid "Apply to all locale columns, or restrict to a single locale"
+msgstr "Apply to all locale columns, or restrict to a single locale"
+
+#: ui/translation_windows/all_translations_window.py:932
+msgid ""
+"Only visible rows are searched and replaced. Use the Search box and Status "
+"Filter in the main window to narrow the scope before replacing."
+msgstr ""
+"Only visible rows are searched and replaced. Use the Search box and Status "
+"Filter in the main window to narrow the scope before replacing."
+
+#: ui/translation_windows/all_translations_window.py:948
+msgid "Replace All"
+msgstr "Replace All"
+
+#: ui/translation_windows/all_translations_window.py:960
+#: ui/translation_windows/translation_quality_review_window.py:272
+msgid "All locales"
+msgstr "All locales"
+
+#: ui/translation_windows/all_translations_window.py:972
+msgid "Please enter text to find."
+msgstr "Please enter text to find."
+
+#: ui/translation_windows/all_translations_window.py:983
+msgid "Invalid regex: {error}"
+msgstr "Invalid regex: {error}"
+
+#: ui/translation_windows/all_translations_window.py:995
+msgid "No matches found."
+msgstr "No matches found."
+
+#: ui/translation_windows/all_translations_window.py:1003
+msgid "Confirm Replacement"
+msgstr "Confirm Replacement"
+
+#: ui/translation_windows/all_translations_window.py:1005
+msgid ""
+"Found {cell_count} match(es) across {row_count} row(s) ({scope}).\n"
+"\n"
+"Changes are held in memory — use Save Changes to persist.\n"
+"\n"
+"Proceed?"
+msgstr ""
+"Found {cell_count} match(es) across {row_count} row(s) ({scope}).\n"
+"\n"
+"Changes are held in memory — use Save Changes to persist.\n"
+"\n"
+"Proceed?"
+
+#: ui/translation_windows/all_translations_window.py:1021
+msgid "Replaced {count} cell(s). Use Save Changes to persist."
+msgstr "Replaced {count} cell(s). Use Save Changes to persist."
+
+#: ui/translation_windows/base_translation_window.py:224
+msgid ""
+"Delete translation key \"{key_display}\" from all locales?\n"
+"\n"
+"This will remove the key from written translation files on save/update."
+msgstr ""
+"Delete translation key \"{key_display}\" from all locales?\n"
+"\n"
+"This will remove the key from written translation files on save/update."
+
+#: ui/translation_windows/replace_key_window.py:61
+msgid "Replace Translation Key"
+msgstr "Replace Translation Key"
+
+#: ui/translation_windows/replace_key_window.py:84
+msgid "Replacing key: {key}"
+msgstr "Replacing key: {key}"
+
+#: ui/translation_windows/replace_key_window.py:91
+msgid ""
+"Edit the key text in the first column below to define the new key. Existing "
+"translations for other locales are carried over as a starting point -- edit "
+"or clear any that no longer apply. Right-click a locale cell to translate it"
+" with Argos or an LLM."
+msgstr ""
+"Edit the key text in the first column below to define the new key. Existing "
+"translations for other locales are carried over as a starting point -- edit "
+"or clear any that no longer apply. Right-click a locale cell to translate it"
+" with Argos or an LLM."
+
+#: ui/translation_windows/replace_key_window.py:103
+msgid "Optional -- leave blank unless this project uses msgctxt"
+msgstr "Optional -- leave blank unless this project uses msgctxt"
+
+#: ui/translation_windows/replace_key_window.py:128
+msgid "New Key"
+msgstr "New Key"
+
+#: ui/translation_windows/replace_key_window.py:176
+msgid "The new key cannot be empty."
+msgstr "The new key cannot be empty."
+
+#: ui/translation_windows/replace_key_window.py:187
+msgid ""
+"A translation key with this text already exists (\"{key}\"). Choose a "
+"different key, or edit that key directly instead."
+msgstr ""
+"A translation key with this text already exists (\"{key}\"). Choose a "
+"different key, or edit that key directly instead."
+
+#: ui/translation_windows/replace_key_window.py:195
+msgid "Confirm Replace"
+msgstr "Confirm Replace"
+
+#: ui/translation_windows/replace_key_window.py:197
+msgid ""
+"Replace key \"{old}\" with \"{new}\"?\n"
+"\n"
+"The old key and its translations will be removed; the values shown above will be saved under the new key."
+msgstr ""
+"Replace key \"{old}\" with \"{new}\"?\n"
+"\n"
+"The old key and its translations will be removed; the values shown above will be saved under the new key."
+
 #: ui/translation_windows/translation_quality_review_window.py:213
 msgid ""
 "Review possible issues (lower severity than Outstanding Items), manage "
@@ -2218,6 +2100,35 @@ msgstr ""
 msgid "Request stop after the current batch completes."
 msgstr "Request stop after the current batch completes."
 
+#: ui/translation_windows/outstanding_items/window.py:180
+#: ui/translation_windows/translation_quality_review_window.py:454
+msgid "LLM Settings"
+msgstr "LLM Settings"
+
+#: ui/translation_windows/outstanding_items/window.py:182
+#: ui/translation_windows/translation_quality_review_window.py:456
+msgid "Configure LLM translation prompt template"
+msgstr "Configure LLM translation prompt template"
+
+#: ui/translation_windows/translation_quality_review_window.py:458
+#: ui/translation_windows/translation_quality_review_window.py:734
+msgid "Simulate (no network)"
+msgstr "Simulate (no network)"
+
+#: ui/translation_windows/translation_quality_review_window.py:461
+msgid ""
+"Runs the same background worker/thread lifecycle as a real review, but "
+"answers every model call locally and instantly instead of calling Ollama -- "
+"no network calls, no LLM credits used. For re-testing the review pipeline "
+"itself (e.g. after changing its threading code) without paying for a real "
+"run."
+msgstr ""
+"Runs the same background worker/thread lifecycle as a real review, but "
+"answers every model call locally and instantly instead of calling Ollama -- "
+"no network calls, no LLM credits used. For re-testing the review pipeline "
+"itself (e.g. after changing its threading code) without paying for a real "
+"run."
+
 #: ui/translation_windows/translation_quality_review_window.py:487
 msgid "Select a project with settings support."
 msgstr "Select a project with settings support."
@@ -2308,6 +2219,10 @@ msgstr "Starting catalog LLM review…"
 #: ui/translation_windows/translation_quality_review_window.py:878
 msgid "Running…"
 msgstr "Running…"
+
+#: ui/translation_windows/translation_quality_review_window.py:852
+msgid "Starting simulated LLM review (no network, no credits)…"
+msgstr "Starting simulated LLM review (no network, no credits)…"
 
 #: ui/translation_windows/translation_quality_review_window.py:867
 msgid "No project or translation manager available."
@@ -2418,6 +2333,221 @@ msgid ""
 msgstr ""
 "Quality Review findings are based on actual Unicode script values loaded "
 "from translation files."
+
+#: ui/translation_windows/outstanding_items/context_menus.py:55
+msgid "Fill Missing in Row with Default Translation"
+msgstr "Fill Missing in Row with Default Translation"
+
+#: ui/translation_windows/outstanding_items/context_menus.py:86
+msgid "Disabled while a background LLM translation batch is running."
+msgstr "Disabled while a background LLM translation batch is running."
+
+#: ui/translation_windows/outstanding_items/duplicate_prefill.py:126
+msgid "Combine Duplicate Translations?"
+msgstr "Combine Duplicate Translations?"
+
+#: ui/translation_windows/outstanding_items/duplicate_prefill.py:188
+msgid ""
+"Pending duplicate-prefill updates: {count}. These may include keys not "
+"currently visible in the table and will be saved."
+msgstr ""
+"Pending duplicate-prefill updates: {count}. These may include keys not "
+"currently visible in the table and will be saved."
+
+#: ui/translation_windows/outstanding_items/tsv_export.py:74
+msgid "No Data"
+msgstr "No Data"
+
+#: ui/translation_windows/outstanding_items/tsv_export.py:74
+msgid "There are no outstanding rows to export."
+msgstr "There are no outstanding rows to export."
+
+#: ui/translation_windows/outstanding_items/tsv_export.py:174
+#: ui/translation_windows/outstanding_items/window.py:190
+msgid "Export Outstanding TSV"
+msgstr "Export Outstanding TSV"
+
+#: ui/translation_windows/outstanding_items/tsv_export.py:176
+msgid "TSV Files (*.tsv);;All Files (*)"
+msgstr "TSV Files (*.tsv);;All Files (*)"
+
+#: ui/translation_windows/outstanding_items/tsv_export.py:223
+msgid "Export Complete"
+msgstr "Export Complete"
+
+#: ui/translation_windows/outstanding_items/tsv_export.py:224
+msgid ""
+"Exported {count} outstanding key(s) to:\n"
+"{path}\n"
+"\n"
+"Markdown companion:\n"
+"{md_path}"
+msgstr ""
+"Exported {count} outstanding key(s) to:\n"
+"{path}\n"
+"\n"
+"Markdown companion:\n"
+"{md_path}"
+
+#: ui/translation_windows/outstanding_items/tsv_export.py:234
+msgid "Export Failed"
+msgstr "Export Failed"
+
+#: ui/translation_windows/outstanding_items/tsv_export.py:235
+msgid ""
+"Could not export TSV file:\n"
+"{error}"
+msgstr ""
+"Could not export TSV file:\n"
+"{error}"
+
+#: ui/translation_windows/outstanding_items/window.py:92
+msgid "Outstanding Translation Items"
+msgstr "Outstanding Translation Items"
+
+#: ui/translation_windows/outstanding_items/window.py:123
+msgid "Translation in Progress"
+msgstr "Translation in Progress"
+
+#: ui/translation_windows/outstanding_items/window.py:124
+msgid "Translation is in progress. Are you sure you want to close?"
+msgstr "Translation is in progress. Are you sure you want to close?"
+
+#: ui/translation_windows/outstanding_items/window.py:172
+msgid "Translate All (Argos)"
+msgstr "Translate All (Argos)"
+
+#: ui/translation_windows/outstanding_items/window.py:174
+msgid "Translate all missing items using Argos Translate (fast, offline)"
+msgstr "Translate all missing items using Argos Translate (fast, offline)"
+
+#: ui/translation_windows/outstanding_items/window.py:176
+msgid "Translate All (LLM)"
+msgstr "Translate All (LLM)"
+
+#: ui/translation_windows/outstanding_items/window.py:178
+msgid "Translate all missing items using LLM (slower, higher quality)"
+msgstr "Translate all missing items using LLM (slower, higher quality)"
+
+#: ui/translation_windows/outstanding_items/window.py:192
+msgid "Export outstanding keys and invalid locale buckets to TSV"
+msgstr "Export outstanding keys and invalid locale buckets to TSV"
+
+#: ui/translation_windows/outstanding_items/window.py:326
+msgid "No Default Translation"
+msgstr "No Default Translation"
+
+#: ui/translation_windows/outstanding_items/window.py:327
+msgid "The default locale translation is empty for this row."
+msgstr "The default locale translation is empty for this row."
+
+#: ui/translation_windows/outstanding_items/window.py:343
+msgid "No Missing Values"
+msgstr "No Missing Values"
+
+#: ui/translation_windows/outstanding_items/window.py:344
+msgid "No missing values were found in this row."
+msgstr "No missing values were found in this row."
+
+#: ui/translation_windows/outstanding_items/window.py:525
+msgid "No Items"
+msgstr "No Items"
+
+#: ui/translation_windows/outstanding_items/window.py:525
+msgid "No missing translations found."
+msgstr "No missing translations found."
+
+#: ui/translation_windows/outstanding_items/window.py:534
+msgid "LLM (all locales per key)"
+msgstr "LLM (all locales per key)"
+
+#: ui/translation_windows/outstanding_items/window.py:536
+msgid ""
+"\n"
+"\n"
+"This will make {count} LLM request(s), one per key covering all its missing locales at once, using model \"{model}\"."
+msgstr ""
+"\n"
+"\n"
+"This will make {count} LLM request(s), one per key covering all its missing locales at once, using model \"{model}\"."
+
+#: ui/translation_windows/outstanding_items/window.py:549
+msgid ""
+"\n"
+"\n"
+"This will make one LLM request per missing locale, using model \"{model}\"."
+msgstr ""
+"\n"
+"\n"
+"This will make one LLM request per missing locale, using model \"{model}\"."
+
+#: ui/translation_windows/outstanding_items/window.py:555
+msgid "Confirm Translation"
+msgstr "Confirm Translation"
+
+#: ui/translation_windows/outstanding_items/window.py:556
+msgid ""
+"This will translate {count} missing items using {method}.\n"
+"\n"
+"LLM translations are higher quality but slower.\n"
+"Argos translations are faster but may be less accurate.{confirm_note}\n"
+"\n"
+"Continue?"
+msgstr ""
+"This will translate {count} missing items using {method}.\n"
+"\n"
+"LLM translations are higher quality but slower.\n"
+"Argos translations are faster but may be less accurate.{confirm_note}\n"
+"\n"
+"Continue?"
+
+#: ui/translation_windows/outstanding_items/window.py:574
+msgid "Mode: all locales per key (model: {model})"
+msgstr "Mode: all locales per key (model: {model})"
+
+#: ui/translation_windows/outstanding_items/window.py:578
+msgid "Mode: one locale at a time (model: {model})"
+msgstr "Mode: one locale at a time (model: {model})"
+
+#: ui/translation_windows/outstanding_items/window.py:701
+msgid "Translation Error"
+msgstr "Translation Error"
+
+#: ui/translation_windows/outstanding_items/window.py:702
+msgid ""
+"An error occurred during translation:\n"
+"{error}"
+msgstr ""
+"An error occurred during translation:\n"
+"{error}"
+
+#: ui/translation_windows/outstanding_items/window.py:716
+msgid ""
+"Translation stopped early: {message}\n"
+"\n"
+"Items completed before this happened (shown above) were kept."
+msgstr ""
+"Translation stopped early: {message}\n"
+"\n"
+"Items completed before this happened (shown above) were kept."
+
+#: ui/translation_windows/outstanding_items/window.py:911
+msgid "All Translations Resolved"
+msgstr "All Translations Resolved"
+
+#: ui/translation_windows/outstanding_items/window.py:1008
+msgid "Save includes hidden duplicate-prefill updates"
+msgstr "Save includes hidden duplicate-prefill updates"
+
+#: ui/translation_windows/outstanding_items/window.py:1010
+msgid ""
+"This save will also persist {count} pre-filled duplicate update(s), including keys that may not be visible in the current table.\n"
+"\n"
+"Continue?"
+msgstr ""
+"This save will also persist {count} pre-filled duplicate update(s), including keys that may not be visible in the current table.\n"
+"\n"
+"Continue?"
 
 #: utils/globals.py:43 utils/globals.py:62
 msgid "Python"
@@ -2545,134 +2675,64 @@ msgstr "Stop character inconsistency"
 msgid "Quote style mismatch"
 msgstr "Quote style mismatch"
 
-#: i18n/llm_catalog_review.py:66
-msgid "Could not create LLM review log directory ({err})."
-msgstr "Could not create LLM review log directory ({err})."
+#: app.py:255 app.py:305
+msgid "Loading project: {path}"
+msgstr "Loading project: {path}"
 
-#: i18n/llm_catalog_review.py:309
-msgid "Saving LLM responses to {dir}"
-msgstr "Saving LLM responses to {dir}"
-
-#: tests/test_all_translations_window.py:193
-#: ui/translation_windows/all_translations_window.py:288
-msgid "(No Context)"
-msgstr "(No Context)"
-
-#: ui/translation_windows/all_translations_window.py:83
-#: ui/translation_windows/replace_key_window.py:104
-msgid "Context:"
-msgstr "Context:"
-
-#: ui/translation_windows/all_translations_window.py:134
-#: ui/translation_windows/all_translations_window.py:484
-#: ui/translation_windows/all_translations_window.py:546
-#: ui/translation_windows/all_translations_window.py:553
-#: ui/translation_windows/outstanding_items/context_menus.py:62
-#: ui/translation_windows/outstanding_items/window.py:194
-#: ui/translation_windows/outstanding_items/window.py:385
-#: ui/translation_windows/outstanding_items/window.py:392
-#: ui/translation_windows/replace_key_window.py:116
-#: ui/translation_windows/replace_key_window.py:176
-#: ui/translation_windows/replace_key_window.py:185
-msgid "Replace Key"
-msgstr "Replace Key"
-
-#: ui/translation_windows/all_translations_window.py:137
-#: ui/translation_windows/outstanding_items/window.py:197
+#: app.py:467
 msgid ""
-"Replace the selected translation key with a new one, carrying over its "
-"translations"
-msgstr ""
-"Replace the selected translation key with a new one, carrying over its "
-"translations"
-
-#: ui/translation_windows/all_translations_window.py:546
-#: ui/translation_windows/outstanding_items/window.py:385
-msgid "Select a translation key first."
-msgstr "Select a translation key first."
-
-#: ui/translation_windows/all_translations_window.py:553
-#: ui/translation_windows/outstanding_items/window.py:392
-msgid "Could not find the selected translation key."
-msgstr "Could not find the selected translation key."
-
-#: ui/translation_windows/replace_key_window.py:61
-msgid "Replace Translation Key"
-msgstr "Replace Translation Key"
-
-#: ui/translation_windows/replace_key_window.py:84
-msgid "Replacing key: {key}"
-msgstr "Replacing key: {key}"
-
-#: ui/translation_windows/replace_key_window.py:91
-msgid ""
-"Edit the key text in the first column below to define the new key. Existing "
-"translations for other locales are carried over as a starting point -- edit "
-"or clear any that no longer apply. Right-click a locale cell to translate it"
-" with Argos or an LLM."
-msgstr ""
-"Edit the key text in the first column below to define the new key. Existing "
-"translations for other locales are carried over as a starting point -- edit "
-"or clear any that no longer apply. Right-click a locale cell to translate it"
-" with Argos or an LLM."
-
-#: ui/translation_windows/replace_key_window.py:103
-msgid "Optional -- leave blank unless this project uses msgctxt"
-msgstr "Optional -- leave blank unless this project uses msgctxt"
-
-#: ui/translation_windows/replace_key_window.py:128
-msgid "New Key"
-msgstr "New Key"
-
-#: ui/translation_windows/replace_key_window.py:176
-msgid "The new key cannot be empty."
-msgstr "The new key cannot be empty."
-
-#: ui/translation_windows/replace_key_window.py:187
-msgid ""
-"A translation key with this text already exists (\"{key}\"). Choose a "
-"different key, or edit that key directly instead."
-msgstr ""
-"A translation key with this text already exists (\"{key}\"). Choose a "
-"different key, or edit that key directly instead."
-
-#: ui/translation_windows/replace_key_window.py:195
-msgid "Confirm Replace"
-msgstr "Confirm Replace"
-
-#: ui/translation_windows/replace_key_window.py:197
-msgid ""
-"Replace key \"{old}\" with \"{new}\"?\n"
+"Task completed with warnings or errors:\n"
 "\n"
-"The old key and its translations will be removed; the values shown above will be saved under the new key."
+"{details}"
 msgstr ""
-"Replace key \"{old}\" with \"{new}\"?\n"
+"Task completed with warnings or errors:\n"
 "\n"
-"The old key and its translations will be removed; the values shown above will be saved under the new key."
+"{details}"
 
-#: ui/translation_windows/translation_quality_review_window.py:458
-#: ui/translation_windows/translation_quality_review_window.py:734
-msgid "Simulate (no network)"
-msgstr "Simulate (no network)"
+#: app.py:513
+msgid "Project loaded successfully!"
+msgstr "Project loaded successfully!"
 
-#: ui/translation_windows/translation_quality_review_window.py:461
-msgid ""
-"Runs the same background worker/thread lifecycle as a real review, but "
-"answers every model call locally and instantly instead of calling Ollama -- "
-"no network calls, no LLM credits used. For re-testing the review pipeline "
-"itself (e.g. after changing its threading code) without paying for a real "
-"run."
-msgstr ""
-"Runs the same background worker/thread lifecycle as a real review, but "
-"answers every model call locally and instantly instead of calling Ollama -- "
-"no network calls, no LLM credits used. For re-testing the review pipeline "
-"itself (e.g. after changing its threading code) without paying for a real "
-"run."
+#: app.py:515
+msgid "Found {translation_count} translations in {locale_count} locales."
+msgstr "Found {translation_count} translations in {locale_count} locales."
 
-#: ui/translation_windows/translation_quality_review_window.py:852
-msgid "Starting simulated LLM review (no network, no credits)…"
-msgstr "Starting simulated LLM review (no network, no credits)…"
+#: app.py:790
+msgid "Writing translation file for default locale ({locale})..."
+msgstr "Writing translation file for default locale ({locale})..."
 
-#: ui/translation_windows/outstanding_items/context_menus.py:86
-msgid "Disabled while a background LLM translation batch is running."
-msgstr "Disabled while a background LLM translation batch is running."
+#: app.py:794
+msgid "Default locale translation file written successfully!"
+msgstr "Default locale translation file written successfully!"
+
+#: app.py:799
+msgid "Failed to write translation file for default locale ({locale})"
+msgstr "Failed to write translation file for default locale ({locale})"
+
+#: app.py:807
+msgid "Default locale ({locale}) not found in project"
+msgstr "Default locale ({locale}) not found in project"
+
+#: app.py:814
+msgid "Failed to write default locale translation file: {error}"
+msgstr "Failed to write default locale translation file: {error}"
+
+#: app.py:854
+msgid "Searching for untranslated strings..."
+msgstr "Searching for untranslated strings..."
+
+#: app.py:858
+msgid "No untranslated strings found in UI components."
+msgstr "No untranslated strings found in UI components."
+
+#: app.py:861
+msgid "Potential untranslated strings found:"
+msgstr "Potential untranslated strings found:"
+
+#: app.py:863
+msgid "In {file_path}:"
+msgstr "In {file_path}:"
+
+#: app.py:872
+msgid "Error finding untranslated strings: {error}"
+msgstr "Error finding untranslated strings: {error}"

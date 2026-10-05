@@ -95,20 +95,6 @@ def classify_trailing_sentence_char(ch: str) -> Optional[SentenceEndingKind]:
     return None
 
 
-def source_trailing_sentence_kind(text: str) -> Optional[SentenceEndingKind]:
-    """Return the sentence-ending kind of *text* after stripping trailing whitespace, if any.
-
-    Strings that end with ``...`` (three ASCII periods) or the Unicode ellipsis (``…``) do not
-    return a kind here; use :func:`source_expected_trailing_suffix` for those.
-    """
-    t = (text or "").rstrip()
-    if not t:
-        return None
-    if t.endswith(ELLIPSIS_UNICODE_CHAR) or _endswith_three_ascii_full_stops(t):
-        return None
-    return classify_trailing_sentence_char(t[-1])
-
-
 def _endswith_three_ascii_full_stops(text: str) -> bool:
     return len(text) >= 3 and text[-3:] == "..."
 
@@ -306,7 +292,7 @@ def translation_has_stop_inconsistency_vs_source(
     return True
 
 
-# Backward-compatible name used in early iterations (period-only); prefer :func:`source_trailing_sentence_kind`.
+# Period-only shorthand for :func:`preferred_sentence_ending_for_locale`.
 def preferred_trailing_sentence_stop_for_locale(target_locale: str) -> str:
     """Return the preferred *period* character for *target_locale* (``.`` vs ``。``)."""
     return preferred_sentence_ending_for_locale(SentenceEndingKind.PERIOD, target_locale)

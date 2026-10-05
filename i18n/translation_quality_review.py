@@ -316,18 +316,6 @@ def _is_allowed_identical_copy(
     return not _contains_latin_letter(scrubbed_without_patterns)
 
 
-def _is_allowed_identical_to_english_default(
-    default_locale: str,
-    locale: str,
-    text: str,
-    latin_ignore_patterns: Sequence[str] = (),
-) -> bool:
-    """Backward-compatible alias for :func:`_is_allowed_identical_copy`."""
-    return _is_allowed_identical_copy(
-        default_locale, locale, text, latin_ignore_patterns
-    )
-
-
 def _apply_latin_ignore_patterns(text: str, patterns: Sequence[str]) -> str:
     scrubbed = text
     for pat in patterns:
@@ -351,13 +339,6 @@ def _is_latin_char(ch: str) -> bool:
 def _contains_latin_letter(text: str) -> bool:
     for ch in text:
         if _is_latin_char(ch):
-            return True
-    return False
-
-
-def _contains_non_latin_letter(text: str) -> bool:
-    for ch in text:
-        if ch.isalpha() and not _is_latin_char(ch):
             return True
     return False
 
