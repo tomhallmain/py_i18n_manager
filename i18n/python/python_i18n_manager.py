@@ -16,6 +16,7 @@ from ..invalid_translation_groups import InvalidTranslationGroups
 from ..i18n_manager_base import I18NManagerBase
 
 from utils.logging_setup import get_logger
+from utils.translations import _
 from utils.utils import Utils
 
 logger = get_logger("python_i18n_manager")
@@ -159,11 +160,16 @@ class PythonI18NManager(I18NManagerBase):
             po = polib.pofile(po_file, encoding='utf-8')
             po.save_as_mofile(mo_file)
             
-            print("Created mo for locale " + locale)
+            logger.info(f"Created mo for locale {locale}")
+            # print() reaches the status pane when this runs inside a TranslationWorker task.
+            print(_("Created mo for locale {locale}").format(locale=locale))
             return True
-            
+
         except Exception as e:
-            print("Error while creating mo file for locale " + locale + ": " + str(e))
+            logger.error(f"Error while creating mo file for locale {locale}: {e}")
+            print(_("Error while creating mo file for locale {locale}: {error}").format(
+                locale=locale, error=e
+            ))
             return False
 
     def _total_locales_for_statistics(self, results: TranslationManagerResults) -> int:
@@ -382,7 +388,9 @@ class PythonI18NManager(I18NManagerBase):
     def write_new_files(self, PO_files):
         for PO in PO_files:
             locale = self._get_po_locale(PO)
-            print(f"Writing new file {locale} to {PO}")
+            logger.info(f"Writing new file {locale} to {PO}")
+            # print() reaches the status pane when this runs inside a TranslationWorker task.
+            print(_("Writing new file {locale} to {path}").format(locale=locale, path=PO))
             self.write_po_file(PO, locale)
 
     def write_po_files(self, modified_locales: set[str], results: TranslationManagerResults):

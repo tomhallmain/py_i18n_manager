@@ -1,3 +1,14 @@
+"""General-purpose helpers (class :class:`Utils`) and shared constants.
+
+Covers thread/async scheduling, string similarity and manipulation, locale and writing-system
+classification, UI language detection, CJK character statistics, opening files, playing
+sounds, and filesystem checks that retry for sleeping external drives.
+
+This module is shared with other applications, so some methods have no callers in this one
+(e.g. ``start_thread``, ``periodic``, ``open_file_location``, ``longest_common_substring``,
+``remove_substring_by_indices``, ``play_sound``). Keep them even when unused here.
+"""
+
 import asyncio
 import math
 import re
@@ -92,7 +103,7 @@ class Utils:
                     period = int(run_obj) if isinstance(run_obj, int) else getattr(run_obj, sleep_attr)
                     await asyncio.sleep(period)
                     if run_obj and run_attr and not getattr(run_obj, run_attr):
-                        print(f"Ending periodic task: {run_obj.__name__}.{run_attr} = False")
+                        logger.debug(f"Ending periodic task: {run_obj.__name__}.{run_attr} = False")
                         break
             return wrapper
         return scheduler
@@ -175,11 +186,11 @@ class Utils:
         if end_index >= len(string) or start_index >= len(string):
             raise Exception("Start or end index were too high for string: " + string)
         if start_index == 0:
-            print("Removed: " + string[:end_index+1])
+            logger.debug("Removed: " + string[:end_index+1])
             return string[end_index+1:]
         left_part = string[:start_index]
         right_part = string[end_index+1:]
-        print("Removed: " + string[start_index:end_index+1])
+        logger.debug("Removed: " + string[start_index:end_index+1])
         return left_part + right_part
 
     @staticmethod

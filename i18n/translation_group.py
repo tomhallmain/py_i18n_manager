@@ -7,6 +7,10 @@ from polib import POEntry
 from .invalid_character_set import InvalidCharacterSetAnalyzer
 from .stop_character_utils import strip_sentence_punct_after_close_paren
 from utils.config import config_manager
+from utils.logging_setup import get_logger
+from utils.translations import _
+
+logger = get_logger("translation_group")
 
 
 def _locale_value_as_text(value: Any) -> str:
@@ -129,7 +133,9 @@ def unescape_unicode(s):
             current += 1
         return ''.join(parts)
     except Exception as e:
-        print(f"Error unescaping string: {e}")
+        logger.warning(f"Error unescaping string: {e}")
+        # print() reaches the status pane when this runs inside a TranslationWorker task.
+        print(_("Error unescaping string: {error}").format(error=e))
         return s
 
 

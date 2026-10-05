@@ -30,6 +30,7 @@ from .yaml_parser_utils import (
 
 from utils.logging_setup import get_logger
 from utils.nested_mapping import add_to_nested_dict, get_nested_value, remove_from_nested_dict
+from utils.translations import _
 from utils.utils import Utils
 
 logger = get_logger("ruby_i18n_manager")
@@ -770,7 +771,9 @@ class RubyI18NManager(I18NManagerBase):
     def write_new_files(self, PO_files):
         for PO in PO_files:
             locale = self._get_po_locale(PO)
-            print(f"Writing new file {locale} to {PO}")
+            logger.info(f"Writing new file {locale} to {PO}")
+            # print() reaches the status pane when this runs inside a TranslationWorker task.
+            print(_("Writing new file {locale} to {path}").format(locale=locale, path=PO))
             self.write_po_file(PO, locale)
 
     def write_po_files(self, modified_locales: set[str], results: TranslationManagerResults):

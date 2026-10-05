@@ -2,7 +2,10 @@ import json
 import os
 from pathlib import Path
 
+from utils.logging_setup import get_logger
 from utils.utils import Utils
+
+logger = get_logger("config")
 
 
 class ConfigManager:
@@ -19,7 +22,7 @@ class ConfigManager:
             system_locale = Utils.get_default_user_language()
             if system_locale:
                 self.set('translation.default_locale', system_locale)
-                print(f"Using system language '{system_locale}' as default locale")
+                logger.info(f"Using system language '{system_locale}' as default locale")
         
     def load_config(self):
         """Load configuration from files, merging user config with defaults."""
@@ -30,7 +33,7 @@ class ConfigManager:
                 with open(self.default_config_path, 'r') as f:
                     default_config = json.load(f)
             except Exception as e:
-                print(f"Warning: Could not load default config: {e}")
+                logger.warning(f"Could not load default config: {e}")
         
         # Load user config if it exists
         user_config = {}
@@ -39,7 +42,7 @@ class ConfigManager:
                 with open(self.user_config_path, 'r') as f:
                     user_config = json.load(f)
             except Exception as e:
-                print(f"Warning: Could not load user config: {e}")
+                logger.warning(f"Could not load user config: {e}")
         
         # Merge configs, user config takes precedence
         return self.merge_configs(default_config, user_config)
@@ -65,7 +68,7 @@ class ConfigManager:
             self.config = self.load_config()  # Reload config
             return True
         except Exception as e:
-            print(f"Error saving user config: {e}")
+            logger.error(f"Error saving user config: {e}")
             return False
     
     def get(self, key, default=None):
