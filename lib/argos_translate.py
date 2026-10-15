@@ -1,5 +1,5 @@
-import os
 from pathlib import Path
+from typing import Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -22,7 +22,14 @@ except Exception as e:
     argostranslate = None
     ARGOS_IMPORT_ERROR = e
 
-WINDOWS_DRIVE_PATH_PREFIXES = tuple(f"{drive}:\\" for drive in "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+def active_packages_dir() -> Optional[Path]:
+    """The package folder argostranslate uses, from its settings module, or
+    None when Argos is unavailable or its settings do not expose it."""
+    settings = getattr(argostranslate, "settings", None) if argostranslate else None
+    path = getattr(settings, "package_data_dir", None)
+    return Path(path) if path else None
+
 
 class ArgosTranslate(QObject):
     """Handles translation using Argos Translate models."""
@@ -30,25 +37,10 @@ class ArgosTranslate(QObject):
     # Signal for download progress updates
     download_progress = pyqtSignal(str)
 
-    @staticmethod
-    def _resolve_models_dir(configured_models_dir):
-        """Resolve configured models path into a safe local filesystem path."""
-        configured = (configured_models_dir or "").strip()
-        if not configured:
-            configured = "~/.py_i18n_manager/models/argos"
-
-        # On non-Windows platforms, treat Windows drive paths as invalid and fallback.
-        if os.name != "nt" and configured.upper().startswith(WINDOWS_DRIVE_PATH_PREFIXES):
-            logger.warning(
-                "Ignoring Windows models_dir '%s' on non-Windows platform; using home directory fallback.",
-                configured,
-            )
-            configured = "~/.py_i18n_manager/models/argos"
-
-        return Path(configured).expanduser()
-    
     def __init__(self):
-        """Initialize Argos Translate with configuration from settings."""
+        """Initialize Argos Translate. Language packages live in Argos's own
+        package folder (``ARGOS_PACKAGES_DIR`` when set), shared with any other
+        Argos user on the machine."""
         super().__init__()
         
         # Initialize state
@@ -58,35 +50,13 @@ class ArgosTranslate(QObject):
                            f"{ARGOS_IMPORT_ERROR}); translations will use the LLM.")
             return
 
-        # Configure model storage path from config
-        try:
-            models_dir = config_manager.get('translation.models_dir', '~/.py_i18n_manager/models/argos')
-            self.models_dir = self._resolve_models_dir(models_dir)
-            
-            # Try to create the directory
-            try:
-                self.models_dir.mkdir(parents=True, exist_ok=True)
-                if not self.models_dir.is_dir():
-                    raise RuntimeError(f"Failed to create models directory: {self.models_dir}")
-            except Exception as e:
-                logger.error(f"Failed to create models directory {self.models_dir}: {e}")
-                self.is_usable = False
-                return
-                
-            # Initialize Argos Translate
-            self._init_argos()
-            
-        except Exception as e:
-            logger.error(f"Failed to initialize Argos Translate configuration: {e}")
-            self.is_usable = False
-            return
-            
+        self._init_argos()
+
     def _init_argos(self):
-        """Initialize Argos Translate with the configured models directory."""
+        """List the installed language packages; Argos is usable if that works."""
         try:
-            # Set the environment variable for package directory
-            os.environ['ARGOS_PACKAGES_DIR'] = str(self.models_dir)
-            
+            logger.info(f"Argos Translate package folder: {active_packages_dir() or 'unknown'}")
+
             # Get installed packages
             installed_packages = argostranslate.package.get_installed_packages()
             logger.info(f"Found {len(installed_packages)} installed Argos Translate packages")

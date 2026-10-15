@@ -46,14 +46,8 @@ python app.py
 From the repo root (its `pytest.ini` and `conftest.py` keep the tests out of your real
 settings, config and cache):
 
-- Run all tests:
 ```bash
 python -m pytest
-```
-
-- Run one specific test file (example):
-```bash
-python -m pytest tests/test_python_i18n_manager.py
 ```
 
 ## Where the app keeps its files
@@ -179,11 +173,6 @@ The application automatically detects and uses `babel.cfg` files for enhanced PO
 This allows you to extract translatable strings from JavaScript, HTML, XML, JSON, and other file formats in addition to Python files.
 
 A complete example `babel.cfg` file is provided as `babel.cfg.example` in the project root.
-
-You can test the Babel integration by running:
-```bash
-python test_babel_integration.py
-```
 
 # Limitations
 

@@ -272,10 +272,11 @@ class SmokeTest:
 
     def check_argos(self) -> None:
         """argostranslate and the native libraries it translates with load,
-        with the models dir in scratch. No model is downloaded."""
+        with Argos's package folder in scratch. No model is downloaded."""
         import importlib
+        import os
 
-        from lib.argos_translate import ARGOS_IMPORT_ERROR, ArgosTranslate
+        from lib.argos_translate import ARGOS_IMPORT_ERROR, ArgosTranslate, active_packages_dir
 
         if ARGOS_IMPORT_ERROR is not None:
             self.check("Argos Translate", False,
@@ -283,8 +284,14 @@ class SmokeTest:
             return
         for module in ("ctranslate2", "sentencepiece"):
             importlib.import_module(module)
-        argos = ArgosTranslate()
-        self.check("Argos Translate", argos.is_usable, str(getattr(argos, "models_dir", "")))
+        self.check("Argos Translate", ArgosTranslate().is_usable)
+        active = active_packages_dir()
+        if active is None:
+            self.logger.info("smoke test: Argos package folder: not exposed by this argostranslate version")
+        else:
+            inside = os.path.normcase(os.path.abspath(active)).startswith(
+                os.path.normcase(os.path.abspath(self.scratch)) + os.sep)
+            self.check("Argos package folder in scratch", inside, str(active))
 
     def check_process_list(self) -> None:
         """The old-build cleanup removes nothing off Windows, and relies on the
