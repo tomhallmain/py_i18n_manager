@@ -203,6 +203,8 @@ def test_build_requirements_include_the_app_and_nuitka():
         lines = [line.split("#")[0].strip() for line in f]
     assert "-r requirements.txt" in lines
     assert "nuitka==4.2.2" in lines
+    assert "PyQt6==6.11.0" in lines
+    assert "PyQt6-Qt6==6.11.2" in lines
 
 
 def test_runtime_requirements_leave_out_test_tools():

@@ -2,9 +2,12 @@
 # imports (requirements.txt).
 -r requirements.txt
 # The version the other apps of this family built with; 4.3 was seen to crash
-# a PySide6 app at runtime. PyQt6 is not pinned yet: the first build records
-# the version it took in build/nuitka/build_info.json.
+# a PySide6 app at runtime.
 nuitka==4.2.2
+# The Qt binding and Qt of the first good build (v1.0.0); pinned so the build
+# venv does not pick up a newer, untried pair. The dev environment may differ.
+PyQt6==6.11.0
+PyQt6-Qt6==6.11.2
 # Compresses the onefile payload.
 zstandard
 # psutil (requirements.txt) also lets scripts/nuitka_memory_wait.py read free
