@@ -1,5 +1,4 @@
 import json
-import os
 from collections import Counter
 from pathlib import Path
 from datetime import datetime
@@ -8,6 +7,7 @@ from typing import Optional, Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from utils.globals import ProjectType
 
+from utils.app_paths import SETTINGS_PATH_ENV, env_override, user_data_path
 from utils.globals import LLMTranslationMode
 from utils.logging_setup import get_logger
 from utils.utils import Utils
@@ -52,11 +52,8 @@ class SettingsManager:
     DEFAULT_QUALITY_REVIEW_LLM_MAX_CATALOG_TOKENS = 16000
     
     def __init__(self):
-        override_path = os.environ.get("PY_I18N_MANAGER_SETTINGS_PATH", "").strip()
-        if override_path:
-            self.settings_file = Path(override_path)
-        else:
-            self.settings_file = Path.home() / '.i18n_manager' / 'settings.json'
+        override_path = env_override(SETTINGS_PATH_ENV)
+        self.settings_file = Path(override_path or user_data_path('settings.json'))
         self.settings_file.parent.mkdir(parents=True, exist_ok=True)
         self._migrate_settings_schema()
 

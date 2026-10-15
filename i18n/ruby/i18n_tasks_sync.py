@@ -39,6 +39,7 @@ from collections import defaultdict
 from typing import Optional
 
 from utils.logging_setup import get_logger
+from utils.subprocess_flags import NO_CONSOLE_WINDOW
 
 from .i18n_tasks_pattern_router import (
     find_i18n_tasks_config_path,
@@ -163,9 +164,11 @@ def run_i18n_tasks_missing(project_root: str) -> tuple[bool, str]:
             cmd,
             cwd=project_root,
             env=env,
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             timeout=600,
+            creationflags=NO_CONSOLE_WINDOW,
             encoding="utf-8",
             errors="replace",
         )
@@ -543,9 +546,11 @@ def run_i18n_tasks_unused(project_root: str) -> tuple[bool, str]:
             cmd,
             cwd=project_root,
             env=env,
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             timeout=600,
+            creationflags=NO_CONSOLE_WINDOW,
             encoding="utf-8",
             errors="replace",
         )

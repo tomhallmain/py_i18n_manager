@@ -1,16 +1,26 @@
 import os
 from pathlib import Path
 
-import argostranslate.package
-import argostranslate.translate
-
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from ui.download_dialog import DownloadDialog
 from utils.config import config_manager
 from utils.logging_setup import get_logger
+from utils.translations import _
 
 logger = get_logger("argos_translate")
+
+# Argos loads native libraries (ctranslate2, sentencepiece) at import. Besides
+# ImportError when it is not installed, a library that fails to load raises other
+# errors, and this module is imported at app start: Argos is then unusable, and
+# TranslationService falls back to the LLM.
+try:
+    import argostranslate.package
+    import argostranslate.translate
+    ARGOS_IMPORT_ERROR = None
+except Exception as e:
+    argostranslate = None
+    ARGOS_IMPORT_ERROR = e
 
 WINDOWS_DRIVE_PATH_PREFIXES = tuple(f"{drive}:\\" for drive in "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
@@ -43,7 +53,11 @@ class ArgosTranslate(QObject):
         
         # Initialize state
         self.is_usable = False
-        
+        if ARGOS_IMPORT_ERROR is not None:
+            logger.warning(f"Argos Translate is not available ({type(ARGOS_IMPORT_ERROR).__name__}: "
+                           f"{ARGOS_IMPORT_ERROR}); translations will use the LLM.")
+            return
+
         # Configure model storage path from config
         try:
             models_dir = config_manager.get('translation.models_dir', '~/.py_i18n_manager/models/argos')
@@ -110,10 +124,10 @@ class ArgosTranslate(QObject):
             dialog = DownloadDialog(parent)
             
             # Download and install package
-            dialog.update_status("Updating package index...")
+            dialog.update_status(_("Updating package index..."))
             argostranslate.package.update_package_index()
             
-            dialog.update_status("Finding available packages...")
+            dialog.update_status(_("Finding available packages..."))
             available_packages = argostranslate.package.get_available_packages()
             
             # Find the package we want to install
@@ -131,10 +145,10 @@ class ArgosTranslate(QObject):
                 return False
                 
             # Download and install the package
-            dialog.update_status("Downloading package...")
+            dialog.update_status(_("Downloading package..."))
             package_path = package_to_install.download()
             
-            dialog.update_status("Installing package...")
+            dialog.update_status(_("Installing package..."))
             argostranslate.package.install_from_path(package_path)
             
             dialog.close()

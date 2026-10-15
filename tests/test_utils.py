@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
@@ -31,13 +30,14 @@ def isolated_settings_and_cache_env(
 ) -> Iterator[dict[str, str]]:
     """Temporarily point settings/app-cache/config paths at a tests-local temp directory.
 
-    Isolates three things that would otherwise touch real, shared state:
-    - :class:`~utils.settings_manager.SettingsManager` (``~/.i18n_manager/settings.json``)
+    Gives each of these its own fresh files, on top of the session-wide data dir the root
+    conftest.py sets:
+    - :class:`~utils.settings_manager.SettingsManager` (``settings.json``)
     - :class:`~utils.app_info_cache.AppInfoCache`
-    - the module-level ``utils.config.config_manager`` singleton, which by default reads/writes
-      ``configs/user_config.json`` *relative to the process cwd* - i.e. the real repo's config
-      file. Without this, any test exercising a "global" (non-project-path) settings save (e.g.
-      ``SettingsManager.save_llm_model(..., project_path=None)``) would silently mutate that file.
+    - the module-level ``utils.config.config_manager`` singleton (``configs/user_config.json``),
+      which every "global" (non-project-path) settings save goes through (e.g.
+      ``SettingsManager.save_llm_model(..., project_path=None)``), so tests asserting on such
+      saves do not see each other's.
 
     ``config_manager`` is swapped for a fresh instance pointed at the temp dir for the duration of
     the context, then restored - callers that do ``from utils.config import config_manager``
@@ -61,14 +61,9 @@ def isolated_settings_and_cache_env(
     settings_path = str(root / "settings.json")
     app_cache_path = str(root / "app_info_cache.json")
     config_dir = root / "configs"
+    # Only user_config.json lives here; ConfigManager always reads the bundled
+    # default_config.json, so the app's real defaults stay visible.
     config_dir.mkdir(parents=True, exist_ok=True)
-
-    # Mirror the real default_config.json so an isolated ConfigManager still sees the app's real
-    # defaults (translation.default_locale, llm_prompt_template, etc.) - only user_config.json
-    # (the writable half) is isolated/absent.
-    real_default_config = Path(__file__).parent.parent / "configs" / "default_config.json"
-    if real_default_config.exists():
-        shutil.copy(real_default_config, config_dir / "default_config.json")
 
     old_env = {name: os.environ.get(name) for name in _ISOLATED_ENV_VARS}
     os.environ["PY_I18N_MANAGER_SETTINGS_PATH"] = settings_path

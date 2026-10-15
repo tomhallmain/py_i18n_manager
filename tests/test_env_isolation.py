@@ -1,11 +1,9 @@
 """Tests for tests/test_utils.isolated_settings_and_cache_env's isolation guarantees.
 
-utils.config.config_manager is a process-wide singleton that, by default, reads/writes
-configs/user_config.json *relative to the process cwd* - i.e. this repo's real config file, with
-no built-in override (unlike SettingsManager and AppInfoCache, which both already supported an
-env var override before this was added). Any test that saves a "global" setting (project_path=
-None) - including several of the new LLM translation-mode/model settings - goes through that
-singleton, so isolating it is required, not just nice-to-have.
+utils.config.config_manager is a process-wide singleton holding configs/user_config.json. Any test
+that saves a "global" setting (project_path=None) - including the LLM translation-mode/model
+settings - goes through it, so each test needs its own. The root conftest.py keeps all of them out
+of the real app data dir (tests/test_app_paths.py checks that).
 """
 
 import os
@@ -39,12 +37,12 @@ def test_isolated_config_manager_writes_stay_out_of_real_repo_config():
 
 
 def test_isolated_config_manager_still_sees_real_app_defaults():
-    """default_config.json is mirrored into the temp dir, so real defaults stay visible."""
+    """The bundled default_config.json is read whatever the config dir override says."""
     with isolated_settings_and_cache_env(prefix=".tmp_env_isolation_"):
         import utils.config as config_module
 
-        # From the real configs/default_config.json; proves it was actually copied, not just an
-        # empty/absent file silently returning None for everything.
+        # From the real configs/default_config.json; proves it was actually read, not just an
+        # absent file silently returning None for everything.
         assert config_module.config_manager.get("files.settings_file") == "settings.json"
 
 

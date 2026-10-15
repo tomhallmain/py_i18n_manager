@@ -27,9 +27,9 @@ A PyQt6-based desktop application for managing internationalization (i18n) trans
 python -m venv venv
 venv/bin/activate  # On Unix: source venv\Scripts\activate
 ```
-3. Install dependencies:
+3. Install dependencies (`requirements-test.txt` adds pytest to them):
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-test.txt
 ```
 
 ## Usage
@@ -43,15 +43,61 @@ python app.py
 
 ## Running Tests
 
+From the repo root (its `pytest.ini` and `conftest.py` keep the tests out of your real
+settings, config and cache):
+
 - Run all tests:
 ```bash
-python -m unittest discover -s tests -p "test_*.py"
+python -m pytest
 ```
 
 - Run one specific test file (example):
 ```bash
-python -m unittest discover -s tests -p "test_invalid_non_latin_ratio.py"
+python -m pytest tests/test_python_i18n_manager.py
 ```
+
+## Where the app keeps its files
+
+Settings, recent projects, the user config (`configs/user_config.json`), the window/app cache
+(`app_info_cache.json`) and LLM catalog review output (`llm_review_output/`) are in
+`~/.i18n_manager`, whether the app runs from source or as an executable. Earlier versions kept
+some of these in the repo; the first start from source moves them there (see the log for
+"Moved ..." lines). Logs are in `%APPDATA%\py_i18n_manager\logs` on Windows and
+`~/.local/share/py_i18n_manager/logs` elsewhere.
+
+## Building an executable
+
+`build_exe.py` builds a single executable with [Nuitka](https://nuitka.net):
+`dist/I18nManager.exe` on Windows, `dist/I18nManager` on macOS and Linux. It runs on a
+machine without Python and uses the same settings and data as `python app.py`.
+
+1. Use Python 3.11 and a C compiler (Visual Studio Build Tools on Windows, or let Nuitka
+   download MinGW; Xcode Command Line Tools on macOS).
+2. Build:
+   ```bash
+   python build_exe.py
+   ```
+   The script creates its own `.venv-build` from `requirements-build.txt`, compiles,
+   copies the result to `dist/` and runs it once with `--smoke-test` in a scratch
+   environment. The log of each build is in `build/logs/`. Options: `--min-free-memory=<GiB>`
+   (memory to wait for before the final compression; 0 to not wait), `--lock=<file>` (install
+   the build venv from a recorded `build/nuitka/build-requirements.lock.txt`),
+   `--current-env` (build with the running interpreter); anything else goes to Nuitka.
+3. Publish it as a GitHub release (needs the GitHub CLI, `gh`):
+   ```bash
+   python scripts/package_release.py
+   ```
+   It rebuilds the executable if it is behind the checkout, stages it with its checksums and
+   lock file, and creates a draft release after asking; rerun with `--publish` to publish the
+   draft.
+
+The executable unpacks its runtime to `~/.i18n_manager/unpacked/i18n-manager-<build id>` at the
+first start of each build; that start also removes older builds' folders. Native crashes are
+recorded in `faults.log` in the logs folder, and the first lines of each log name the version
+and build.
+
+The build records the path of the checkout it was built from, which anyone with the
+executable can read; a build tells you at startup when that checkout has moved on since.
 
 ## Write Policy by Project Type
 
@@ -83,7 +129,7 @@ For Java and JavaScript, topology is currently projected from the default locale
 
 ## Requirements
 
-- Python 3.8 or higher
+- Python 3.11 (development and the executable build use it)
 - PyQt6
 - polib
 - babel

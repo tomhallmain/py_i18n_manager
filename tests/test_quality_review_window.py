@@ -315,8 +315,8 @@ class TestLlmCatalogReviewThreading:
         # These tests start a real _CatalogLlmWorker/QThread (see class docstring), which -- for
         # any run with translations loaded -- creates a llm_review_output/<timestamp>/ directory
         # via i18n.llm_catalog_review.ReviewResponseLog before the (now fake) LLM call fails.
-        # Without this patch that would write real (if empty) directories into the actual repo on
-        # every test run instead of the isolated temp dir.
+        # Without this patch those (if empty) directories would pile up in the session-wide
+        # test data dir rather than this test's own temp dir.
         from i18n import llm_catalog_review
 
         self._review_log_root_patcher = patch.object(

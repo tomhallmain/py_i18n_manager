@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, TYPE_CHECKING
 
+from utils.app_paths import user_data_path
 from utils.logging_setup import get_logger
 from utils.translations import I18N, _
 from utils.utils import Utils
@@ -41,7 +42,7 @@ SYSTEM_PROMPT_ALWAYS = 0.0
 # -- if the process dies before the final report is produced (a crash, or the user closing the
 # app), that in-memory history is gone. Each response is written to disk immediately as it comes
 # in, one markdown file per call, so nothing is lost even if a later call in the same run fails.
-REVIEW_LOG_ROOT = Path(__file__).resolve().parent.parent / "llm_review_output"
+REVIEW_LOG_ROOT = Path(user_data_path("llm_review_output"))
 
 
 class ReviewResponseLog:

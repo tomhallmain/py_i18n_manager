@@ -21,8 +21,8 @@ from lib.llm import LLMResult
 
 @pytest.fixture
 def review_log_root():
-    """Redirects ReviewResponseLog output to a throwaway temp directory instead of the real
-    repo's llm_review_output/, and removes it once the test is done -- whether it passed,
+    """Redirects ReviewResponseLog output to a throwaway temp directory of its own, and
+    removes it once the test is done -- whether it passed,
     failed, or raised. TemporaryDirectory's own __exit__ (via the `with` block below) runs on
     generator teardown regardless of outcome, so nothing written during the test survives it.
     """

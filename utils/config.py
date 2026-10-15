@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 
+from utils.app_paths import CONFIG_DIR_ENV, env_override, resource_path, user_data_path
 from utils.logging_setup import get_logger
 from utils.utils import Utils
 
@@ -10,9 +11,11 @@ logger = get_logger("config")
 
 class ConfigManager:
     def __init__(self):
-        override_dir = os.environ.get("PY_I18N_MANAGER_CONFIG_DIR", "").strip()
-        self.config_dir = Path(override_dir) if override_dir else Path("configs")
-        self.default_config_path = self.config_dir / "default_config.json"
+        # The defaults are bundled and read-only; the override and config_dir
+        # apply to the user's config only.
+        self.default_config_path = Path(resource_path("configs", "default_config.json"))
+        override_dir = env_override(CONFIG_DIR_ENV)
+        self.config_dir = Path(override_dir) if override_dir else Path(user_data_path("configs"))
         self.user_config_path = self.config_dir / "user_config.json"
         self.config = self.load_config()
         

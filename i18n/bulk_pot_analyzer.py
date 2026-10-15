@@ -8,6 +8,7 @@ from typing import Dict, List, Optional
 from .i18n_manager import I18NManager
 from utils.logging_setup import get_logger
 from utils.settings_manager import SettingsManager
+from utils.subprocess_flags import NO_CONSOLE_WINDOW
 
 logger = get_logger("bulk_pot_analyzer")
 
@@ -213,9 +214,11 @@ class BulkPotAnalyzer:
             result = subprocess.run(
                 ["git", "status", "--porcelain"],
                 cwd=project_path,
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
+                creationflags=NO_CONSOLE_WINDOW,
             )
             
             if result.returncode != 0:

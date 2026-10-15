@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from i18n.translation_group import TranslationGroup, TranslationKey
+from utils.subprocess_flags import NO_CONSOLE_WINDOW
 from ..translation_manager_results import TranslationManagerResults, TranslationAction, LocaleStatus
 from ..invalid_translation_groups import InvalidTranslationGroups
 from ..i18n_manager_base import I18NManagerBase
@@ -1368,9 +1369,11 @@ msgstr ""
                 cmd,
                 cwd=project_root,
                 env=env,
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 timeout=600,
+                creationflags=NO_CONSOLE_WINDOW,
                 encoding="utf-8",
                 errors="replace",
             )

@@ -1,13 +1,13 @@
 import gettext
-import os
 
+from utils.app_paths import resource_path
 from utils.logging_setup import get_logger
 from utils.utils import DEFAULT_UI_LANGUAGE, Utils
 
 logger = get_logger("translations")
 
 class I18N:
-    localedir = os.path.join(os.path.dirname(os.path.abspath(os.path.dirname(__file__))), 'locale')
+    localedir = resource_path('locale')
     # Placeholders until install_locale() runs with the detected language at the end of this module.
     locale = DEFAULT_UI_LANGUAGE
     translate = gettext.NullTranslations()

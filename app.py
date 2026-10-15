@@ -1,12 +1,18 @@
+import sys
+
+if "--smoke-test" in sys.argv[1:]:
+    # Before any other app import: modules resolve their paths as they load.
+    from utils.smoke_test import isolate_environment
+    isolate_environment()
+
 from datetime import datetime
 import os
-import sys
 from typing import Optional
 
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, 
                             QHBoxLayout, QPushButton, QLabel, QFileDialog, 
                             QTextEdit, QTabWidget, QMessageBox, QFrame, QProgressDialog)
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QIcon
 
 from i18n.i18n_manager import I18NManager
@@ -23,21 +29,32 @@ from ui.recent_projects_dialog import RecentProjectsDialog
 from ui.setup_translation_project_window import SetupTranslationProjectWindow
 from ui.stats_widget import StatsWidget
 from ui.translation_windows.translation_quality_review_window import TranslationQualityReviewWindow
+from ui.qt_message_log import install_qt_message_handler
+from utils.app_paths import resource_path
+from utils.build_maintenance import start_build_maintenance
+from utils.crash_log import enable_fault_log
 from utils.globals import ProjectType
 from utils.logging_setup import get_logger
 from utils.project_detector import ProjectDetector
 from utils.settings_manager import SettingsManager
 from utils.translations import _
+from utils.version import describe
 from workers.translation_worker import TranslationWorker
 
 logger = get_logger("main_window")
 
 class MainWindow(SmartMainWindow):
+    #: A build's startup check found its source checkout has changed; carries
+    #: the detail. Emitted from a background thread.
+    source_drift = pyqtSignal(str)
+
     def __init__(self):
         super().__init__(restore_geometry=True)
         logger.debug("Initializing MainWindow")
+        self._source_drift_box = None
+        self.source_drift.connect(self._notify_source_drift)
         self.setWindowTitle(_("i18n Translation Manager"))
-        _icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.svg")
+        _icon_path = resource_path("assets", "icon.svg")
         if os.path.exists(_icon_path):
             self.setWindowIcon(QIcon(_icon_path))
         
@@ -767,6 +784,16 @@ class MainWindow(SmartMainWindow):
             self._last_latest_translation_file_mtime = None
             self.update_project_time_display()
 
+    def _notify_source_drift(self, detail: str):
+        """Tell the user this build no longer matches its source checkout, in a
+        box that does not block the window. *detail* is already in the log."""
+        box = QMessageBox(QMessageBox.Icon.Information, _("Build out of date"),
+                          _("This build differs from its source checkout. Details are in the log."),
+                          QMessageBox.StandardButton.Ok, self)
+        box.setWindowModality(Qt.WindowModality.NonModal)
+        box.show()
+        self._source_drift_box = box
+
     def closeEvent(self, event):
         """Handle application closing."""
         # If there's a current project and it failed to load, remove it
@@ -954,15 +981,37 @@ class MainWindow(SmartMainWindow):
             )
 
 def main():
+    logger.info(describe())
+    try:
+        logger.info(f"Fault log: {enable_fault_log()}")
+    except OSError as e:
+        logger.error(f"Could not open the fault log: {e}")
+    # Before the QApplication, so no Qt message goes to Qt's default handler.
+    install_qt_message_handler()
+    if "--smoke-test" in sys.argv[1:]:
+        sys.exit(_smoke_test())
     app = QApplication(sys.argv)
-    _icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.svg")
+    _icon_path = resource_path("assets", "icon.svg")
     if os.path.exists(_icon_path):
         app.setWindowIcon(QIcon(_icon_path))
     AppStyle.sync_theme_from_application(app)
     window = MainWindow()
     logger.info(f"Application started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     window.show()
+    # Not in the smoke test: it exits within seconds, which would cut a folder
+    # removal short.
+    start_build_maintenance(on_drift=window.source_drift.emit)
     sys.exit(app.exec())
+
+def _smoke_test() -> int:
+    """Run the smoke test in the environment isolated for it at the top of this file."""
+    from utils.smoke_test import SCRATCH_DIR_ENV, is_isolated, run_smoke_test
+
+    if not is_isolated():
+        # Without the isolation the checks would write to the user's data dir.
+        logger.error("--smoke-test needs the environment app.py sets up at import; start it through app.py")
+        return 1
+    return run_smoke_test(os.environ[SCRATCH_DIR_ENV], main_window_class=MainWindow)
 
 if __name__ == "__main__":
     main()

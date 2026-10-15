@@ -4,6 +4,7 @@ import shutil
 import threading
 
 from lib.position_data import PositionData
+from utils.app_paths import APP_INFO_CACHE_PATH_ENV, env_override, user_data_path
 from utils.logging_setup import get_logger
 from utils.runner_app_config import RunnerAppConfig
 
@@ -12,20 +13,17 @@ logger = get_logger(__name__)
 
 class AppInfoCache:
     # TODO: Move all SettingsManager functionality to this class
-    DEFAULT_JSON_LOC = os.path.join(
-        os.path.dirname(os.path.abspath(os.path.dirname(__file__))),
-        "app_info_cache.json",
-    )
-    JSON_LOC = os.environ.get("PY_I18N_MANAGER_APP_INFO_CACHE_PATH", DEFAULT_JSON_LOC)
+    FILE_NAME = "app_info_cache.json"
+    # Set by __init__: the override, or FILE_NAME in the app data dir.
+    JSON_LOC = None
     INFO_KEY = "info"
     NUM_BACKUPS = 4  # Number of backup files to maintain
 
     def __init__(self):
-        override_path = os.environ.get("PY_I18N_MANAGER_APP_INFO_CACHE_PATH", "").strip()
-        if override_path:
-            # Ensure both class-level and instance-level path follow test/runtime override.
-            AppInfoCache.JSON_LOC = override_path
-            self.JSON_LOC = override_path
+        json_loc = env_override(APP_INFO_CACHE_PATH_ENV) or user_data_path(AppInfoCache.FILE_NAME)
+        # Both class-level and instance-level path follow it (tests reload the module).
+        AppInfoCache.JSON_LOC = json_loc
+        self.JSON_LOC = json_loc
         self._lock = threading.RLock()
         self._cache = {AppInfoCache.INFO_KEY: {}}
         self.load()
@@ -37,6 +35,7 @@ class AppInfoCache:
     def store(self):
         with self._lock:
             try:
+                os.makedirs(os.path.dirname(AppInfoCache.JSON_LOC), exist_ok=True)
                 with open(AppInfoCache.JSON_LOC, "w", encoding="utf-8") as f:
                     json.dump(self._cache, f, ensure_ascii=False, indent=2)
             except Exception as e:
