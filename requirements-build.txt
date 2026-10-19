@@ -10,5 +10,5 @@ PyQt6==6.11.0
 PyQt6-Qt6==6.11.2
 # Compresses the onefile payload.
 zstandard
-# psutil (requirements.txt) also lets scripts/nuitka_memory_wait.py read free
-# memory off Windows.
+# psutil (requirements.txt) also lets the memory-wait plugin (from app-release)
+# read free memory off Windows.

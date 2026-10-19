@@ -77,13 +77,14 @@ machine without Python and uses the same settings and data as `python app.py`.
    (memory to wait for before the final compression; 0 to not wait), `--lock=<file>` (install
    the build venv from a recorded `build/nuitka/build-requirements.lock.txt`),
    `--current-env` (build with the running interpreter); anything else goes to Nuitka.
-3. Publish it as a GitHub release (needs the GitHub CLI, `gh`):
+   The wait for free memory needs [app-release](https://github.com/tomhallmain/release-tools)
+   installed, which ships the memory-wait plugin; without it the build warns and does not wait.
+3. Publish it as a GitHub release with app-release, a separate tool (install it with `pipx`):
    ```bash
-   python scripts/package_release.py
+   app-release <path to this checkout>
    ```
-   It rebuilds the executable if it is behind the checkout, stages it with its checksums and
-   lock file, and creates a draft release after asking; rerun with `--publish` to publish the
-   draft.
+   It rebuilds the executable if it is behind the checkout, then stages and publishes it; its
+   [README](https://github.com/tomhallmain/release-tools#readme) lists the options.
 
 The executable unpacks its runtime to `~/.i18n_manager/unpacked/i18n-manager-<build id>` at the
 first start of each build; that start also removes older builds' folders. Native crashes are
